@@ -10,6 +10,12 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
+  "overrides": {
+    "recharts": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
+  },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^1.29.0",
