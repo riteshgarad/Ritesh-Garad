@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // Project Helpers
+    function isValidProject(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             (data.status == null || data.status in ['planning', 'active', 'completed', 'on_hold']) &&
+             data.creator_id == request.auth.uid &&
+             data.created_at == request.time;
+    }
+
+    // Task Helpers
+    function isValidTask(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 500 &&
+             (data.status == null || data.status in ['todo', 'inprogress', 'completed']) &&
+             data.creator_id == request.auth.uid &&
+             data.created_at == request.time;
+    }
+
+    // Volunteer Helpers
+    function isValidVolunteer(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 200;
+    }
+
+    // Notification Helpers
+    function isValidNotification(data, userId) {
+      return data.user_id == userId &&
+             data.title is string && data.title.size() <= 200 &&
+             data.isRead is bool;
+    }
+
+    // --- Collections ---
+
+    match /projects/{projectId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidProject(incoming());
+      allow update: if isSignedIn() && (
+        isOwner(existing().creator_id) || 
+        incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status', 'budget_status'])
+      ) && incoming().creator_id == existing().creator_id;
+    }
+
+    match /tasks/{taskId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidTask(incoming());
+      allow update: if isSignedIn() && 
+                      incoming().creator_id == existing().creator_id &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'status', 'priority', 'assigned_to', 'due_date', 'department', 'task_type', 'is_locked', 'decision']);
+    }
+
+    match /volunteers/{volunteerId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidVolunteer(incoming());
+      allow update: if isSignedIn() && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'department', 'skills', 'hours', 'status']);
+    }
+
+    match /users/{userId}/notifications/{notificationId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidNotification(incoming(), userId);
+      allow update: if isOwner(userId) && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+    }
+    
+    // Support Test Collection for connection verification
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

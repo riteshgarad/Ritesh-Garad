@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "Represents an NGO project or initiative.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "tag": { "type": "string", "enum": ["Health", "Education", "Environment", "Community", "Technology"] },
+        "status": { "type": "string", "enum": ["planning", "active", "completed", "on_hold"] },
+        "phase": { "type": "number" },
+        "progress": { "type": "number" },
+        "lead_name": { "type": "string" },
+        "budget": { "type": "string" },
+        "budget_status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "creator_id": { "type": "string" }
+      },
+      "required": ["name", "status", "creator_id"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A specific task or action item within a project.",
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string" },
+        "title": { "type": "string" },
+        "department": { "type": "string" },
+        "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "assigned_to": { "type": "string" },
+        "due_date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["todo", "inprogress", "completed"] },
+        "task_type": { "type": "string", "enum": ["execution", "approval"] },
+        "is_locked": { "type": "boolean" },
+        "decision": { "type": "string", "enum": ["approved", "rejected"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "creator_id": { "type": "string" }
+      },
+      "required": ["title", "status", "creator_id"]
+    },
+    "Volunteer": {
+      "title": "Volunteer",
+      "description": "An NGO operative or member.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string" },
+        "department": { "type": "string" },
+        "skills": { "type": "string" },
+        "hours": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] }
+      },
+      "required": ["name", "email", "status"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification for the user.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["deadline", "milestone", "system", "approval"] },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isRead": { "type": "boolean" },
+        "relatedId": { "type": "string" }
+      },
+      "required": ["user_id", "title", "message", "isRead"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Collection of NGO projects."
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Flat collection of tasks, linked by project_id."
+    },
+    "/volunteers/{volunteerId}": {
+      "schema": "Volunteer",
+      "description": "Collection of NGO members."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Per-user notifications."
+    }
+  }
+}
