@@ -1,11 +1,24 @@
 import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY 
+  apiKey: process.env.GEMINI_API_KEY || ''
 });
 
 export async function askAssistant(prompt: string, context: string) {
   try {
+    // Detect if we are on Vercel or local dev
+    const isVercel = window.location.hostname !== 'localhost' && !window.location.hostname.includes('ais-dev');
+    
+    if (isVercel) {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, context })
+      });
+      const data = await response.json();
+      return data.text || data.error || "Communication failure.";
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
