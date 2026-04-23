@@ -269,6 +269,7 @@ export default function App() {
         const role = firebaseUser.email === 'riteshgarad4@gmail.com' ? 'Admin' : 'Staff Operative';
         
         setUser({
+          uid: firebaseUser.uid,
           name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
           email: firebaseUser.email || '',
           role: role
@@ -1622,6 +1623,31 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Global Rejection Alert */}
+      {project.budget_status === 'rejected' && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 bg-red-600 rounded-2xl text-white shadow-2xl shadow-red-500/30 flex items-center justify-between gap-6"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-500 rounded-xl border border-red-400">
+              <AlertCircle size={24} />
+            </div>
+            <div className="text-left">
+              <h4 className="text-sm font-black uppercase tracking-widest leading-none mb-1">Fiscal Rejection Triggered</h4>
+              <p className="text-[10px] font-medium text-red-100 uppercase tracking-tight">The finance department has denied the current budget strategy.</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => onEditBudget(project)}
+            className="px-6 py-3 bg-white text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 shadow-lg"
+          >
+            <Plus size={14} /> Revise & Resubmit
+          </button>
+        </motion.div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200">
         <div className="flex items-center gap-6">
@@ -1907,19 +1933,6 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total CapEx</span>
                     <span className="text-lg font-black text-slate-900">₹{project.budget_items.reduce((a: number, c: any) => a + c.cost, 0).toLocaleString()}</span>
                   </div>
-
-                  {project.budget_status === 'rejected' && project.budget_rejection_reason && (
-                    <div className="p-4 bg-red-50 border border-red-100 rounded-xl mt-4">
-                       <p className="text-[9px] font-black text-red-900 uppercase mb-1">Denial Protocol Feedback</p>
-                       <p className="text-[10px] text-red-700 font-medium leading-relaxed">{project.budget_rejection_reason}</p>
-                       <button 
-                         onClick={() => onEditBudget(project)}
-                         className="w-full mt-4 py-2 bg-red-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-700 transition-all"
-                       >
-                        Revise Budget Strategy
-                       </button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1954,6 +1967,35 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
                      </div>
                   </div>
                 </div>
+              )}
+
+              {/* Action: Revise Rejected Budget */}
+              {project.budget_status === 'rejected' && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-xl mt-6">
+                   <div className="flex items-center gap-2 mb-2">
+                     <AlertCircle size={14} className="text-red-600" />
+                     <p className="text-[9px] font-black text-red-900 uppercase tracking-widest">Budget Denial Protocol</p>
+                   </div>
+                   <p className="text-[10px] text-red-700 font-medium leading-relaxed bg-white/50 p-2 rounded-lg border border-red-100/50">
+                     {project.budget_rejection_reason || "No feedback provided by the finance department."}
+                   </p>
+                   <button 
+                     onClick={() => onEditBudget(project)}
+                     className="w-full mt-4 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200 flex items-center justify-center gap-2"
+                   >
+                    <Plus size={14} /> Revise Budget Strategy
+                   </button>
+                </div>
+              )}
+
+              {/* Action: Edit Pending Budget (Self-Correction) */}
+              {project.budget_status === 'pending' && user?.uid === project.creator_id && (
+                <button 
+                  onClick={() => onEditBudget(project)}
+                  className="w-full mt-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200 border-dashed"
+                >
+                  Modify Awaiting Budget
+                </button>
               )}
            </Card>
 
