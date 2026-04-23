@@ -1,3 +1,8 @@
+export interface BudgetItem {
+  item: string;
+  cost: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -9,7 +14,9 @@ export interface Project {
   lead_name: string;
   budget: string;
   budget_status?: 'pending' | 'approved' | 'rejected';
+  budget_items?: BudgetItem[];
   rejection_reason?: string;
+  budget_rejection_reason?: string;
   timeline?: string;
   department: string;
   created_at: any;
@@ -22,7 +29,22 @@ export interface FinanceRequest {
   project_name: string;
   amount: string;
   requested_at: any;
-  status: 'pending' | 'disbursed' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface BudgetRequest {
+  id: string;
+  projectId: string;
+  projectName: string;
+  proposedBy: string;
+  department: string;
+  itemizedList: BudgetItem[];
+  totalAmount: number;
+  status: 'pending_finance' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  submittedAt: any;
+  reviewedBy?: string;
+  reviewedAt?: any;
 }
 
 export interface Task {

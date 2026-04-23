@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import FinanceDashboard from './components/FinanceDashboard';
 import MarketingDashboard from './components/MarketingDashboard';
+import { BudgetPlanner } from './components/BudgetPlanner';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -55,12 +56,12 @@ import {
 } from 'recharts';
 import { differenceInDays, parseISO, isFuture, isPast } from 'date-fns';
 import { cn } from './lib/utils';
-import { Project, Task, Volunteer, Transaction, Campaign, AppUser, AppNotification, FinanceRequest } from './types';
+import { BudgetItem, Project, Task, Volunteer, Transaction, Campaign, AppUser, AppNotification, BudgetRequest, FinanceRequest } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
 import { askAssistant } from './services/geminiService';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // --- Firebase Initialization ---
@@ -412,7 +413,7 @@ export default function App() {
   const handleCreateProject = async (formData: any) => {
     if (!auth.currentUser || !user) return;
     try {
-      await addDoc(collection(db, 'projects'), {
+      const projectRef = await addDoc(collection(db, 'projects'), {
         ...formData,
         status: "pending_dept_review",
         phase: 1,
@@ -422,6 +423,22 @@ export default function App() {
         creator_id: auth.currentUser.uid,
         department: formData.department || user.department || "General"
       });
+
+      // Itemized Budget Request Integration
+      if (formData.budget_items && formData.budget_items.length > 0) {
+        const totalBudget = formData.budget_items.reduce((acc: number, curr: any) => acc + Number(curr.cost), 0);
+        await addDoc(collection(db, 'budget_requests'), {
+          projectId: projectRef.id,
+          projectName: formData.name,
+          proposedBy: user.name,
+          department: formData.department || user.department || "General",
+          itemizedList: formData.budget_items,
+          totalAmount: totalBudget,
+          status: 'pending_finance',
+          submittedAt: serverTimestamp()
+        });
+      }
+
       setIsProjectModalOpen(false);
     } catch (err) {
       handleFirestoreError(err, 'create', 'projects');
@@ -543,6 +560,51 @@ export default function App() {
       setResetSent(true);
     } catch (err: any) {
       setLoginError(err.message || 'Failed to send reset email.');
+    }
+  };
+
+  const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+
+  const handleUpdateBudget = async (projectId: string, budgetItems: BudgetItem[]) => {
+    try {
+      const totalBudget = budgetItems.reduce((acc, curr) => acc + Number(curr.cost), 0);
+      const batch = writeBatch(db);
+
+      // 1. Update Project
+      const projectRef = doc(db, 'projects', projectId);
+      batch.update(projectRef, {
+        budget_items: budgetItems,
+        budget: `₹${totalBudget.toLocaleString()}`,
+        budget_status: 'pending' // Reset to pending
+      });
+
+      // 2. Find and update the existing budget_request or create a new one
+      // For simplicity, we create a new one or update if we find it.
+      // Better to update existing one to keep history.
+      const q = query(collection(db, 'budget_requests'), where('projectId', '==', projectId));
+      // Since we can't use await inside batch easily if we don't know the ID, 
+      // we'll just handle it as a separate update after commit or find it first.
+      
+      await batch.commit();
+
+      // Find and update budget request status
+      // ... actual implementation below
+      const reqSnapshot = await getDocs(query(collection(db, 'budget_requests'), where('projectId', '==', projectId)));
+      if (!reqSnapshot.empty) {
+        const reqId = reqSnapshot.docs[0].id;
+        await updateDoc(doc(db, 'budget_requests', reqId), {
+          itemizedList: budgetItems,
+          totalAmount: totalBudget,
+          status: 'pending_finance',
+          submittedAt: serverTimestamp()
+        });
+      }
+
+      setIsEditBudgetModalOpen(false);
+      setEditingProject(null);
+    } catch (err) {
+      handleFirestoreError(err, 'update', `projects/${projectId}/budget`);
     }
   };
 
@@ -865,6 +927,10 @@ export default function App() {
                 onAddVolunteer={handleAddVolunteer}
                 onDeleteProject={handleDeleteProject}
                 onUpdateProjectStatus={handleUpdateProjectStatus}
+                onEditBudget={(p: any) => {
+                  setEditingProject(p);
+                  setIsEditBudgetModalOpen(true);
+                }}
               />
             </motion.div>
           </AnimatePresence>
@@ -930,25 +996,96 @@ export default function App() {
             onCreate={handleCreateVolunteer}
           />
         )}
+        {isEditBudgetModalOpen && (
+          <EditBudgetModal 
+            isOpen={isEditBudgetModalOpen}
+            onClose={() => setIsEditBudgetModalOpen(false)}
+            onUpdate={handleUpdateBudget}
+            project={editingProject}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
 }
 
-// --- Modals ---
+const EditBudgetModal = ({ isOpen, onClose, onUpdate, project }: any) => {
+  const [items, setItems] = useState<BudgetItem[]>(project?.budget_items || []);
+
+  useEffect(() => {
+    if (project?.budget_items) {
+      setItems(project.budget_items);
+    }
+  }, [project]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-white w-full max-w-xl rounded-[32px] p-8 shadow-2xl border border-slate-200"
+      >
+        <div className="text-left mb-8 flex justify-between items-start">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">Revise Fiscal Strategy</h3>
+            <p className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-widest leading-none">Mission: {project?.name}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto mb-8 pr-2">
+          <BudgetPlanner 
+            items={items} 
+            onChange={setItems}
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <button 
+            onClick={onClose}
+            className="flex-1 py-4 bg-slate-50 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={() => onUpdate(project.id, items)}
+            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200"
+          >
+            Update & Resubmit
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 const ProjectModal = ({ isOpen, onClose, onCreate, volunteers }: any) => {
   const [formData, setFormData] = useState({
     name: '',
-    tag: 'Technology',
+    tag: 'Technology' as any,
     department: 'Health',
     budget: '',
+    budget_items: [] as BudgetItem[],
     lead_name: '',
     description: '',
     timeline: '3 Months'
   });
 
   if (!isOpen) return null;
+
+  const totalCalculatedBudget = formData.budget_items.reduce((acc, curr) => acc + Number(curr.cost), 0);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
@@ -1027,16 +1164,20 @@ const ProjectModal = ({ isOpen, onClose, onCreate, volunteers }: any) => {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">CapEx Buffer</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Legacy Budget Format (Optional)</label>
               <input 
-                required
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900"
                 placeholder="e.g. ₹2.5L"
-                value={formData.budget}
+                value={formData.budget || `₹${totalCalculatedBudget.toLocaleString()}`}
                 onChange={e => setFormData({...formData, budget: e.target.value})}
               />
             </div>
           </div>
+
+          <BudgetPlanner 
+            items={formData.budget_items} 
+            onChange={(items) => setFormData({ ...formData, budget_items: items, budget: `₹${items.reduce((a,c) => a+c.cost, 0).toLocaleString()}` })}
+          />
 
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lead Strategist</label>
@@ -1188,14 +1329,14 @@ const VolunteerModal = ({ isOpen, onClose, onCreate }: any) => {
 
 // --- Page Views ---
 
-const PageView = ({ page, projects, tasks, volunteers, selectedProjectId, onOpenProject, setCurrentPage, onAddProject, onAddVolunteer, onDeleteProject, onUpdateProjectStatus, user }: any) => {
+const PageView = ({ page, projects, tasks, volunteers, selectedProjectId, onOpenProject, setCurrentPage, onAddProject, onAddVolunteer, onDeleteProject, onUpdateProjectStatus, onEditBudget, user }: any) => {
   switch (page) {
     case 'dashboard':
       return <DashboardView projects={projects} tasks={tasks} volunteers={volunteers} onOpenProject={onOpenProject} setCurrentPage={setCurrentPage} onDeleteProject={onDeleteProject} user={user} />;
     case 'projects':
       return <ProjectsView projects={projects} onOpenProject={onOpenProject} onAdd={onAddProject} onDelete={onDeleteProject} user={user} />;
     case 'project-detail':
-      return <ProjectDetailView projectId={selectedProjectId} projects={projects} tasks={tasks} volunteers={volunteers} onBack={() => setCurrentPage('projects')} onDelete={onDeleteProject} onUpdateProjectStatus={onUpdateProjectStatus} user={user} />;
+      return <ProjectDetailView projectId={selectedProjectId} projects={projects} tasks={tasks} volunteers={volunteers} onBack={() => setCurrentPage('projects')} onDelete={onDeleteProject} onUpdateProjectStatus={onUpdateProjectStatus} onEditBudget={onEditBudget} user={user} />;
     case 'tasks':
       return <TasksView tasks={tasks} projects={projects} />;
     case 'volunteers':
@@ -1441,7 +1582,7 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
   );
 };
 
-const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onDelete, onUpdateProjectStatus, user }: any) => {
+const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onDelete, onUpdateProjectStatus, onEditBudget, user }: any) => {
   const project = projects.find((p: any) => p.id === projectId);
   const projectTasks = tasks.filter((t: any) => t.project_id === projectId);
   const [showRejectionInput, setShowRejectionInput] = useState(false);
@@ -1740,39 +1881,80 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
 
            {/* Budget Card */}
            <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Fiscal Allocation</h3>
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-end justify-between mb-4">
-                    <div className="text-left">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total CapEx</p>
-                       <h4 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{project.budget}</h4>
-                    </div>
-                    <div className="text-right">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Utilization</p>
-                       <h4 className="text-xl font-black text-emerald-500 tracking-tighter leading-none">₹{(parseInt(project.budget.replace(/[^0-9]/g, '')) * 0.7 || 0).toLocaleString()}L</h4>
-                    </div>
-                  </div>
-                  <div className="pbar h-3 bg-slate-50 border border-slate-100">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: '70%' }}
-                      className="pfill bg-emerald-500 shadow-lg shadow-emerald-500/20"
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Approved</p>
-                      <p className="text-sm font-black text-slate-900 uppercase">95% Flow</p>
-                   </div>
-                   <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Burn Rate</p>
-                      <p className="text-sm font-black text-slate-900 uppercase">Sustainable</p>
-                   </div>
-                </div>
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fiscal Allocation</h3>
+                <Badge className={cn(
+                  "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border rounded-md",
+                  project.budget_status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                  project.budget_status === 'rejected' ? 'bg-red-50 text-red-600 border-red-100' :
+                  'bg-amber-50 text-amber-600 border-amber-100'
+                )}>
+                  Budget {project.budget_status || 'Pending'}
+                </Badge>
               </div>
+
+              {project.budget_items && project.budget_items.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    {project.budget_items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-50">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">{item.item}</span>
+                        <span className="text-[11px] font-black text-slate-900">₹{item.cost.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-4 flex items-center justify-between border-t border-slate-900">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total CapEx</span>
+                    <span className="text-lg font-black text-slate-900">₹{project.budget_items.reduce((a: number, c: any) => a + c.cost, 0).toLocaleString()}</span>
+                  </div>
+
+                  {project.budget_status === 'rejected' && project.budget_rejection_reason && (
+                    <div className="p-4 bg-red-50 border border-red-100 rounded-xl mt-4">
+                       <p className="text-[9px] font-black text-red-900 uppercase mb-1">Denial Protocol Feedback</p>
+                       <p className="text-[10px] text-red-700 font-medium leading-relaxed">{project.budget_rejection_reason}</p>
+                       <button 
+                         onClick={() => onEditBudget(project)}
+                         className="w-full mt-4 py-2 bg-red-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-700 transition-all"
+                       >
+                        Revise Budget Strategy
+                       </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex items-end justify-between mb-4">
+                      <div className="text-left">
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total CapEx</p>
+                         <h4 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{project.budget}</h4>
+                      </div>
+                      <div className="text-right">
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Utilization</p>
+                         <h4 className="text-xl font-black text-emerald-500 tracking-tighter leading-none">₹{(parseInt(project.budget.replace(/[^0-9]/g, '')) * 0.7 || 0).toLocaleString()}L</h4>
+                      </div>
+                    </div>
+                    <div className="pbar h-3 bg-slate-50 border border-slate-100">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: '70%' }}
+                        className="pfill bg-emerald-500 shadow-lg shadow-emerald-500/20"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Approved</p>
+                        <p className="text-sm font-black text-slate-900 uppercase">95% Flow</p>
+                     </div>
+                     <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Burn Rate</p>
+                        <p className="text-sm font-black text-slate-900 uppercase">Sustainable</p>
+                     </div>
+                  </div>
+                </div>
+              )}
            </Card>
 
             {/* Personnel Allocation */}
