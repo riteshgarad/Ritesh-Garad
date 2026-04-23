@@ -564,8 +564,6 @@ export default function App() {
     { id: 'finance', label: 'Finance', icon: IndianRupee },
     { id: 'docs', label: 'Documentation', icon: FileText },
     { id: 'social', label: 'Social & PR', icon: Share2 },
-    { id: 'fundraising', label: 'Marketing & Donations', icon: Megaphone },
-    { id: 'chatbot', label: 'AI Assistant', icon: Bot },
     { id: 'automation', label: 'Automation', icon: Zap },
   ];
 
