@@ -3,13 +3,26 @@ export interface Project {
   name: string;
   description: string;
   tag: 'Health' | 'Education' | 'Environment' | 'Community' | 'Technology';
-  status: 'planning' | 'active' | 'completed' | 'on_hold';
+  status: 'pending_dept_review' | 'pending_admin_review' | 'approved' | 'rejected' | 'active' | 'completed' | 'on_hold';
   phase: number;
   progress: number;
   lead_name: string;
   budget: string;
   budget_status?: 'pending' | 'approved' | 'rejected';
-  created_at: string;
+  rejection_reason?: string;
+  timeline?: string;
+  department: string;
+  created_at: any;
+  creator_id: string;
+}
+
+export interface FinanceRequest {
+  id: string;
+  project_id: string;
+  project_name: string;
+  amount: string;
+  requested_at: any;
+  status: 'pending' | 'disbursed' | 'rejected';
 }
 
 export interface Task {
@@ -40,12 +53,17 @@ export interface Volunteer {
 
 export interface Transaction {
   id: string;
-  date: string;
-  description: string;
-  category: string;
-  type: 'credit' | 'debit';
+  type: 'income' | 'expense';
   amount: number;
-  status: 'pending' | 'approved' | 'rejected';
+  category: string;
+  projectID?: string;
+  donationType?: 'One-time' | 'Monthly' | 'Corporate' | 'In-kind' | 'N/A';
+  expenditureType?: 'Procurement' | 'Travel' | 'Event Setup' | 'Marketing' | 'N/A';
+  paymentMethod: 'Bank Transfer' | 'Cash' | 'UPI' | 'Online Gateway';
+  status: 'pending' | 'approved' | 'rejected' | 'cleared';
+  receiptURL?: string;
+  date: any; // Firestore Timestamp
+  createdBy: string;
 }
 
 export interface Campaign {

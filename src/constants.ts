@@ -11,6 +11,8 @@ export const INITIAL_PROJECTS: Project[] = [
     progress: 45,
     lead_name: 'Rites Garad',
     budget: '2.4L',
+    department: 'Health',
+    creator_id: 'system',
     created_at: new Date().toISOString(),
   },
   {
@@ -18,11 +20,13 @@ export const INITIAL_PROJECTS: Project[] = [
     name: 'Digital Literacy 2026',
     description: 'Teaching web development to underprivileged youth.',
     tag: 'Education',
-    status: 'planning',
+    status: 'pending_dept_review',
     phase: 1,
     progress: 10,
     lead_name: 'Siddhesh Garad',
     budget: '1.5L',
+    department: 'Technology',
+    creator_id: 'system',
     created_at: new Date().toISOString(),
   }
 ];

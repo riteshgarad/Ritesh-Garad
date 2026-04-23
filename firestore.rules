@@ -14,72 +14,131 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
-    // Project Helpers
+    // Auth token check is not enough, but for bootstrapped admin we can use email
+    // In production, this would look up a 'users' or 'admins' collection
+    function isAdmin() { 
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'riteshgarad4@gmail.com'
+      );
+    }
+
+    function isDH() {
+      return isSignedIn() && exists(/databases/$(database)/documents/department_heads/$(request.auth.uid));
+    }
+
+    // Project Validation Helper (Pillar 2)
     function isValidProject(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-             (data.status == null || data.status in ['planning', 'active', 'completed', 'on_hold']) &&
+      return data.keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at', 'phase', 'progress', 'budget_status', 'tag', 'lead_name', 'description', 'timeline', 'budget']) &&
+             data.keys().size() == 13 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.description is string && data.description.size() <= 2000 &&
+             data.status in ['pending_dept_review', 'pending_admin_review', 'approved', 'rejected', 'active', 'completed', 'on_hold'] &&
+             data.tag in ['Health', 'Education', 'Environment', 'Community', 'Technology'] &&
+             data.phase is int && data.phase >= 1 && data.phase <= 6 &&
+             data.progress is number && data.progress >= 0 && data.progress <= 100 &&
+             data.budget_status in ['pending', 'approved', 'rejected'] &&
              data.creator_id == request.auth.uid &&
              data.created_at == request.time;
-    }
-
-    // Task Helpers
-    function isValidTask(data) {
-      return data.title is string && data.title.size() > 0 && data.title.size() <= 500 &&
-             (data.status == null || data.status in ['todo', 'inprogress', 'completed']) &&
-             data.creator_id == request.auth.uid &&
-             data.created_at == request.time;
-    }
-
-    // Volunteer Helpers
-    function isValidVolunteer(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-             data.email is string && data.email.size() <= 200;
-    }
-
-    // Notification Helpers
-    function isValidNotification(data, userId) {
-      return data.user_id == userId &&
-             data.title is string && data.title.size() <= 200 &&
-             data.isRead is bool;
     }
 
     // --- Collections ---
 
     match /projects/{projectId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      // Pillar 3: Path Variable Hardening
+      allow get: if isSignedIn() && isValidId(projectId);
+      // Pillar 8: Secure List Queries
+      allow list: if isSignedIn(); 
+      
       allow create: if isSignedIn() && isValidProject(incoming());
-      allow update: if isSignedIn() && (
-        isOwner(existing().creator_id) || 
-        incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status', 'budget_status'])
+      
+      // Pillar 4: Tiered Identity Logic & Pillar 2: Action-Based Update
+      allow update: if isSignedIn() && isValidProject(incoming()) && (
+        // Action: Progress Update (By Owner or Assigned)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status']) && 
+         (isOwner(existing().creator_id) || isAdmin())) ||
+        
+        // Action: Approval (By DH or Admin)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason']) && 
+         (isAdmin() || isDH())) ||
+         
+        // Action: Full Edit (Admin only)
+        isAdmin()
       ) && incoming().creator_id == existing().creator_id;
+      
+      allow delete: if isAdmin() || isOwner(existing().creator_id);
     }
 
     match /tasks/{taskId} {
-      allow get: if isSignedIn();
+      allow get: if isSignedIn() && isValidId(taskId);
       allow list: if isSignedIn();
+      
+      function isValidTask(data) {
+        return data.keys().hasAll(['title', 'status', 'creator_id', 'project_id']) &&
+               data.title is string && data.title.size() <= 500 &&
+               data.status in ['todo', 'inprogress', 'completed'] &&
+               data.creator_id == request.auth.uid;
+      }
+
       allow create: if isSignedIn() && isValidTask(incoming());
-      allow update: if isSignedIn() && 
-                      incoming().creator_id == existing().creator_id &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'status', 'priority', 'assigned_to', 'due_date', 'department', 'task_type', 'is_locked', 'decision']);
+      allow update: if isSignedIn() && isValidTask(incoming()) && (
+        isOwner(existing().creator_id) || isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      );
+      allow delete: if isAdmin() || isOwner(existing().creator_id);
     }
 
     match /volunteers/{volunteerId} {
-      allow get: if isSignedIn();
+      allow get: if isSignedIn() && isValidId(volunteerId);
       allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidVolunteer(incoming());
-      allow update: if isSignedIn() && 
-                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'department', 'skills', 'hours', 'status']);
+      allow create: if isAdmin(); // Only admins can onboard
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
+    match /finance_requests/{requestId} {
+      allow read: if isAdmin();
+      // Pillar 7: Atomicity Guarantee (existsAfter)
+      // Finance requests should only be created when a project is approved
+      allow create: if isAdmin() && 
+                      incoming().status == 'pending' &&
+                      existsAfter(/databases/$(database)/documents/projects/$(incoming().project_id));
+    }
+
+    // Pillar 6: PII Isolation
     match /users/{userId}/notifications/{notificationId} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidNotification(incoming(), userId);
-      allow update: if isOwner(userId) && 
-                      incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow create: if isAdmin() || isOwner(userId);
+      allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isOwner(userId);
+    }
+
+    match /transactions/{transactionId} {
+      allow get: if isSignedIn() && (isAdmin() || existing().createdBy == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || resource.data.createdBy == request.auth.uid);
+      
+      function isValidTransaction(data) {
+        return data.keys().hasAll(['type', 'amount', 'category', 'status', 'date', 'createdBy', 'paymentMethod']) &&
+               data.type in ['income', 'expense'] &&
+               data.amount is number && data.amount > 0 &&
+               data.status in ['pending', 'approved', 'rejected', 'cleared'] &&
+               data.createdBy == request.auth.uid &&
+               data.date == request.time;
+      }
+
+      allow create: if isSignedIn() && isValidTransaction(incoming());
+      
+      allow update: if isSignedIn() && (
+        // Admins can approve/reject
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
+        // Owners can update pending ones
+        (existing().createdBy == request.auth.uid && existing().status == 'pending' && isValidTransaction(incoming()))
+      );
+      
+      allow delete: if isAdmin();
     }
     
-    // Support Test Collection for connection verification
+    // Public connection check
     match /test/connection {
       allow read: if true;
     }

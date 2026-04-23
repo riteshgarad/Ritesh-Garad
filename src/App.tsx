@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import FinanceDashboard from './components/FinanceDashboard';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -30,7 +31,8 @@ import {
   TrendingUp,
   Clock,
   AlertCircle,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -51,12 +53,12 @@ import {
 } from 'recharts';
 import { differenceInDays, parseISO, isFuture, isPast } from 'date-fns';
 import { cn } from './lib/utils';
-import { Project, Task, Volunteer, Transaction, Campaign, AppUser, AppNotification } from './types';
+import { Project, Task, Volunteer, Transaction, Campaign, AppUser, AppNotification, FinanceRequest } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
 import { askAssistant } from './services/geminiService';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // --- Firebase Initialization ---
@@ -403,20 +405,80 @@ export default function App() {
   const handleAddVolunteer = () => setIsVolunteerModalOpen(true);
 
   const handleCreateProject = async (formData: any) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !user) return;
     try {
       await addDoc(collection(db, 'projects'), {
         ...formData,
-        status: "planning",
+        status: "pending_dept_review",
         phase: 1,
         progress: 0,
         budget_status: "pending",
         created_at: serverTimestamp(),
-        creator_id: auth.currentUser.uid
+        creator_id: auth.currentUser.uid,
+        department: formData.department || user.department || "General"
       });
       setIsProjectModalOpen(false);
     } catch (err) {
       handleFirestoreError(err, 'create', 'projects');
+    }
+  };
+
+  const handleUpdateProjectStatus = async (projectId: string, newStatus: any, reason?: string) => {
+    if (!auth.currentUser || !user) return;
+    try {
+      const projectRef = doc(db, 'projects', projectId);
+      const updateData: any = { 
+        status: newStatus,
+        updated_at: serverTimestamp()
+      };
+      
+      if (reason) {
+        updateData.rejection_reason = reason;
+      }
+
+      await updateDoc(projectRef, updateData);
+
+      // Financial Integration Trigger
+      if (newStatus === 'approved') {
+        const projectDoc = projects.find(p => p.id === projectId);
+        if (projectDoc) {
+          // 1. Finance Request for internal track
+          await addDoc(collection(db, 'finance_requests'), {
+            project_id: projectId,
+            project_name: projectDoc.name,
+            amount: projectDoc.budget,
+            requested_at: serverTimestamp(),
+            status: 'pending'
+          });
+
+          // 2. Automated Pending Expense entry in Ledger (Requirement 2)
+          const budgetNum = parseFloat(projectDoc.budget.replace(/[^0-9.]/g, '')) || 0;
+          await addDoc(collection(db, 'transactions'), {
+            type: 'expense',
+            amount: budgetNum,
+            category: 'Project Fund',
+            projectID: projectId,
+            status: 'pending',
+            date: serverTimestamp(),
+            createdBy: auth.currentUser.uid,
+            paymentMethod: 'Bank Transfer',
+            expenditureType: 'Procurement',
+            description: `Automated budget allocation for approved project: ${projectDoc.name}`
+          });
+          
+          // Notify the creator
+          await addDoc(collection(db, `users/${projectDoc.creator_id}/notifications`), {
+            type: 'approval',
+            title: 'Project Fully Approved',
+            message: `Mission "${projectDoc.name}" has cleared Admin review. Fiscal allocation requested.`,
+            timestamp: serverTimestamp(),
+            isRead: false,
+            relatedId: projectId
+          });
+        }
+      }
+    } catch (err) {
+      handleFirestoreError(err, 'update', `projects/${projectId}`);
     }
   };
 
@@ -430,6 +492,22 @@ export default function App() {
       setIsVolunteerModalOpen(false);
     } catch (err) {
       handleFirestoreError(err, 'create', 'volunteers');
+    }
+  };
+
+  const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to permanently delete this project? This action cannot be reversed.")) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'projects', id));
+      if (selectedProjectId === id) {
+        setSelectedProjectId(null);
+        setCurrentPage('projects');
+      }
+    } catch (err) {
+      handleFirestoreError(err, 'delete', `projects/${id}`);
     }
   };
 
@@ -782,6 +860,8 @@ export default function App() {
                 }}
                 onAddProject={handleAddProject}
                 onAddVolunteer={handleAddVolunteer}
+                onDeleteProject={handleDeleteProject}
+                onUpdateProjectStatus={handleUpdateProjectStatus}
               />
             </motion.div>
           </AnimatePresence>
@@ -858,9 +938,11 @@ const ProjectModal = ({ isOpen, onClose, onCreate, volunteers }: any) => {
   const [formData, setFormData] = useState({
     name: '',
     tag: 'Technology',
+    department: 'Health',
     budget: '',
     lead_name: '',
-    description: ''
+    description: '',
+    timeline: '3 Months'
   });
 
   if (!isOpen) return null;
@@ -882,7 +964,7 @@ const ProjectModal = ({ isOpen, onClose, onCreate, volunteers }: any) => {
       >
         <div className="sticky top-0 z-10 p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md">
           <div className="text-left">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-1">Initialize Mission</h3>
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-1">Add Project</h3>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sector Allocation Protocol</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-slate-50 rounded-xl border border-slate-200">
@@ -900,6 +982,32 @@ const ProjectModal = ({ isOpen, onClose, onCreate, volunteers }: any) => {
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Functional Department</label>
+              <select 
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 appearance-none"
+                value={formData.department}
+                onChange={e => setFormData({...formData, department: e.target.value})}
+              >
+                {['Health', 'Education', 'Environment', 'Economy', 'Technology'].map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Project Timeline</label>
+              <input 
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900"
+                placeholder="e.g. 6 Months"
+                value={formData.timeline}
+                onChange={e => setFormData({...formData, timeline: e.target.value})}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
@@ -961,7 +1069,7 @@ const ProjectModal = ({ isOpen, onClose, onCreate, volunteers }: any) => {
 
           <div className="flex gap-4 pt-4">
             <Button variant="secondary" type="button" className="flex-1 py-4 uppercase tracking-widest bg-white border-slate-200" onClick={onClose}>Abort</Button>
-            <Button variant="primary" type="submit" className="flex-1 py-4 uppercase tracking-widest shadow-xl shadow-blue-500/20">Init. Sequence</Button>
+            <Button variant="primary" type="submit" className="flex-1 py-4 uppercase tracking-widest shadow-xl shadow-blue-500/20">ADD PROJECT</Button>
           </div>
         </form>
       </motion.div>
@@ -1077,20 +1185,20 @@ const VolunteerModal = ({ isOpen, onClose, onCreate }: any) => {
 
 // --- Page Views ---
 
-const PageView = ({ page, projects, tasks, volunteers, selectedProjectId, onOpenProject, setCurrentPage, onAddProject, onAddVolunteer }: any) => {
+const PageView = ({ page, projects, tasks, volunteers, selectedProjectId, onOpenProject, setCurrentPage, onAddProject, onAddVolunteer, onDeleteProject, onUpdateProjectStatus, user }: any) => {
   switch (page) {
     case 'dashboard':
-      return <DashboardView projects={projects} tasks={tasks} volunteers={volunteers} onOpenProject={onOpenProject} setCurrentPage={setCurrentPage} />;
+      return <DashboardView projects={projects} tasks={tasks} volunteers={volunteers} onOpenProject={onOpenProject} setCurrentPage={setCurrentPage} onDeleteProject={onDeleteProject} user={user} />;
     case 'projects':
-      return <ProjectsView projects={projects} onOpenProject={onOpenProject} onAdd={onAddProject} />;
+      return <ProjectsView projects={projects} onOpenProject={onOpenProject} onAdd={onAddProject} onDelete={onDeleteProject} user={user} />;
     case 'project-detail':
-      return <ProjectDetailView projectId={selectedProjectId} projects={projects} tasks={tasks} volunteers={volunteers} onBack={() => setCurrentPage('projects')} />;
+      return <ProjectDetailView projectId={selectedProjectId} projects={projects} tasks={tasks} volunteers={volunteers} onBack={() => setCurrentPage('projects')} onDelete={onDeleteProject} onUpdateProjectStatus={onUpdateProjectStatus} user={user} />;
     case 'tasks':
       return <TasksView tasks={tasks} projects={projects} />;
     case 'volunteers':
       return <VolunteersView volunteers={volunteers} onAdd={onAddVolunteer} />;
     case 'finance':
-      return <FinanceView />;
+      return <FinanceDashboard user={user} projects={projects} />;
     case 'social':
       return <SocialMediaView />;
     case 'fundraising':
@@ -1110,12 +1218,25 @@ const PageView = ({ page, projects, tasks, volunteers, selectedProjectId, onOpen
 
 // --- Sub-Views ---
 
-const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentPage }: any) => {
+const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentPage, onDeleteProject, user }: any) => {
+  const isDH = user?.role === 'DH';
+  const isAdmin = user?.role === 'Admin';
+  
+  const pendingByMe = projects.filter((p: any) => {
+    if (isAdmin) return p.status === 'pending_admin_review';
+    if (isDH) return p.status === 'pending_dept_review' && p.department === user.department;
+    return false;
+  });
+
+  const activeMissions = projects.filter((p: any) => 
+    p.status === 'approved' || p.status === 'active'
+  );
+
   const stats = [
-    { label: 'Active Missions', value: projects.length, icon: FolderKanban, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+    { label: 'Pending Review', value: pendingByMe.length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+    { label: 'Active Missions', value: activeMissions.length, icon: FolderKanban, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
     { label: 'Units Deployed', value: volunteers.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    { label: 'Task Backlog', value: tasks.filter((t: any) => t.status === 'todo').length, icon: CheckSquare, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-    { label: 'Capital Reserve', value: '₹12.4L', icon: IndianRupee, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+    { label: 'Fiscal Allocation', value: '₹12.4L', icon: IndianRupee, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
   ];
 
   return (
@@ -1143,26 +1264,30 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
         <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Active Mission Pulse</h3>
-            <Button variant="secondary" className="text-[9px] font-black uppercase tracking-widest px-4 py-2 border-slate-100" onClick={() => setCurrentPage('projects')}>Full Portfolio</Button>
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Pending My Authorization</h3>
+            <Badge className="bg-amber-50 text-amber-600 border border-amber-100 px-3 py-1">{pendingByMe.length} Signals</Badge>
           </div>
           <div className="space-y-4">
-            {projects.slice(0, 3).map((p: any) => (
-              <div key={p.id} className="p-5 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-blue-500/20 transition-all cursor-pointer" onClick={() => onOpenProject(p.id)}>
+            {pendingByMe.length > 0 ? pendingByMe.slice(0, 3).map((p: any) => (
+              <div key={p.id} className="p-5 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-blue-500/20 transition-all cursor-pointer relative" onClick={() => onOpenProject(p.id)}>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">{p.tag}</span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PHASE {p.phase}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest leading-none">Awaiting {p.status === 'pending_dept_review' ? 'DH' : 'Admin'}</span>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.department} SECTOR</span>
                 </div>
-                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-4 leading-none">{p.name}</h4>
-                <div className="pbar h-2 bg-slate-200/50">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${p.progress}%` }}
-                    className="pfill bg-blue-600"
-                  />
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2 leading-none">{p.name}</h4>
+                <p className="text-[10px] text-slate-500 line-clamp-1 mb-4">{p.description}</p>
+                <div className="flex items-center justify-between">
+                   <div className="text-[10px] font-black text-slate-400 uppercase">CapEx: {p.budget}</div>
+                   <ArrowRight size={14} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="py-12 border-2 border-dashed border-slate-100 rounded-3xl flex flex-col items-center justify-center">
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Queue Clear</p>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -1207,7 +1332,15 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
               {projects.slice(0, 3).map((p: any) => (
                 <div key={p.id} className="group cursor-pointer text-left" onClick={() => onOpenProject(p.id)}>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-black text-slate-600 group-hover:text-blue-600 transition-colors uppercase tracking-widest">{p.name}</span>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[11px] font-black text-slate-600 group-hover:text-blue-600 transition-colors uppercase tracking-widest">{p.name}</span>
+                       <button 
+                        onClick={(e) => { e.stopPropagation(); onDeleteProject(p.id, e); }}
+                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                     <span className="text-[10px] font-black text-slate-400">{p.progress}%</span>
                   </div>
                   <div className="pbar h-2 bg-slate-100">
@@ -1305,11 +1438,43 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
   );
 };
 
-const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack }: any) => {
+const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onDelete, onUpdateProjectStatus, user }: any) => {
   const project = projects.find((p: any) => p.id === projectId);
   const projectTasks = tasks.filter((t: any) => t.project_id === projectId);
-  
+  const [showRejectionInput, setShowRejectionInput] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+
   if (!project) return null;
+
+  const canApprove = (
+    (user?.role === 'DH' && project.status === 'pending_dept_review' && project.department === user?.department) ||
+    (user?.role === 'Admin' && project.status === 'pending_admin_review')
+  );
+
+  const handleApprove = () => {
+    const nextStatus = project.status === 'pending_dept_review' ? 'pending_admin_review' : 'approved';
+    onUpdateProjectStatus(project.id, nextStatus);
+  };
+
+  const handleReject = () => {
+    if (!rejectionReason) {
+       setShowRejectionInput(true);
+       return;
+    }
+    onUpdateProjectStatus(project.id, 'rejected', rejectionReason);
+  };
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'pending_dept_review': return { label: 'DEPT REVIEW', color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' };
+      case 'pending_admin_review': return { label: 'ADMIN REVIEW', color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' };
+      case 'approved': return { label: 'APPROVED', color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' };
+      case 'rejected': return { label: 'REJECTED', color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-100' };
+      default: return { label: status.toUpperCase(), color: 'text-slate-500', bg: 'bg-slate-50', border: 'border-slate-200' };
+    }
+  };
+
+  const statusCfg = getStatusConfig(project.status);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1324,17 +1489,88 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack }: a
           </button>
           <div className="text-left">
             <div className="flex items-center gap-3 mb-2">
-              <Badge className="bg-blue-50 text-blue-600 border border-blue-100 rounded-lg px-2 py-0.5 text-[10px] uppercase font-black">{project.tag}</Badge>
+              <Badge className={cn("rounded-lg px-2 py-0.5 text-[10px] uppercase font-black", statusCfg.bg, statusCfg.color)}>{statusCfg.label}</Badge>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg">ID: {project.id}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg">{project.department}</span>
             </div>
             <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight leading-none">{project.name}</h2>
           </div>
         </div>
         <div className="flex gap-4">
+          {user?.role === 'Admin' && (
+            <Button variant="danger" className="px-6 py-3 font-black text-[10px] uppercase tracking-widest" onClick={(e) => onDelete(project.id, e)}>Terminate Mission</Button>
+          )}
           <Button variant="secondary" className="px-6 py-3 font-black text-[10px] uppercase tracking-widest">Share Protocol</Button>
           <Button variant="primary" className="px-8 py-3 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20">Edit Mission</Button>
         </div>
       </div>
+
+      {canApprove && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-8 bg-[#0f172a] rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
+            <Bot size={120} />
+          </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
+            <div className="text-left">
+              <h3 className="text-lg font-black text-white uppercase tracking-tight mb-2">Authorization Required</h3>
+              <p className="text-slate-400 text-xs font-medium max-w-md leading-relaxed">
+                This project is currently in <span className="text-blue-400 font-bold">"{statusCfg.label}"</span>. Review the budget of {project.budget} and technical parameters before granting clearance.
+              </p>
+            </div>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              {showRejectionInput ? (
+                <div className="flex gap-2 w-full">
+                  <input 
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-red-500/50"
+                    placeholder="Reason for rejection..."
+                    value={rejectionReason}
+                    onChange={e => setRejectionReason(e.target.value)}
+                  />
+                  <Button variant="danger" onClick={handleReject}>Reject</Button>
+                  <Button variant="secondary" onClick={() => setShowRejectionInput(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setShowRejectionInput(true)}
+                    className="px-8 py-3.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+                  >
+                    <X size={14} /> Denied
+                  </button>
+                  <button 
+                    onClick={() => onUpdateProjectStatus(project.id, project.status, 'Revision Requested')}
+                    className="px-8 py-3.5 bg-white/5 text-slate-300 border border-white/10 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+                  >
+                    <Clock size={14} /> Revision
+                  </button>
+                  <button 
+                    onClick={handleApprove}
+                    className="px-10 py-3.5 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 shadow-xl shadow-blue-600/30 transition-all flex items-center gap-2 transform hover:scale-105 active:scale-95"
+                  >
+                    <CheckCircle2 size={16} /> Grant Clearance
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {project.status === 'rejected' && (
+        <div className="p-8 bg-red-50 rounded-3xl border border-red-100 flex items-start gap-6 text-left">
+           <div className="p-3 bg-red-100 text-red-600 rounded-xl">
+              <AlertCircle size={24} />
+           </div>
+           <div>
+              <h3 className="text-sm font-black text-red-900 uppercase tracking-widest mb-1">Authorization Rejected</h3>
+              <p className="text-red-700 text-xs font-medium">{project.rejection_reason || 'No specific reason provided by evaluator.'}</p>
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Project Info & Tasks */}
@@ -1536,25 +1772,47 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack }: a
               </div>
            </Card>
 
-           {/* Personnel Allocation */}
-           <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Operative Deployment</h3>
-              <div className="space-y-4">
-                {volunteers.slice(0, 4).map((v: any, i: number) => (
-                   <div key={v.id} className="flex items-center justify-between">
-                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 font-black text-[9px] uppercase tracking-tighter">{INITIALS(v.name)}</div>
-                        <div className="text-left">
-                           <p className="text-[11px] font-black text-slate-900 uppercase leading-none">{v.name}</p>
-                           <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">{v.role}</p>
+            {/* Personnel Allocation */}
+            <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Personnel Deployment Hub</h3>
+               <div className="space-y-4">
+                 <div className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-lg shadow-blue-500/20">
+                       {INITIALS(project.lead_name)}
+                    </div>
+                    <div>
+                       <p className="text-xs font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{project.lead_name}</p>
+                       <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">MISSION COMMANDER</p>
+                    </div>
+                 </div>
+
+                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Active Operatives</p>
+                 <div className="space-y-3">
+                   {volunteers.slice(0, 3).map((v: any) => (
+                      <div key={v.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl group hover:border-blue-200 transition-all">
+                        <div className="flex items-center gap-3">
+                           <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 font-black text-[9px] uppercase tracking-tighter">{INITIALS(v.name)}</div>
+                           <div className="text-left">
+                              <p className="text-[10px] font-black text-slate-900 uppercase leading-none">{v.name}</p>
+                              <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{v.role}</p>
+                           </div>
                         </div>
-                     </div>
-                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-glow"></div>
-                   </div>
-                ))}
-              </div>
-              <Button variant="secondary" className="w-full mt-8 py-3 text-[10px] font-black uppercase tracking-widest border-slate-200">View Personnel Node</Button>
-           </Card>
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-glow"></div>
+                      </div>
+                   ))}
+                 </div>
+                 
+                 {project.status === 'approved' && user?.role === 'Admin' && (
+                    <div className="pt-6 mt-6 border-t border-slate-100 space-y-4">
+                       <div className="flex items-center justify-between">
+                          <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest">HR Allocation Node</p>
+                          <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">Pending Assignment</Badge>
+                       </div>
+                       <Button variant="secondary" className="w-full py-3.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-slate-900 hover:text-white border-slate-200">Broadcast Personnel Call</Button>
+                    </div>
+                 )}
+               </div>
+            </Card>
         </div>
       </div>
     </div>
@@ -1648,61 +1906,111 @@ const FundraisingView = () => {
   );
 };
 
-const ProjectsView = ({ projects, onOpenProject, onAdd }: any) => {
+const ProjectsView = ({ projects, onOpenProject, onAdd, onDelete, user }: any) => {
+  const [filter, setFilter] = useState('All Initiatives');
+  
+  const filteredProjects = projects.filter((p: any) => {
+    if (user?.role === 'Volunteer' && p.creator_id !== auth.currentUser?.uid) return false;
+    if (filter === 'All Initiatives') return true;
+    if (filter === 'Active') return p.status === 'approved' || p.status === 'active';
+    if (filter === 'Strategic Planning') return p.status === 'pending_dept_review' || p.status === 'pending_admin_review';
+    if (filter === 'Archived') return p.status === 'completed' || p.status === 'rejected';
+    return true;
+  });
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'pending_dept_review': return { label: 'DEPT REVIEW', color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' };
+      case 'pending_admin_review': return { label: 'ADMIN REVIEW', color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' };
+      case 'approved': return { label: 'APPROVED', color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' };
+      case 'rejected': return { label: 'REJECTED', color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-100' };
+      default: return { label: status.toUpperCase(), color: 'text-slate-500', bg: 'bg-slate-50', border: 'border-slate-200' };
+    }
+  };
+
   return (
     <div className="space-y-6 md:space-y-10">
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 md:gap-6">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 md:gap-6 bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/20">
         <div className="flex overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide gap-2">
           {['All Initiatives', 'Active', 'Strategic Planning', 'Archived'].map(f => (
-            <button key={f} className="px-4 md:px-5 py-2 md:py-2.5 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm whitespace-nowrap">
+            <button 
+              key={f} 
+              onClick={() => setFilter(f)}
+              className={cn(
+                "px-4 md:px-5 py-2 md:py-2.5 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border transition-all shadow-sm whitespace-nowrap",
+                filter === f ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-200 hover:text-blue-600 hover:border-blue-200"
+              )}
+            >
               {f}
             </button>
           ))}
         </div>
         <Button variant="primary" className="flex items-center gap-3 w-full md:w-auto justify-center px-8 py-4 md:py-3 shadow-xl shadow-blue-500/20 active:scale-[0.98] transition-all" onClick={onAdd}>
-          <Plus size={16} /> <span className="uppercase tracking-[0.1em] font-black text-[11px]">Initialize Mission</span>
+          <Plus size={16} /> <span className="uppercase tracking-[0.1em] font-black text-[11px]">Add Project</span>
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 pb-10 md:pb-0">
-        {projects.map((p: any) => (
-          <Card key={p.id} className="p-8 group cursor-pointer border-slate-200 bg-white shadow-xl shadow-slate-200/20 hover:shadow-2xl hover:shadow-blue-500/10" onClick={() => onOpenProject(p.id)}>
-            <div className="flex items-start justify-between mb-8">
-              <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-4 py-1.5 rounded-xl">{p.tag}</Badge>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">FUND: {p.budget}</div>
-            </div>
-            <h3 className="font-black text-slate-900 text-xl mb-4 group-hover:text-blue-600 transition-colors tracking-tight text-left uppercase">{p.name}</h3>
-            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-10 font-medium text-left">{p.description}</p>
-            
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                  <span className="text-blue-600">{PHASES[p.phase - 1]}</span>
-                  <span className="text-slate-900">{p.progress}%</span>
+        {filteredProjects.map((p: any) => {
+          const statusCfg = getStatusConfig(p.status);
+          return (
+            <Card key={p.id} className="p-8 group cursor-pointer border-slate-200 bg-white shadow-xl shadow-slate-200/20 hover:shadow-2xl hover:shadow-blue-500/10 relative overflow-hidden" onClick={() => onOpenProject(p.id)}>
+              <div className="flex items-start justify-between mb-8">
+                <div className="flex flex-col items-start gap-2">
+                  <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-4 py-1.5 rounded-xl">{p.tag}</Badge>
+                   <Badge className={cn("px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border rounded-md", statusCfg.bg, statusCfg.color, statusCfg.border)}>
+                    {statusCfg.label}
+                  </Badge>
                 </div>
-                <div className="pbar h-2.5 bg-slate-50 border border-slate-100">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${p.progress}%` }}
-                    className="pfill bg-blue-600 shadow-lg shadow-blue-500/20"
-                  />
+                <div className="flex items-center gap-2">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">FUND: {p.budget}</div>
+                  {user?.role === 'Admin' && (
+                    <button 
+                      onClick={(e) => onDelete(p.id, e)}
+                      className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                      title="Delete Project"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
+              <h3 className="font-black text-slate-900 text-xl mb-4 group-hover:text-blue-600 transition-colors tracking-tight text-left uppercase leading-none">{p.name}</h3>
+              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-6 font-medium text-left">{p.description}</p>
               
-              <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="w-9 h-9 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 font-black text-[11px] shadow-sm">
-                    {INITIALS(p.lead_name)}
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <span className="text-blue-600">PHASE {p.phase}</span>
+                    <span className="text-slate-900">{p.progress}%</span>
                   </div>
-                  <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{p.lead_name}</span>
+                  <div className="pbar h-2 bg-slate-50 border border-slate-100">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${p.progress}%` }}
+                      className="pfill bg-blue-600 shadow-lg shadow-blue-500/20"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center text-slate-300 group-hover:text-blue-600 transition-colors transform group-hover:translate-x-1 duration-300">
-                  <ArrowRight size={20} />
+                
+                <div className="flex items-center justify-between pt-6 border-t border-slate-100">
+                  <div className="flex items-center gap-4">
+                    <div className="w-9 h-9 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 font-black text-[11px] shadow-sm">
+                      {INITIALS(p.lead_name)}
+                    </div>
+                    <div className="text-left">
+                       <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest leading-none">{p.lead_name}</span>
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">{p.department}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center text-slate-300 group-hover:text-blue-600 transition-colors transform group-hover:translate-x-1 duration-300">
+                    <ArrowRight size={20} />
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
@@ -1860,6 +2168,17 @@ const ALLOCATION_DATA = [
 ];
 
 const FinanceView = () => {
+  const [financeRequests, setFinanceRequests] = useState<FinanceRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'finance_requests'), orderBy('requested_at', 'desc'), limit(10));
+    return onSnapshot(q, (snapshot) => {
+      setFinanceRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinanceRequest)));
+      setLoading(false);
+    });
+  }, []);
+
   return (
     <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* 1. System Metrics & Hubs */}
@@ -1881,56 +2200,39 @@ const FinanceView = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        {/* Expenditure Trends */}
-        <Card className="p-6 md:p-8 bg-white border-slate-200 shadow-xl shadow-slate-200/20 text-left">
-          <div className="flex items-center justify-between mb-8 md:mb-10">
-             <div className="text-left">
-               <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-1">Expenditure Trajectory</h3>
-               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Fiscal Cycle 2026 Audit</p>
-             </div>
-             <div className="hidden sm:flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">System Forecast</span>
-             </div>
-          </div>
-          <div className="h-64 md:h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={EXPENDITURE_DATA}>
-                <defs>
-                  <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }}
-                  tickFormatter={(val) => `₹${val/1000}k`}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1e293b', 
-                    border: 'none', 
-                    borderRadius: '16px', 
-                    color: '#fff',
-                    fontSize: '10px',
-                    fontWeight: 900,
-                    textTransform: 'uppercase'
-                  }} 
-                />
-                <Area type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorAmt)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Pending Requests from Projects */}
+        <Card className="p-8 bg-white border-slate-200 shadow-xl shadow-slate-200/20 text-left">
+           <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Live Budget Requisitions</h3>
+              <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1 font-black text-[9px] uppercase tracking-widest">{financeRequests.length} Nodes</Badge>
+           </div>
+           <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {financeRequests.length > 0 ? financeRequests.map((req) => (
+                <div key={req.id} className="flex items-center justify-between p-5 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-blue-500/20 transition-all">
+                   <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 font-black text-xs shadow-sm">
+                         FR
+                      </div>
+                      <div className="text-left">
+                         <p className="text-xs font-black text-slate-900 uppercase tracking-tight mb-1">{req.project_name}</p>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">REQ_ID: {req.id}</p>
+                      </div>
+                   </div>
+                   <div className="text-right">
+                      <p className="text-sm font-black text-emerald-600 tracking-tighter">{req.amount}</p>
+                      <Badge className={cn(
+                        "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg mt-1 block w-fit ml-auto",
+                        req.status === 'pending' ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                      )}>{req.status}</Badge>
+                   </div>
+                </div>
+              )) : (
+                <div className="py-20 flex flex-col items-center justify-center opacity-20">
+                   <IndianRupee size={48} />
+                   <p className="text-[10px] font-black uppercase tracking-[0.3em] mt-4">Zero Pending Requests</p>
+                </div>
+              )}
+           </div>
         </Card>
 
         {/* Donation Inflows */}

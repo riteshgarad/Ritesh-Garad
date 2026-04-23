@@ -8,16 +8,32 @@
         "name": { "type": "string" },
         "description": { "type": "string" },
         "tag": { "type": "string", "enum": ["Health", "Education", "Environment", "Community", "Technology"] },
-        "status": { "type": "string", "enum": ["planning", "active", "completed", "on_hold"] },
+        "status": { "type": "string", "enum": ["pending_dept_review", "pending_admin_review", "approved", "rejected", "active", "completed", "on_hold"] },
         "phase": { "type": "number" },
         "progress": { "type": "number" },
+        "rejection_reason": { "type": "string" },
+        "timeline": { "type": "string" },
+        "department": { "type": "string" },
         "lead_name": { "type": "string" },
         "budget": { "type": "string" },
         "budget_status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
         "created_at": { "type": "string", "format": "date-time" },
         "creator_id": { "type": "string" }
       },
-      "required": ["name", "status", "creator_id"]
+      "required": ["name", "status", "creator_id", "department"]
+    },
+    "FinanceRequest": {
+      "title": "Finance Request",
+      "description": "Automatically generated budget request for approved projects.",
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string" },
+        "project_name": { "type": "string" },
+        "amount": { "type": "string" },
+        "requested_at": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "disbursed", "rejected"] }
+      },
+      "required": ["project_id", "amount", "status"]
     },
     "Task": {
       "title": "Task",
@@ -68,6 +84,25 @@
         "relatedId": { "type": "string" }
       },
       "required": ["user_id", "title", "message", "isRead"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial record (income or expense) for the NGO.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "projectID": { "type": "string" },
+        "donationType": { "type": "string", "enum": ["One-time", "Monthly", "Corporate", "In-kind", "N/A"] },
+        "expenditureType": { "type": "string", "enum": ["Procurement", "Travel", "Event Setup", "Marketing", "N/A"] },
+        "paymentMethod": { "type": "string", "enum": ["Bank Transfer", "Cash", "UPI", "Online Gateway"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "cleared"] },
+        "receiptURL": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["type", "amount", "category", "status", "date", "createdBy"]
     }
   },
   "firestore": {
@@ -83,9 +118,17 @@
       "schema": "Volunteer",
       "description": "Collection of NGO members."
     },
+    "/finance_requests/{requestId}": {
+      "schema": "FinanceRequest",
+      "description": "Automated budget allocation requests."
+    },
     "/users/{userId}/notifications/{notificationId}": {
       "schema": "Notification",
       "description": "Per-user notifications."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Financial ledger for the NGO."
     }
   }
 }
