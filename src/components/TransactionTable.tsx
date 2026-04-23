@@ -117,18 +117,18 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onAct
                   {isAdmin && (
                     <td className="px-6 py-4 text-right">
                       {t.status === 'pending' ? (
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-2 transition-all">
                           <button 
                             onClick={() => onAction?.(t.id, 'approved')}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg border border-transparent hover:border-emerald-100 transition-all shadow-sm"
-                            title="Approve Transaction"
+                            className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-100 transition-all shadow-sm"
+                            title="Direct Approval"
                           >
                             <CheckCircle2 size={16} />
                           </button>
                           <button 
                             onClick={() => setRejectionId(t.id)}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-100 transition-all shadow-sm"
-                            title="Reject Transaction"
+                            className="p-2 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-100 transition-all shadow-sm"
+                            title="Rejection Protocol"
                           >
                             <XCircle size={16} />
                           </button>

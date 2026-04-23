@@ -118,20 +118,24 @@ service cloud.firestore {
       allow list: if isSignedIn() && (isAdmin() || resource.data.createdBy == request.auth.uid);
       
       function isValidTransaction(data) {
+        // Core fields required on create
         return data.keys().hasAll(['type', 'amount', 'category', 'status', 'date', 'createdBy', 'paymentMethod']) &&
                data.type in ['income', 'expense'] &&
                data.amount is number && data.amount > 0 &&
                data.status in ['pending', 'approved', 'rejected', 'cleared'] &&
-               data.createdBy == request.auth.uid &&
-               data.date == request.time;
+               data.createdBy == request.auth.uid;
       }
 
-      allow create: if isSignedIn() && isValidTransaction(incoming());
+      allow create: if isSignedIn() && isValidTransaction(incoming()) && incoming().date == request.time;
       
       allow update: if isSignedIn() && (
-        // Admins can approve/reject
-        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status'])) ||
-        // Owners can update pending ones
+        // Action: Audit Review (Admin or Finance Head)
+        ((isAdmin() || isDH()) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt']) &&
+         incoming().reviewedBy == request.auth.uid &&
+         incoming().reviewedAt == request.time) ||
+         
+        // Action: Self Correction (Owner can update pending ones)
         (existing().createdBy == request.auth.uid && existing().status == 'pending' && isValidTransaction(incoming()))
       );
       

@@ -98,9 +98,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
     return transactions.filter(t => {
       const matchesType = filters.type === 'all' || t.type === filters.type;
       const matchesProject = filters.projectID === 'all' || t.projectID === filters.projectID;
+      const matchesStatus = filters.status === 'all' || t.status === filters.status;
       const matchesSearch = filters.search === '' || 
         t.category.toLowerCase().includes(filters.search.toLowerCase()) ||
-        (t.expenditureType || '').toLowerCase().includes(filters.search.toLowerCase());
+        (t.expenditureType || '').toLowerCase().includes(filters.search.toLowerCase()) ||
+        (t.donationType || '').toLowerCase().includes(filters.search.toLowerCase()) ||
+        (t.description || '').toLowerCase().includes(filters.search.toLowerCase());
       
       let matchesDate = true;
       if (filters.startDate && t.date) {
@@ -114,9 +117,18 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
         matchesDate = tDate <= end;
       }
 
-      return matchesType && matchesProject && matchesSearch && matchesDate;
+      return matchesType && matchesProject && matchesStatus && matchesSearch && matchesDate;
     });
   }, [transactions, filters]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.projectID !== 'all') count++;
+    if (filters.status !== 'all') count++;
+    if (filters.startDate) count++;
+    if (filters.endDate) count++;
+    return count;
+  }, [filters]);
 
   return (
     <div className="space-y-8 p-4 md:p-0 bg-[#F9FAFB]/50 min-h-screen">
@@ -248,7 +260,11 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
             className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-600 hover:bg-slate-50 relative group"
           >
             <Filter size={18} />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-[8px] font-black flex items-center justify-center rounded-full border-2 border-white">2</span>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-[8px] font-black flex items-center justify-center rounded-full border-2 border-white">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
         </div>
       </div>

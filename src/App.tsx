@@ -264,10 +264,13 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        // Automatically promote the specific user to Admin for module management
+        const role = firebaseUser.email === 'riteshgarad4@gmail.com' ? 'Admin' : 'Staff Operative';
+        
         setUser({
           name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
           email: firebaseUser.email || '',
-          role: 'Staff Operative'
+          role: role
         });
       } else {
         setUser(null);
