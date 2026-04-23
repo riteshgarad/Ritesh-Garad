@@ -137,6 +137,41 @@ service cloud.firestore {
       
       allow delete: if isAdmin();
     }
+
+    // --- Marketing & Donations (Pillar 6, 8) ---
+
+    match /campaigns/{campaignId} {
+      allow read: if isSignedIn();
+      
+      function isValidCampaign(data) {
+        return data.keys().hasAll(['title', 'goal_amount', 'status', 'created_by', 'created_at', 'current_raised', 'category']) &&
+               data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+               data.goal_amount is number && data.goal_amount > 0 &&
+               data.status in ['draft', 'pending_head', 'pending_admin', 'active', 'completed'];
+      }
+
+      allow create: if isSignedIn() && isValidCampaign(incoming()) && incoming().created_by == request.auth.uid;
+      
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (isDH() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejection_reason', 'updated_at'])) ||
+        (isOwner(existing().created_by) && existing().status == 'draft' && isValidCampaign(incoming())) ||
+        // Support donation auto-updates (Pillar 7)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['current_raised', 'updated_at']))
+      );
+    }
+
+    match /donors/{donorId} {
+      // PII Protection: Only Admin or Marketing Heads can see donor list
+      allow read: if isAdmin() || isDH();
+      allow write: if isAdmin() || isDH();
+    }
+
+    match /donations/{donationId} {
+      allow read: if isAdmin() || isDH();
+      allow create: if isSignedIn(); // Users/Bots create donations
+      allow update: if isAdmin();
+    }
     
     // Public connection check
     match /test/connection {

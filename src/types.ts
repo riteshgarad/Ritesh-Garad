@@ -64,15 +64,49 @@ export interface Transaction {
   receiptURL?: string;
   date: any; // Firestore Timestamp
   createdBy: string;
+  reviewedBy?: string;
+  reviewedAt?: any;
+  rejectionReason?: string;
 }
+
+export type CampaignStatus = 'draft' | 'pending_head' | 'pending_admin' | 'active' | 'completed';
 
 export interface Campaign {
   id: string;
+  title: string;
+  description: string;
+  goal_amount: number;
+  current_raised: number;
+  status: CampaignStatus;
+  media_urls: string[];
+  impact_story_id?: string; // Reference to projects collection
+  created_at: any;
+  created_by: string;
+  rejection_reason?: string;
+  category: string;
+}
+
+export interface Donor {
+  id: string;
   name: string;
-  goal: number;
-  raised: number;
-  end_date: string;
-  status: 'active' | 'completed';
+  email: string;
+  total_donated: number;
+  tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  last_donation_date: any;
+  frequency: 'one-time' | 'monthly' | 'yearly';
+  join_date: any;
+}
+
+export interface Donation {
+  id: string;
+  donor_id: string;
+  amount: number;
+  campaign_id: string;
+  is_recurring: boolean;
+  status: 'captured' | 'failed';
+  donor_visibility: 'public' | 'anonymous';
+  timestamp: any;
+  payment_method: string;
 }
 
 export interface AppNotification {

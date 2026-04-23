@@ -103,6 +103,55 @@
         "createdBy": { "type": "string" }
       },
       "required": ["type", "amount", "category", "status", "date", "createdBy"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "A fundraising campaign for the NGO.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "goal_amount": { "type": "number" },
+        "current_raised": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "pending_head", "pending_admin", "active", "completed"] },
+        "media_urls": { "type": "array", "items": { "type": "string" } },
+        "impact_story_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["title", "goal_amount", "status", "created_by"]
+    },
+    "Donor": {
+      "title": "Donor",
+      "description": "A supporter who provides financial contributions.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "total_donated": { "type": "number" },
+        "tier": { "type": "string", "enum": ["Bronze", "Silver", "Gold", "Platinum"] },
+        "last_donation_date": { "type": "string", "format": "date-time" },
+        "frequency": { "type": "string", "enum": ["one-time", "monthly", "yearly"] },
+        "join_date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "tier"]
+    },
+    "Donation": {
+      "title": "Donation",
+      "description": "An individual financial contribution record.",
+      "type": "object",
+      "properties": {
+        "donor_id": { "type": "string" },
+        "amount": { "type": "number" },
+        "campaign_id": { "type": "string" },
+        "is_recurring": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["captured", "failed"] },
+        "donor_visibility": { "type": "string", "enum": ["public", "anonymous"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payment_method": { "type": "string" }
+      },
+      "required": ["donor_id", "amount", "status", "timestamp"]
     }
   },
   "firestore": {
@@ -129,6 +178,18 @@
     "/transactions/{transactionId}": {
       "schema": "Transaction",
       "description": "Financial ledger for the NGO."
+    },
+    "/campaigns/{campaignId}": {
+      "schema": "Campaign",
+      "description": "Marketing fundraising campaigns."
+    },
+    "/donors/{donorId}": {
+      "schema": "Donor",
+      "description": "CRM for NGO supporters."
+    },
+    "/donations/{donationId}": {
+      "schema": "Donation",
+      "description": "Individual donation transaction records."
     }
   }
 }

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import FinanceDashboard from './components/FinanceDashboard';
+import MarketingDashboard from './components/MarketingDashboard';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -18,6 +19,7 @@ import {
   Zap, 
   Search, 
   Bell, 
+  Megaphone,
   LogOut, 
   Menu, 
   X,
@@ -559,7 +561,7 @@ export default function App() {
     { id: 'finance', label: 'Finance', icon: IndianRupee },
     { id: 'docs', label: 'Documentation', icon: FileText },
     { id: 'social', label: 'Social & PR', icon: Share2 },
-    { id: 'fundraising', label: 'Fundraising', icon: Star },
+    { id: 'fundraising', label: 'Marketing & Donations', icon: Megaphone },
     { id: 'chatbot', label: 'AI Assistant', icon: Bot },
     { id: 'automation', label: 'Automation', icon: Zap },
   ];
@@ -1202,7 +1204,7 @@ const PageView = ({ page, projects, tasks, volunteers, selectedProjectId, onOpen
     case 'social':
       return <SocialMediaView />;
     case 'fundraising':
-      return <FundraisingView />;
+      return <MarketingDashboard user={user} />;
     case 'chatbot':
       return <ChatbotView projects={projects} tasks={tasks} volunteers={volunteers} />;
     default:

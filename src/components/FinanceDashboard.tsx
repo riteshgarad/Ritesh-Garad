@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
-import { collection, query, onSnapshot, orderBy, updateDoc, doc, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, updateDoc, doc, where, serverTimestamp } from 'firebase/firestore';
 import { Transaction, Project, AppUser } from '../types';
 import TransactionTable from './TransactionTable';
 import AddTransactionModal from './AddTransactionModal';
@@ -59,10 +59,17 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
     return () => unsubscribe();
   }, []);
 
-  const handleUpdateStatus = async (id: string, status: any) => {
+  const handleUpdateStatus = async (id: string, status: any, reason?: string) => {
     if (!isAdmin) return;
     try {
-      await updateDoc(doc(db, 'transactions', id), { status });
+      const data: any = { 
+        status,
+        reviewedBy: auth.currentUser?.uid,
+        reviewedAt: serverTimestamp()
+      };
+      if (reason) data.rejectionReason = reason;
+
+      await updateDoc(doc(db, 'transactions', id), data);
     } catch (error) {
       console.error("Error updating transaction status:", error);
     }
