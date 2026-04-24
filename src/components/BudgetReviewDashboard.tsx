@@ -115,11 +115,16 @@ export const BudgetReviewDashboard: React.FC<BudgetReviewDashboardProps> = ({ us
                   <div className="flex items-center gap-3 mb-2">
                     <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-none">{req.projectName}</h4>
                     {getStatusBadge(req.status)}
+                    {(req as any).resubmittedAt && (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-full text-[8px] font-black uppercase tracking-widest animate-pulse">
+                        Resubmitted
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">
                     <span className="flex items-center gap-1.5"><Building2 size={12} /> {req.department}</span>
                     <span className="flex items-center gap-1.5"><User size={12} /> Proposed by {req.proposedBy}</span>
-                    <span className="flex items-center gap-1.5"><Clock size={12} /> {req.submittedAt?.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                    <span className="flex items-center gap-1.5"><Clock size={12} /> {req.submittedAt?.toDate ? req.submittedAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Pending'}</span>
                   </div>
                 </div>
               </div>

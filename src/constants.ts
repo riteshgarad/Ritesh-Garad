@@ -47,9 +47,45 @@ export const INITIAL_TASKS: Task[] = [
 ];
 
 export const INITIAL_VOLUNTEERS: Volunteer[] = [
-  { id: '1', name: 'Rites Garad', email: 'riteshgarad4@gmail.com', role: 'admin', department: 'Admin', skills: 'Leadership, Tech', hours: 120, status: 'Active' },
-  { id: '2', name: 'Siddhesh Garad', email: 'siddheshgarad02@gmail.com', role: 'volunteer', department: 'Volunteers', skills: 'Field Ops', hours: 85, status: 'Active' },
-  { id: '3', name: 'Yukta Garad', email: 'yuktagarad@gmail.com', role: 'finance', department: 'Finance', skills: 'Accounting', hours: 45, status: 'Active' }
+  { 
+    id: '1', 
+    name: 'Rites Garad', 
+    email: 'riteshgarad4@gmail.com', 
+    role: 'Admin', 
+    department: 'Admin', 
+    skills: ['Leadership', 'Tech'], 
+    hours: 120, 
+    status: 'Active',
+    impactPoints: 500,
+    badges: ['Veteran', 'Strategic Lead'],
+    joinDate: new Date('2024-01-01').toISOString()
+  },
+  { 
+    id: '2', 
+    name: 'Siddhesh Garad', 
+    email: 'siddheshgarad02@gmail.com', 
+    role: 'Volunteer', 
+    department: 'Volunteers', 
+    skills: ['Field Ops'], 
+    hours: 85, 
+    status: 'Active',
+    impactPoints: 350,
+    badges: ['Rapid Responder'],
+    joinDate: new Date('2024-02-15').toISOString()
+  },
+  { 
+    id: '3', 
+    name: 'Yukta Garad', 
+    email: 'yuktagarad@gmail.com', 
+    role: 'Finance', 
+    department: 'Finance', 
+    skills: ['Accounting'], 
+    hours: 45, 
+    status: 'Active',
+    impactPoints: 150,
+    badges: ['Fiscal Integrity'],
+    joinDate: new Date('2024-03-10').toISOString()
+  }
 ];
 
 export const TEAM = [

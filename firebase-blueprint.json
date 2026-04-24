@@ -64,11 +64,62 @@
         "email": { "type": "string", "format": "email" },
         "role": { "type": "string" },
         "department": { "type": "string" },
-        "skills": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
         "hours": { "type": "number" },
-        "status": { "type": "string", "enum": ["Active", "Inactive"] }
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "impactPoints": { "type": "number" },
+        "badges": { "type": "array", "items": { "type": "string" } },
+        "profileImage": { "type": "string" },
+        "joinDate": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "email", "status"]
+    },
+    "WorkLog": {
+      "title": "Work Log",
+      "description": "Record of volunteer hours spent on a project.",
+      "type": "object",
+      "properties": {
+        "volunteerId": { "type": "string" },
+        "volunteerName": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "hours": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "verifiedBy": { "type": "string" }
+      },
+      "required": ["volunteerId", "projectId", "hours", "status", "date"]
+    },
+    "VolunteerApplication": {
+      "title": "Volunteer Application",
+      "description": "Information provided by prospective volunteers during onboarding.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "string" },
+        "interests": { "type": "string" },
+        "idProofURL": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending_verification", "approved", "rejected"] },
+        "appliedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "status", "appliedAt"]
+    },
+    "VolunteerCertificate": {
+      "title": "Volunteer Certificate",
+      "description": "Metadata for issued certificates.",
+      "type": "object",
+      "properties": {
+        "volunteerId": { "type": "string" },
+        "volunteerName": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "certificateURL": { "type": "string" }
+      },
+      "required": ["volunteerId", "projectId", "issuedAt", "certificateURL"]
     },
     "Notification": {
       "title": "Notification",
@@ -152,6 +203,28 @@
         "payment_method": { "type": "string" }
       },
       "required": ["donor_id", "amount", "status", "timestamp"]
+    },
+    "NGODocument": {
+      "title": "NGO Document",
+      "description": "A stored document or media file in the NGO vault.",
+      "type": "object",
+      "properties": {
+        "fileName": { "type": "string" },
+        "fileURL": { "type": "string" },
+        "category": { "type": "string", "enum": ["Project_Reports", "Finance_Records", "Legal_NGO", "Volunteer_Docs"] },
+        "uploadedBy": { "type": "string" },
+        "uploaderId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "uploadDate": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "expiryDate": { "type": "string", "format": "date-time" },
+        "fileSize": { "type": "number" },
+        "fileType": { "type": "string" },
+        "version": { "type": "number" }
+      },
+      "required": ["fileName", "fileURL", "category", "uploadedBy", "uploaderId", "uploadDate"]
     }
   },
   "firestore": {
@@ -166,6 +239,18 @@
     "/volunteers/{volunteerId}": {
       "schema": "Volunteer",
       "description": "Collection of NGO members."
+    },
+    "/volunteer_applications/{applicationId}": {
+      "schema": "VolunteerApplication",
+      "description": "Onboarding applications for new volunteers."
+    },
+    "/work_logs/{logId}": {
+      "schema": "WorkLog",
+      "description": "Validated hours of contribution."
+    },
+    "/volunteer_certificates/{certId}": {
+      "schema": "VolunteerCertificate",
+      "description": "Issued recognition credentials."
     },
     "/finance_requests/{requestId}": {
       "schema": "FinanceRequest",
@@ -190,6 +275,10 @@
     "/donations/{donationId}": {
       "schema": "Donation",
       "description": "Individual donation transaction records."
+    },
+    "/documents/{documentId}": {
+      "schema": "NGODocument",
+      "description": "Centralized NGO document repository."
     }
   }
 }

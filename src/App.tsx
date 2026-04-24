@@ -4,9 +4,17 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { Toaster, toast } from 'react-hot-toast';
 import FinanceDashboard from './components/FinanceDashboard';
 import MarketingDashboard from './components/MarketingDashboard';
 import { BudgetPlanner } from './components/BudgetPlanner';
+import { DocumentVault } from './components/DocumentVault';
+import { FileUploadModal } from './components/FileUploadModal';
+import { VolunteerApplicationForm } from './components/VolunteerApplication';
+import { VolunteerDirectory } from './components/VolunteerDirectory';
+import { VolunteerProfile } from './components/VolunteerProfile';
+import { generateProjectImpactReport } from './services/reportGenerator';
+import { generateVolunteerCertificate } from './services/certificateGenerator';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -56,18 +64,35 @@ import {
 } from 'recharts';
 import { differenceInDays, parseISO, isFuture, isPast } from 'date-fns';
 import { cn } from './lib/utils';
-import { BudgetItem, Project, Task, Volunteer, Transaction, Campaign, AppUser, AppNotification, BudgetRequest, FinanceRequest } from './types';
+import { 
+  BudgetItem, 
+  Project, 
+  Task, 
+  Volunteer, 
+  Transaction, 
+  Campaign, 
+  AppUser, 
+  AppNotification, 
+  BudgetRequest, 
+  FinanceRequest, 
+  NGODocument,
+  VolunteerApplication,
+  WorkLog,
+  VolunteerCertificate
+} from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
 import { askAssistant } from './services/geminiService';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // --- Firebase Initialization ---
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 const handleFirestoreError = (error: any, operationType: string, path: string | null = null) => {
   const authInfo = auth.currentUser ? {
@@ -246,6 +271,12 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [documents, setDocuments] = useState<NGODocument[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [applications, setApplications] = useState<VolunteerApplication[]>([]);
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [certificates, setCertificates] = useState<VolunteerCertificate[]>([]);
+  const [isApplying, setIsApplying] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -255,10 +286,12 @@ export default function App() {
   // Modal States
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isVolunteerModalOpen, setIsVolunteerModalOpen] = useState(false);
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
 
   // Notifications State
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotifOpen, setNotifOpen] = useState(false);
+  const [isUpdateLoading, setIsUpdateLoading] = useState(false);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   // --- Auth & Data Fetching ---
@@ -296,14 +329,51 @@ export default function App() {
     );
 
     const unsubVolunteers = onSnapshot(collection(db, 'volunteers'), 
-      (snapshot) => setVolunteers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Volunteer))),
+      (snapshot) => setVolunteers(snapshot.docs.map(d => {
+        const data = d.data();
+        return { 
+          id: d.id, 
+          ...data,
+          skills: Array.isArray(data.skills) ? data.skills : (typeof data.skills === 'string' ? data.skills.split(',').map((s: string) => s.trim()) : [])
+        } as Volunteer;
+      })),
       (err) => handleFirestoreError(err, 'list', 'volunteers')
+    );
+
+    const unsubDocuments = onSnapshot(collection(db, 'documents'),
+      (snapshot) => setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as NGODocument))),
+      (err) => handleFirestoreError(err, 'list', 'documents')
+    );
+
+    const unsubTransactions = onSnapshot(collection(db, 'transactions'),
+      (snapshot) => setTransactions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction))),
+      (err) => handleFirestoreError(err, 'list', 'transactions')
+    );
+
+    const unsubApps = onSnapshot(collection(db, 'volunteer_applications'),
+      (snapshot) => setApplications(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerApplication))),
+      (err) => handleFirestoreError(err, 'list', 'volunteer_applications')
+    );
+
+    const unsubLogs = onSnapshot(collection(db, 'work_logs'),
+      (snapshot) => setWorkLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))),
+      (err) => handleFirestoreError(err, 'list', 'work_logs')
+    );
+
+    const unsubCerts = onSnapshot(collection(db, 'volunteer_certificates'),
+      (snapshot) => setCertificates(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerCertificate))),
+      (err) => handleFirestoreError(err, 'list', 'volunteer_certificates')
     );
 
     return () => {
       unsubProjects();
       unsubTasks();
       unsubVolunteers();
+      unsubDocuments();
+      unsubTransactions();
+      unsubApps();
+      unsubLogs();
+      unsubCerts();
     };
   }, [user]);
 
@@ -460,7 +530,22 @@ export default function App() {
         updateData.rejection_reason = reason;
       }
 
+      // Add Progress auto-update for completion
+      if (newStatus === 'completed') {
+        updateData.progress = 100;
+      }
+
       await updateDoc(projectRef, updateData);
+
+      // Trigger Auto-Report Generation if completed
+      if (newStatus === 'completed') {
+        const proj = projects.find(p => p.id === projectId);
+        if (proj) {
+          const projectTransactions = transactions.filter(t => t.projectID === projectId);
+          generateProjectImpactReport(proj, proj.budget_items || [], projectTransactions);
+          toast.success("Impact Report auto-generated successfully.");
+        }
+      }
 
       // Financial Integration Trigger
       if (newStatus === 'approved') {
@@ -535,6 +620,160 @@ export default function App() {
     }
   };
 
+  const handleUploadDocument = async (docData: any) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'documents'), {
+        ...docData,
+        uploadedBy: user.name,
+        uploaderId: user.uid,
+        uploadDate: serverTimestamp(),
+        version: 1
+      });
+      toast.success("Document ingestion successful. Records updated.");
+    } catch (err) {
+      handleFirestoreError(err, 'create', 'documents');
+    }
+  };
+
+  const handleDeleteDocument = async (id: string) => {
+    if (!window.confirm("Perform hard deletion on this record?")) return;
+    try {
+      await deleteDoc(doc(db, 'documents', id));
+      toast.success("Record expunged from repository.");
+    } catch (err) {
+      handleFirestoreError(err, 'delete', `documents/${id}`);
+    }
+  };
+
+  // --- Volunteer Handlers ---
+  const handleVolunteerApplication = async (appData: any) => {
+    setIsUpdateLoading(true);
+    try {
+      await addDoc(collection(db, 'volunteer_applications'), {
+        ...appData,
+        status: 'pending_verification',
+        appliedAt: serverTimestamp()
+      });
+      toast.success("Application submitted successfully.");
+    } catch (err) {
+      handleFirestoreError(err, 'create', 'volunteer_applications');
+    } finally {
+      setIsUpdateLoading(false);
+    }
+  };
+
+  const handleApproveApplication = async (app: VolunteerApplication) => {
+    if (!user) return;
+    try {
+      const batch = writeBatch(db);
+      
+      // 1. Create Volunteer record
+      const volunteerRef = doc(collection(db, 'volunteers'));
+      batch.set(volunteerRef, {
+        name: app.name,
+        email: app.email,
+        skills: app.skills,
+        role: 'Volunteer',
+        department: 'General',
+        hours: 0,
+        status: 'Active',
+        impactPoints: 0,
+        badges: ['Newbie'],
+        joinDate: serverTimestamp()
+      });
+
+      // 2. Update Application status
+      batch.update(doc(db, 'volunteer_applications', app.id), {
+        status: 'approved',
+        reviewedBy: user.name,
+        reviewedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+      toast.success(`Protocol executed. ${app.name} has been onboarded.`);
+    } catch (err) {
+      handleFirestoreError(err, 'update', `volunteer_applications/${app.id}`);
+    }
+  };
+
+  const handleLogHours = async (logData: any) => {
+    try {
+      await addDoc(collection(db, 'work_logs'), {
+        ...logData,
+        status: 'pending',
+        date: logData.date instanceof Date ? logData.date : serverTimestamp()
+      });
+      toast.success("Hours logged. Pending verification by Sector Lead.");
+    } catch (err) {
+      handleFirestoreError(err, 'create', 'work_logs');
+    }
+  };
+
+  const handleVerifyWorkLog = async (logId: string, status: 'verified' | 'rejected') => {
+    if (!user) return;
+    try {
+      const log = workLogs.find(l => l.id === logId);
+      if (!log) return;
+
+      const batch = writeBatch(db);
+      
+      // 1. Update Log Status
+      batch.update(doc(db, 'work_logs', logId), {
+        status,
+        verifiedBy: user.name,
+        verifiedAt: serverTimestamp()
+      });
+
+      // 2. If verified, update volunteer hours and points
+      if (status === 'verified') {
+        const vRef = doc(db, 'volunteers', log.volunteerId);
+        const currentV = volunteers.find(v => v.id === log.volunteerId);
+        if (currentV) {
+          batch.update(vRef, {
+            hours: (currentV.hours || 0) + log.hours,
+            impactPoints: (currentV.impactPoints || 0) + (log.hours * 10)
+          });
+        }
+      }
+
+      await batch.commit();
+      toast.success(`Contribution ${status}. Records synchronized.`);
+    } catch (err) {
+      handleFirestoreError(err, 'update', `work_logs/${logId}`);
+    }
+  };
+
+  const handleGenerateCertificate = async (volunteerId: string, projectId: string) => {
+    if (!user) return;
+    try {
+      const v = volunteers.find(v => v.id === volunteerId);
+      const p = projects.find(p => p.id === projectId);
+      
+      if (!v || !p) {
+        toast.error("Internal Error: Entity not found.");
+        return;
+      }
+
+      // Generate PDF
+      const fileName = generateVolunteerCertificate(v, p);
+      
+      // Save metadata to Firestore
+      await addDoc(collection(db, 'volunteer_certificates'), {
+        volunteerId,
+        volunteerName: v.name,
+        projectId,
+        projectName: p.name,
+        issuedAt: serverTimestamp(),
+        certificateURL: `certificates/${fileName}` // In a real app we'd upload this to storage first
+      });
+
+      toast.success("Recognition Diploma generated and archived.");
+    } catch (err) {
+      handleFirestoreError(err, 'create', 'volunteer_certificates');
+    }
+  };
+
   // --- Login Logic ---
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -569,6 +808,8 @@ export default function App() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const handleUpdateBudget = async (projectId: string, budgetItems: BudgetItem[]) => {
+    if (!auth.currentUser || !user) return;
+    setIsUpdateLoading(true);
     try {
       const totalBudget = budgetItems.reduce((acc, curr) => acc + Number(curr.cost), 0);
       const batch = writeBatch(db);
@@ -578,51 +819,53 @@ export default function App() {
       batch.update(projectRef, {
         budget_items: budgetItems,
         budget: `₹${totalBudget.toLocaleString()}`,
-        budget_status: 'pending', // Reset to pending
-        budget_rejection_reason: null // Clear rejection logic context
+        budget_status: 'pending', 
+        budget_rejection_reason: null,
+        resubmittedAt: serverTimestamp()
       });
 
-      // 2. Find and update the existing budget_request or create a new one
-      // For simplicity, we create a new one or update if we find it.
-      // Better to update existing one to keep history.
-      const q = query(collection(db, 'budget_requests'), where('projectId', '==', projectId));
-      // Since we can't use await inside batch easily if we don't know the ID, 
-      // we'll just handle it as a separate update after commit or find it first.
-      
-      await batch.commit();
-
-      // Find and update budget request status
+      // 2. Find and update budget request status
       const reqSnapshot = await getDocs(query(collection(db, 'budget_requests'), where('projectId', '==', projectId)));
-        if (!reqSnapshot.empty) {
-          const reqId = reqSnapshot.docs[0].id;
-          await updateDoc(doc(db, 'budget_requests', reqId), {
-            itemizedList: budgetItems,
-            totalAmount: totalBudget,
-            status: 'pending_finance',
-            submittedAt: serverTimestamp(),
-            proposerId: user.uid,
-            proposedBy: user.name
-          });
-        } else {
-          // Create it if it doesn't exist (failsafe)
-          const projectDoc = projects.find(p => p.id === projectId);
-          await addDoc(collection(db, 'budget_requests'), {
-            projectId: projectId,
-            projectName: projectDoc?.name || 'Project Budget',
-            proposerId: user.uid,
-            proposedBy: user.name,
-            department: projectDoc?.department || user.department || "General",
-            itemizedList: budgetItems,
-            totalAmount: totalBudget,
-            status: 'pending_finance',
-            submittedAt: serverTimestamp()
-          });
-        }
+      if (!reqSnapshot.empty) {
+        const reqId = reqSnapshot.docs[0].id;
+        batch.update(doc(db, 'budget_requests', reqId), {
+          itemizedList: budgetItems,
+          totalAmount: totalBudget,
+          status: 'pending_finance',
+          submittedAt: serverTimestamp(),
+          resubmittedAt: serverTimestamp(),
+          rejectionReason: null,
+          proposerId: user.uid,
+          proposedBy: user.name
+        });
+      } else {
+        // Create it if it doesn't exist (failsafe)
+        const projectDoc = projects.find(p => p.id === projectId);
+        const newDocRef = doc(collection(db, 'budget_requests'));
+        batch.set(newDocRef, {
+          projectId: projectId,
+          projectName: projectDoc?.name || 'Project Budget',
+          proposerId: user.uid,
+          proposedBy: user.name,
+          department: projectDoc?.department || user.department || "General",
+          itemizedList: budgetItems,
+          totalAmount: totalBudget,
+          status: 'pending_finance',
+          submittedAt: serverTimestamp(),
+          resubmittedAt: serverTimestamp()
+        });
+      }
 
+      await batch.commit();
+      toast.success("Budget resubmitted for approval.");
       setIsEditBudgetModalOpen(false);
       setEditingProject(null);
     } catch (err) {
+      console.error(err);
+      toast.error("Resubmission failed. Please check connectivity.");
       handleFirestoreError(err, 'update', `projects/${projectId}/budget`);
+    } finally {
+      setIsUpdateLoading(false);
     }
   };
 
@@ -648,6 +891,15 @@ export default function App() {
   ];
 
   if (!user) {
+    if (isApplying) {
+      return (
+        <VolunteerApplicationForm 
+          onSubmit={handleVolunteerApplication} 
+          isLoading={isUpdateLoading} 
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <motion.div 
@@ -712,13 +964,26 @@ export default function App() {
               {isSignUp ? 'Register Operative' : 'Authorize Access'}
             </button>
 
-            <div className="text-center pt-2">
+            <div className="flex flex-col gap-4 text-center pt-2">
               <button
                 type="button"
                 onClick={() => setIsSignUp(!isSignUp)}
                 className="text-[10px] font-bold text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-colors"
               >
                 {isSignUp ? 'Already registered? System Login' : 'First deployment? Initialize Account'}
+              </button>
+              
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+                <div className="relative flex justify-center"><span className="bg-white px-2 text-[8px] font-black text-slate-300 uppercase tracking-widest">OR</span></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsApplying(true)}
+                className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+              >
+                <Star size={12} fill="currentColor" /> Apply to Volunteer
               </button>
             </div>
           </form>
@@ -732,6 +997,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-700 overflow-hidden text-xs md:text-sm tracking-tight select-none">
+      <Toaster position="top-right" />
       {/* Sidebar Overlay for Mobile */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -935,6 +1201,7 @@ export default function App() {
                 projects={projects} 
                 tasks={tasks}
                 volunteers={volunteers}
+                documents={documents}
                 selectedProjectId={selectedProjectId}
                 setCurrentPage={setCurrentPage}
                 onOpenProject={(id: string) => {
@@ -949,6 +1216,19 @@ export default function App() {
                   setEditingProject(p);
                   setIsEditBudgetModalOpen(true);
                 }}
+                onDeleteDocument={handleDeleteDocument}
+                setIsDocumentModalOpen={setIsDocumentModalOpen}
+                transactions={transactions}
+                applications={applications}
+                onApprove={handleApproveApplication}
+                onReject={async (id: string) => {
+                  await updateDoc(doc(db, 'volunteer_applications', id), { status: 'rejected' });
+                }}
+                onLogHours={handleLogHours}
+                workLogs={workLogs}
+                certificates={certificates}
+                onVerifyLog={handleVerifyWorkLog}
+                onGenerateCert={handleGenerateCertificate}
               />
             </motion.div>
           </AnimatePresence>
@@ -1020,6 +1300,15 @@ export default function App() {
             onClose={() => setIsEditBudgetModalOpen(false)}
             onUpdate={handleUpdateBudget}
             project={editingProject}
+            isLoading={isUpdateLoading}
+          />
+        )}
+        {isDocumentModalOpen && (
+          <FileUploadModal 
+            isOpen={isDocumentModalOpen}
+            onClose={() => setIsDocumentModalOpen(false)}
+            onUpload={handleUploadDocument}
+            projects={projects}
           />
         )}
       </AnimatePresence>
@@ -1027,7 +1316,7 @@ export default function App() {
   );
 }
 
-const EditBudgetModal = ({ isOpen, onClose, onUpdate, project }: any) => {
+const EditBudgetModal = ({ isOpen, onClose, onUpdate, project, isLoading }: any) => {
   const [items, setItems] = useState<BudgetItem[]>(project?.budget_items || []);
 
   useEffect(() => {
@@ -1072,16 +1361,25 @@ const EditBudgetModal = ({ isOpen, onClose, onUpdate, project }: any) => {
 
         <div className="flex gap-3">
           <button 
+            disabled={isLoading}
             onClick={onClose}
-            className="flex-1 py-4 bg-slate-50 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest"
+            className="flex-1 py-4 bg-slate-50 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
           >
             Cancel
           </button>
           <button 
+            disabled={isLoading}
             onClick={() => onUpdate(project.id, items)}
-            className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-200 hover:bg-red-700 transition-all"
+            className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-200 hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Update & Resubmit
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Resubmitting...
+              </>
+            ) : (
+              'Update & Resubmit'
+            )}
           </button>
         </div>
       </motion.div>
@@ -1347,24 +1645,76 @@ const VolunteerModal = ({ isOpen, onClose, onCreate }: any) => {
 
 // --- Page Views ---
 
-const PageView = ({ page, projects, tasks, volunteers, selectedProjectId, onOpenProject, setCurrentPage, onAddProject, onAddVolunteer, onDeleteProject, onUpdateProjectStatus, onEditBudget, user }: any) => {
+const PageView = ({ 
+  page, projects, tasks, volunteers, documents, transactions, selectedProjectId, 
+  onOpenProject, setCurrentPage, onAddProject, onAddVolunteer, onDeleteProject, 
+  onUpdateProjectStatus, onEditBudget, onDeleteDocument, setIsDocumentModalOpen, user,
+  applications, onApprove, onReject, onLogHours, workLogs, certificates, 
+  onVerifyLog, onGenerateCert 
+}: any) => {
+  // Determine if current user has a volunteer record
+  const currentVolunteer = volunteers.find((v: any) => v.email === user?.email);
+
   switch (page) {
     case 'dashboard':
       return <DashboardView projects={projects} tasks={tasks} volunteers={volunteers} onOpenProject={onOpenProject} setCurrentPage={setCurrentPage} onDeleteProject={onDeleteProject} user={user} />;
     case 'projects':
       return <ProjectsView projects={projects} onOpenProject={onOpenProject} onAdd={onAddProject} onDelete={onDeleteProject} user={user} />;
     case 'project-detail':
-      return <ProjectDetailView projectId={selectedProjectId} projects={projects} tasks={tasks} volunteers={volunteers} onBack={() => setCurrentPage('projects')} onDelete={onDeleteProject} onUpdateProjectStatus={onUpdateProjectStatus} onEditBudget={onEditBudget} user={user} />;
+      return (
+        <ProjectDetailView 
+          projectId={selectedProjectId} 
+          projects={projects} 
+          tasks={tasks} 
+          volunteers={volunteers} 
+          onBack={() => setCurrentPage('projects')} 
+          onDelete={onDeleteProject} 
+          onUpdateProjectStatus={onUpdateProjectStatus} 
+          onEditBudget={onEditBudget} 
+          user={user}
+          onGenerateCertificate={(vId: string) => onGenerateCert(vId, selectedProjectId)}
+          workLogs={workLogs.filter((l: any) => l.projectId === selectedProjectId)}
+          onVerifyLog={onVerifyLog}
+        />
+      );
     case 'tasks':
       return <TasksView tasks={tasks} projects={projects} />;
     case 'volunteers':
+      const canManage = user.role === 'Admin' || user.role === 'Department Head' || user.role === 'DH';
+      
+      if (canManage) {
+        return (
+          <VolunteerDirectory 
+            volunteers={volunteers}
+            applications={applications}
+            onApprove={onApprove}
+            onReject={onReject}
+            onUpdateStatus={async () => {}} 
+            user={user}
+          />
+        );
+      }
+      
+      if (currentVolunteer) {
+        return (
+          <VolunteerProfile 
+            volunteer={currentVolunteer}
+            projects={projects}
+            logs={workLogs}
+            certificates={certificates}
+            onLogHours={onLogHours}
+            user={user}
+          />
+        );
+      }
+
       return <VolunteersView volunteers={volunteers} onAdd={onAddVolunteer} />;
     case 'finance':
       return <FinanceDashboard user={user} projects={projects} />;
+    case 'docs':
+      return <DocumentVault documents={documents} onUpload={() => setIsDocumentModalOpen(true)} onDelete={onDeleteDocument} user={user} transactions={transactions} />;
     case 'social':
-      return <SocialMediaView />;
-    case 'fundraising':
-      return <MarketingDashboard user={user} />;
+      return <MarketingDashboard user={user} projects={projects} campaigns={[]} volunteers={volunteers} />;
     case 'chatbot':
       return <ChatbotView projects={projects} tasks={tasks} volunteers={volunteers} />;
     default:
@@ -1600,7 +1950,10 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
   );
 };
 
-const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onDelete, onUpdateProjectStatus, onEditBudget, user }: any) => {
+const ProjectDetailView = ({ 
+  projectId, projects, tasks, volunteers, onBack, onDelete, onUpdateProjectStatus, 
+  onEditBudget, user, onGenerateCertificate, workLogs, onVerifyLog 
+}: any) => {
   const project = projects.find((p: any) => p.id === projectId);
   const projectTasks = tasks.filter((t: any) => t.project_id === projectId);
   const [showRejectionInput, setShowRejectionInput] = useState(false);
@@ -1658,7 +2011,7 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
           </div>
           <button 
             onClick={() => onEditBudget(project)}
-            className="px-6 py-3 bg-white text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 shadow-lg"
+            className="px-6 py-3 bg-red-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-900 transition-all flex items-center gap-2 shadow-lg border border-red-400"
           >
             <Plus size={14} /> Revise & Resubmit
           </button>
@@ -2016,10 +2369,143 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
               )}
            </Card>
 
-            {/* Personnel Allocation */}
-            <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Personnel Deployment Hub</h3>
-               <div className="space-y-4">
+            {/* Personnel Registry */}
+            <div className="space-y-6">
+              <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Personnel Deployment</h3>
+                <div className="space-y-4">
+                  {volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).length > 0 ? (
+                    volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).map((v: any) => (
+                      <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-indigo-200 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-indigo-500 font-black text-[10px]">
+                            {v.name.split(' ').map((n: any) => n[0]).join('')}
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{v.name}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{v.role}</p>
+                          </div>
+                        </div>
+                        {user?.role === 'Admin' && (
+                          <button 
+                            onClick={() => onGenerateCertificate(v.id)}
+                            className="p-2.5 text-indigo-500 hover:bg-white rounded-xl transition-all shadow-sm opacity-0 group-hover:opacity-100"
+                            title="Generate Recognition Diploma"
+                          >
+                            <Star size={16} fill="currentColor" />
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-6 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">No operatives assigned</div>
+                  )}
+                </div>
+              </Card>
+
+              {/* Work Log Verification (For Dept Heads / Admins) */}
+              {(user?.role === 'Admin' || user?.role === 'DH') && (
+                <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Contribution Verification</h3>
+                  <div className="space-y-4">
+                    {workLogs.filter((l: any) => l.status === 'pending').length > 0 ? (
+                      workLogs.filter((l: any) => l.status === 'pending').map((log: any) => (
+                        <div key={log.id} className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{log.volunteerName}</p>
+                              <p className="text-[9px] font-bold text-slate-500">{log.hours} Hours • {log.date.toDate().toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => onVerifyLog(log.id, 'verified')}
+                                className="w-8 h-8 bg-emerald-500 text-white rounded-lg flex items-center justify-center hover:bg-emerald-600 transition-all shadow-md"
+                              >
+                                <CheckCircle2 size={16} />
+                              </button>
+                              <button 
+                                onClick={() => onVerifyLog(log.id, 'rejected')}
+                                className="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition-all shadow-md"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-600 italic leading-snug">"{log.description}"</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">Zero pending logs</div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Skill Matching Suggestions */}
+              <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                  <Zap size={80} className="text-indigo-600" />
+                </div>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">AI Skill Matching</h3>
+                <div className="space-y-4">
+                  {volunteers
+                    .filter(v => !projectTasks.some(t => t.assigned_to === v.name)) // Not already assigned
+                    .filter(v => v.skills.some(s => project.tags?.includes(s) || project.description.toLowerCase().includes(s.toLowerCase())))
+                    .slice(0, 3)
+                    .map(v => (
+                      <div key={v.id} className="flex items-center justify-between p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white border border-indigo-100 rounded-xl flex items-center justify-center text-indigo-500 font-black text-[10px]">
+                            {v.name.split(' ').map((n: any) => n[0]).join('')}
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{v.name}</p>
+                            <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-widest">Matches Needs</p>
+                          </div>
+                        </div>
+                        <button className="p-2 text-indigo-500 hover:bg-white rounded-xl transition-all shadow-sm">
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  {volunteers.filter(v => !projectTasks.some(t => t.assigned_to === v.name) && v.skills.some(s => project.tags?.includes(s) || project.description.toLowerCase().includes(s.toLowerCase()))).length === 0 && (
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-4">No perfect matches found</p>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Right Column: Stats & Personnel */}
+          <div className="space-y-8">
+             {/* Progress Card */}
+             <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Mission Velocity</h3>
+                <div className="flex items-center justify-center relative mb-8">
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-50"/>
+                    <motion.circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent"
+                      strokeDasharray={364.4}
+                      initial={{ strokeDashoffset: 364.4 }}
+                      animate={{ strokeDashoffset: 364.4 - (364.4 * project.progress) / 100 }}
+                      transition={{ duration: 1.5, ease: "circOut" }}
+                      className="text-blue-600"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{project.progress}%</span>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Status</span>
+                  <Badge className="bg-white text-emerald-500 border border-emerald-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">Optimal</Badge>
+                </div>
+             </Card>
+
+             {/* Personnel Assignment Section */}
+             <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Mission Command</h3>
+               <div className="space-y-6">
                  <div className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl mb-4">
                     <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-lg shadow-blue-500/20">
                        {INITIALS(project.lead_name)}
@@ -2032,7 +2518,7 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
 
                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Active Operatives</p>
                  <div className="space-y-3">
-                   {volunteers.slice(0, 3).map((v: any) => (
+                   {volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).slice(0, 5).map((v: any) => (
                       <div key={v.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl group hover:border-blue-200 transition-all">
                         <div className="flex items-center gap-3">
                            <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 font-black text-[9px] uppercase tracking-tighter">{INITIALS(v.name)}</div>
@@ -2044,6 +2530,9 @@ const ProjectDetailView = ({ projectId, projects, tasks, volunteers, onBack, onD
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-glow"></div>
                       </div>
                    ))}
+                   {volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).length === 0 && (
+                     <p className="text-center text-[10px] font-bold text-slate-300 uppercase py-2">No personnel deployed</p>
+                   )}
                  </div>
                  
                  {project.status === 'approved' && user?.role === 'Admin' && (

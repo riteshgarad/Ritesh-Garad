@@ -20,6 +20,7 @@ export interface Project {
   timeline?: string;
   department: string;
   created_at: any;
+  resubmittedAt?: any;
   creator_id: string;
 }
 
@@ -44,6 +45,7 @@ export interface BudgetRequest {
   status: 'pending_finance' | 'approved' | 'rejected';
   rejectionReason?: string;
   submittedAt: any;
+  resubmittedAt?: any;
   reviewedBy?: string;
   reviewedAt?: any;
 }
@@ -69,9 +71,51 @@ export interface Volunteer {
   email: string;
   role: string;
   department: string;
-  skills: string;
+  skills: string[];
   hours: number;
   status: 'Active' | 'Inactive';
+  impactPoints: number;
+  badges: string[];
+  profileImage?: string;
+  joinDate: any;
+}
+
+export interface WorkLog {
+  id: string;
+  volunteerId: string;
+  volunteerName: string;
+  projectId: string;
+  projectName: string;
+  hours: number;
+  description: string;
+  date: any;
+  status: 'pending' | 'verified' | 'rejected';
+  verifiedBy?: string;
+  verifiedAt?: any;
+}
+
+export interface VolunteerApplication {
+  id: string;
+  name: string;
+  email: string;
+  skills: string[];
+  availability: string;
+  interests: string;
+  idProofURL: string;
+  status: 'pending_verification' | 'approved' | 'rejected';
+  appliedAt: any;
+  reviewedBy?: string;
+  reviewedAt?: any;
+}
+
+export interface VolunteerCertificate {
+  id: string;
+  volunteerId: string;
+  volunteerName: string;
+  projectId: string;
+  projectName: string;
+  issuedAt: any;
+  certificateURL: string;
 }
 
 export interface Transaction {
@@ -79,6 +123,7 @@ export interface Transaction {
   type: 'income' | 'expense';
   amount: number;
   category: string;
+  description: string;
   projectID?: string;
   donationType?: 'One-time' | 'Monthly' | 'Corporate' | 'In-kind' | 'N/A';
   expenditureType?: 'Procurement' | 'Travel' | 'Event Setup' | 'Marketing' | 'N/A';
@@ -90,6 +135,28 @@ export interface Transaction {
   reviewedBy?: string;
   reviewedAt?: any;
   rejectionReason?: string;
+}
+
+export type DocumentCategory = 'Project_Reports' | 'Finance_Records' | 'Legal_NGO' | 'Volunteer_Docs';
+
+export interface NGODocument {
+  id: string;
+  fileName: string;
+  fileURL: string;
+  category: DocumentCategory;
+  uploadedBy: string;
+  uploaderId: string;
+  projectId?: string;
+  projectName?: string;
+  uploadDate: any;
+  description: string;
+  location?: string;
+  expiryDate?: any;
+  fileSize?: number;
+  fileType: string;
+  version: number;
+  lastEditedBy?: string;
+  lastEditedAt?: any;
 }
 
 export type CampaignStatus = 'draft' | 'pending_head' | 'pending_admin' | 'active' | 'completed';
