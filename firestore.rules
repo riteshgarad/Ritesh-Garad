@@ -14,6 +14,11 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
+    // Safely get a field or default
+    function getField(data, field, defaultValue) {
+      return data.get(field, defaultValue);
+    }
+    
     // Auth token check is not enough, but for bootstrapped admin we can use email
     // In production, this would look up a 'users' or 'admins' collection
     function isAdmin() { 
@@ -28,17 +33,14 @@ service cloud.firestore {
     }
 
     // Project Validation Helper (Pillar 2)
+    // Refactored to only validate values IF present during update, 
+    // and require items only on create in the match block.
     function isValidProject(data) {
-      // Core fields required for basic integrity
-      let hasCore = data.keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at', 'phase', 'progress', 'budget_status', 'budget']);
-      
-      // Type and value validation
-      return hasCore &&
-             data.name is string && data.name.size() > 0 &&
-             data.status in ['pending_dept_review', 'pending_admin_review', 'approved', 'rejected', 'active', 'completed', 'on_hold'] &&
-             data.phase is int && data.progress is number &&
-             data.budget_status in ['pending', 'approved', 'rejected'] &&
-             (data.creator_id == request.auth.uid || isAdmin());
+      return (data.get('name', '') is string) &&
+             (data.get('status', 'approved') in ['pending_dept_review', 'pending_admin_review', 'approved', 'rejected', 'active', 'completed', 'on_hold']) &&
+             (data.get('phase', 1) is int) && 
+             (data.get('progress', 0) is number) &&
+             (data.get('budget_status', 'approved') in ['pending', 'approved', 'rejected']);
     }
 
     // --- Collections ---
@@ -48,17 +50,20 @@ service cloud.firestore {
       allow list: if isSignedIn();
       
       function isValidBudgetReq(data) {
-        return data.keys().hasAll(['projectId', 'projectName', 'proposedBy', 'department', 'itemizedList', 'totalAmount', 'status', 'submittedAt']) &&
+        return data.keys().hasAll(['projectId', 'projectName', 'proposerId', 'proposedBy', 'department', 'itemizedList', 'totalAmount', 'status', 'submittedAt']) &&
                data.projectId is string &&
+               data.proposerId is string &&
                data.totalAmount is number &&
                data.status in ['pending_finance', 'approved', 'rejected'];
       }
 
-      allow create: if isSignedIn() && isValidBudgetReq(incoming()) && incoming().submittedAt == request.time;
+      allow create: if isSignedIn() && isValidBudgetReq(incoming()) && 
+                    incoming().submittedAt == request.time &&
+                    incoming().proposerId == request.auth.uid;
       allow update: if (isAdmin() || isDH()) && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt']) ||
-                    (isSignedIn() && incoming().proposedBy == request.auth.uid && 
-                     incoming().diff(existing()).affectedKeys().hasOnly(['itemizedList', 'totalAmount', 'status', 'submittedAt']));
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'itemizedList', 'totalAmount', 'submittedAt']) ||
+                    (isSignedIn() && existing().proposerId == request.auth.uid && 
+                     incoming().diff(existing()).affectedKeys().hasOnly(['itemizedList', 'totalAmount', 'status', 'submittedAt', 'proposerId', 'proposedBy']));
     }
 
     match /projects/{projectId} {
@@ -69,13 +74,14 @@ service cloud.firestore {
       
       // Creation requires strict schema
       allow create: if isSignedIn() && 
-                    incoming().keys().hasAll(['tag', 'lead_name', 'description', 'timeline', 'budget_items']) &&
+                    incoming().keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at', 'phase', 'progress', 'budget_status', 'budget', 'tag', 'lead_name', 'description', 'timeline', 'budget_items']) &&
                     isValidProject(incoming()) && 
-                    incoming().created_at == request.time;
+                    incoming().created_at == request.time &&
+                    incoming().creator_id == request.auth.uid;
       
       // Pillar 4: Tiered Identity Logic & Pillar 2: Action-Based Update
       allow update: if isSignedIn() && (
-        // Action: Full Edit (Admin only) - Admins can correct legacy data
+        // Action: Full Edit (Admin only) - Admins can correct data
         isAdmin() ||
         
         // Other actions require standard validation
@@ -85,14 +91,19 @@ service cloud.firestore {
            (isOwner(existing().creator_id) || isAdmin())) ||
           
           // Action: Budget Revision (By Owner)
-          (incoming().diff(existing()).affectedKeys().hasOnly(['budget', 'budget_items', 'budget_status']) && 
+          (incoming().diff(existing()).affectedKeys().hasOnly(['budget', 'budget_items', 'budget_status', 'budget_rejection_reason']) && 
            isOwner(existing().creator_id)) ||
 
           // Action: Approval (By DH or Admin)
           (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason', 'budget_rejection_reason']) && 
            (isAdmin() || isDH()))
         ))
-      ) && incoming().creator_id == existing().creator_id && incoming().created_at == existing().created_at;
+      ) && (
+        isAdmin() || (
+          incoming().get('creator_id', '') == existing().get('creator_id', '') && 
+          incoming().get('created_at', request.time) == existing().get('created_at', incoming().get('created_at', request.time))
+        )
+      );
       
       allow delete: if isAdmin() || isOwner(existing().creator_id);
     }

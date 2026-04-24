@@ -431,6 +431,7 @@ export default function App() {
         await addDoc(collection(db, 'budget_requests'), {
           projectId: projectRef.id,
           projectName: formData.name,
+          proposerId: user.uid,
           proposedBy: user.name,
           department: formData.department || user.department || "General",
           itemizedList: formData.budget_items,
@@ -577,7 +578,8 @@ export default function App() {
       batch.update(projectRef, {
         budget_items: budgetItems,
         budget: `₹${totalBudget.toLocaleString()}`,
-        budget_status: 'pending' // Reset to pending
+        budget_status: 'pending', // Reset to pending
+        budget_rejection_reason: null // Clear rejection logic context
       });
 
       // 2. Find and update the existing budget_request or create a new one
@@ -590,17 +592,32 @@ export default function App() {
       await batch.commit();
 
       // Find and update budget request status
-      // ... actual implementation below
       const reqSnapshot = await getDocs(query(collection(db, 'budget_requests'), where('projectId', '==', projectId)));
-      if (!reqSnapshot.empty) {
-        const reqId = reqSnapshot.docs[0].id;
-        await updateDoc(doc(db, 'budget_requests', reqId), {
-          itemizedList: budgetItems,
-          totalAmount: totalBudget,
-          status: 'pending_finance',
-          submittedAt: serverTimestamp()
-        });
-      }
+        if (!reqSnapshot.empty) {
+          const reqId = reqSnapshot.docs[0].id;
+          await updateDoc(doc(db, 'budget_requests', reqId), {
+            itemizedList: budgetItems,
+            totalAmount: totalBudget,
+            status: 'pending_finance',
+            submittedAt: serverTimestamp(),
+            proposerId: user.uid,
+            proposedBy: user.name
+          });
+        } else {
+          // Create it if it doesn't exist (failsafe)
+          const projectDoc = projects.find(p => p.id === projectId);
+          await addDoc(collection(db, 'budget_requests'), {
+            projectId: projectId,
+            projectName: projectDoc?.name || 'Project Budget',
+            proposerId: user.uid,
+            proposedBy: user.name,
+            department: projectDoc?.department || user.department || "General",
+            itemizedList: budgetItems,
+            totalAmount: totalBudget,
+            status: 'pending_finance',
+            submittedAt: serverTimestamp()
+          });
+        }
 
       setIsEditBudgetModalOpen(false);
       setEditingProject(null);
@@ -1062,7 +1079,7 @@ const EditBudgetModal = ({ isOpen, onClose, onUpdate, project }: any) => {
           </button>
           <button 
             onClick={() => onUpdate(project.id, items)}
-            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200"
+            className="flex-1 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-200 hover:bg-red-700 transition-all"
           >
             Update & Resubmit
           </button>

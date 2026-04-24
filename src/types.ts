@@ -36,6 +36,7 @@ export interface BudgetRequest {
   id: string;
   projectId: string;
   projectName: string;
+  proposerId: string;
   proposedBy: string;
   department: string;
   itemizedList: BudgetItem[];
