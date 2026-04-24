@@ -67,16 +67,20 @@ export interface Task {
 
 export interface Volunteer {
   id: string;
+  uid?: string;
   name: string;
   email: string;
+  phone?: string;
   role: string;
   department: string;
   skills: string[];
   hours: number;
-  status: 'Active' | 'Inactive';
+  status: 'Active' | 'Pending' | 'On Break' | 'Ex-Volunteer';
   impactPoints: number;
   badges: string[];
   profileImage?: string;
+  idProofUrl?: string;
+  availability?: 'Full-time' | 'Weekends' | 'Freelance';
   joinDate: any;
 }
 
@@ -137,7 +141,7 @@ export interface Transaction {
   rejectionReason?: string;
 }
 
-export type DocumentCategory = 'Project_Reports' | 'Finance_Records' | 'Legal_NGO' | 'Volunteer_Docs';
+export type DocumentCategory = 'Invoice' | 'Project_Report' | 'KYC' | 'Legal' | 'Marketing';
 
 export interface NGODocument {
   id: string;
@@ -150,13 +154,15 @@ export interface NGODocument {
   projectName?: string;
   uploadDate: any;
   description: string;
+  status: 'pending' | 'verified' | 'rejected';
+  rejectionReason?: string;
+  metadata: {
+    size: string;
+    type: string;
+    uploadedAt: any;
+  };
   location?: string;
   expiryDate?: any;
-  fileSize?: number;
-  fileType: string;
-  version: number;
-  lastEditedBy?: string;
-  lastEditedAt?: any;
 }
 
 export type CampaignStatus = 'draft' | 'pending_head' | 'pending_admin' | 'active' | 'completed';
@@ -207,6 +213,16 @@ export interface AppNotification {
   timestamp: string;
   isRead: boolean;
   relatedId?: string; // task or project ID
+}
+
+export interface Milestone {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  status: 'pending' | 'completed';
+  dueDate?: any;
+  completedAt?: any;
 }
 
 export interface AppUser {

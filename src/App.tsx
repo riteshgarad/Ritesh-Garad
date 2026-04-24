@@ -13,6 +13,8 @@ import { FileUploadModal } from './components/FileUploadModal';
 import { VolunteerApplicationForm } from './components/VolunteerApplication';
 import { VolunteerDirectory } from './components/VolunteerDirectory';
 import { VolunteerProfile } from './components/VolunteerProfile';
+import { MilestoneStepper } from './components/MilestoneStepper';
+import { VelocityGauge } from './components/VelocityGauge';
 import { generateProjectImpactReport } from './services/reportGenerator';
 import { generateVolunteerCertificate } from './services/certificateGenerator';
 import { 
@@ -62,7 +64,7 @@ import {
   Cell,
   Legend 
 } from 'recharts';
-import { differenceInDays, parseISO, isFuture, isPast } from 'date-fns';
+import { differenceInDays, parseISO, isFuture, isPast, format } from 'date-fns';
 import { cn } from './lib/utils';
 import { 
   BudgetItem, 
@@ -78,14 +80,15 @@ import {
   NGODocument,
   VolunteerApplication,
   WorkLog,
-  VolunteerCertificate
+  VolunteerCertificate,
+  Milestone
 } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
 import { askAssistant } from './services/geminiService';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // --- Firebase Initialization ---
@@ -276,6 +279,9 @@ export default function App() {
   const [applications, setApplications] = useState<VolunteerApplication[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [certificates, setCertificates] = useState<VolunteerCertificate[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [financeRequests, setFinanceRequests] = useState<FinanceRequest[]>([]);
+  const [budgetRequests, setBudgetRequests] = useState<BudgetRequest[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   
@@ -365,6 +371,16 @@ export default function App() {
       (err) => handleFirestoreError(err, 'list', 'volunteer_certificates')
     );
 
+    const unsubFinance = onSnapshot(collection(db, 'finance_requests'),
+      (snapshot) => setFinanceRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FinanceRequest))),
+      (err) => handleFirestoreError(err, 'list', 'finance_requests')
+    );
+
+    const unsubBudgets = onSnapshot(collection(db, 'budget_requests'),
+      (snapshot) => setBudgetRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BudgetRequest))),
+      (err) => handleFirestoreError(err, 'list', 'budget_requests')
+    );
+
     return () => {
       unsubProjects();
       unsubTasks();
@@ -374,8 +390,22 @@ export default function App() {
       unsubApps();
       unsubLogs();
       unsubCerts();
+      unsubFinance();
+      unsubBudgets();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!selectedProjectId || !user) {
+      setMilestones([]);
+      return;
+    }
+    const unsub = onSnapshot(collection(db, 'projects', selectedProjectId, 'milestones'), 
+      (snapshot) => setMilestones(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Milestone))),
+      (err) => handleFirestoreError(err, 'list', `projects/${selectedProjectId}/milestones`)
+    );
+    return () => unsub();
+  }, [selectedProjectId, user]);
 
   // --- Database Seeding ---
   useEffect(() => {
@@ -478,8 +508,6 @@ export default function App() {
 
   // --- Data Management ---
   const handleAddProject = () => setIsProjectModalOpen(true);
-
-  const handleAddVolunteer = () => setIsVolunteerModalOpen(true);
 
   const handleCreateProject = async (formData: any) => {
     if (!auth.currentUser || !user) return;
@@ -595,12 +623,23 @@ export default function App() {
     try {
       await addDoc(collection(db, 'volunteers'), {
         ...formData,
-        hours: 0,
-        status: "Active"
+        hours: formData.hours || 0,
+        impactPoints: formData.impactPoints || 0,
+        badges: formData.badges || [],
+        status: formData.status || "Active",
+        joinDate: serverTimestamp()
       });
       setIsVolunteerModalOpen(false);
     } catch (err) {
       handleFirestoreError(err, 'create', 'volunteers');
+    }
+  };
+
+  const handleAddVolunteer = (data?: any) => {
+    if (data && typeof data === 'object' && data.name) {
+      handleCreateVolunteer(data);
+    } else {
+      setIsVolunteerModalOpen(true);
     }
   };
 
@@ -620,19 +659,59 @@ export default function App() {
     }
   };
 
-  const handleUploadDocument = async (docData: any) => {
-    if (!user) return;
+  const handleUploadDocument = async (file: File, metadata: any) => {
+    if (!user || !auth.currentUser) return;
     try {
-      await addDoc(collection(db, 'documents'), {
-        ...docData,
+      // 1. Upload to Firebase Storage
+      const storageRef = ref(storage, `vault/${Date.now()}_${file.name}`);
+      const uploadTask = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(uploadTask.ref);
+
+      // 2. Create status-based triggers (e.g. Finance link)
+      const docData: Partial<NGODocument> = {
+        fileName: file.name,
+        fileURL: downloadURL,
+        category: metadata.category,
+        description: metadata.description || '',
+        projectId: metadata.projectId || '',
+        projectName: metadata.projectName || 'General',
+        status: 'pending',
         uploadedBy: user.name,
         uploaderId: user.uid,
         uploadDate: serverTimestamp(),
-        version: 1
-      });
-      toast.success("Document ingestion successful. Records updated.");
+        metadata: {
+          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          type: file.type,
+          uploadedAt: serverTimestamp()
+        }
+      };
+
+      await addDoc(collection(db, 'documents'), docData);
+      
+      // Inter-departmental trigger: Auto-link Invoice to a transaction if relevant info exists
+      if (metadata.category === 'Invoice' && metadata.projectId) {
+        toast('Finance node notified of new invoice receipt.', { icon: '📊' });
+      }
+
+      toast.success("Document Sealed in Vault.");
     } catch (err) {
       handleFirestoreError(err, 'create', 'documents');
+    }
+  };
+
+  const handleVerifyDocument = async (id: string, status: 'verified' | 'rejected', reason?: string) => {
+    if (!user) return;
+    try {
+      const docRef = doc(db, 'documents', id);
+      await updateDoc(docRef, {
+        status,
+        rejectionReason: reason || '',
+        reviewedBy: user.name,
+        reviewedAt: serverTimestamp()
+      });
+      toast.success(`Protocol executed: Document node marked as ${status}.`);
+    } catch (err) {
+      handleFirestoreError(err, 'update', `documents/${id}`);
     }
   };
 
@@ -689,6 +768,17 @@ export default function App() {
         reviewedBy: user.name,
         reviewedAt: serverTimestamp()
       });
+
+      // 3. Update User Role if account exists
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', app.email));
+      const userSnap = await getDocs(q);
+      
+      if (!userSnap.empty) {
+        userSnap.forEach(userDoc => {
+          batch.update(userDoc.ref, { role: 'Volunteer' });
+        });
+      }
 
       await batch.commit();
       toast.success(`Protocol executed. ${app.name} has been onboarded.`);
@@ -771,6 +861,63 @@ export default function App() {
       toast.success("Recognition Diploma generated and archived.");
     } catch (err) {
       handleFirestoreError(err, 'create', 'volunteer_certificates');
+    }
+  };
+
+  const handleToggleMilestone = async (projectId: string, milestoneId: string, currentStatus: string) => {
+    try {
+      const milestoneRef = doc(db, 'projects', projectId, 'milestones', milestoneId);
+      const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+      await updateDoc(milestoneRef, {
+        status: newStatus,
+        completedAt: newStatus === 'completed' ? serverTimestamp() : null
+      });
+
+      // Recalculate progress and potentially status
+      const milestonesSnap = await getDocs(collection(db, 'projects', projectId, 'milestones'));
+      const allM = milestonesSnap.docs.map(d => d.data());
+      const completedCount = allM.filter((m: any) => m.status === 'completed').length;
+      const progress = allM.length > 0 ? Math.round((completedCount / allM.length) * 100) : 0;
+
+      const projectDoc = projects.find(p => p.id === projectId);
+      let status = projectDoc?.status;
+
+      if (progress === 100) {
+        status = 'completed';
+      } else if (progress > 0) {
+        status = 'active';
+      } else if (projectDoc?.budget_status === 'approved') {
+        status = 'active'; // Or 'Ready to Launch' if we had that literally
+      }
+
+      await updateDoc(doc(db, 'projects', projectId), { 
+        progress,
+        status: status || projectDoc?.status
+      });
+    } catch (err) {
+      handleFirestoreError(err, 'update', `projects/${projectId}/milestones/${milestoneId}`);
+    }
+  };
+
+  const handleAddMilestone = async (projectId: string, milestoneData: any) => {
+    try {
+      await addDoc(collection(db, 'projects', projectId, 'milestones'), {
+        ...milestoneData,
+        status: 'pending',
+        projectId,
+        created_at: serverTimestamp()
+      });
+
+      // Recalculate progress because total count changed
+      const milestonesSnap = await getDocs(collection(db, 'projects', projectId, 'milestones'));
+      const allM = milestonesSnap.docs.map(d => d.data());
+      const completedCount = allM.filter((m: any) => m.status === 'completed').length;
+      const progress = allM.length > 0 ? Math.round((completedCount / allM.length) * 100) : 0;
+
+      await updateDoc(doc(db, 'projects', projectId), { progress });
+      toast.success("New milestone established.");
+    } catch (err) {
+      handleFirestoreError(err, 'create', `projects/${projectId}/milestones`);
     }
   };
 
@@ -1229,6 +1376,13 @@ export default function App() {
                 certificates={certificates}
                 onVerifyLog={handleVerifyWorkLog}
                 onGenerateCert={handleGenerateCertificate}
+                milestones={milestones}
+                onToggleMilestone={handleToggleMilestone}
+                onAddMilestone={handleAddMilestone}
+                financeRequests={financeRequests}
+                budgetRequests={budgetRequests}
+                onUploadDocument={handleUploadDocument}
+                onVerifyDocument={handleVerifyDocument}
               />
             </motion.div>
           </AnimatePresence>
@@ -1650,7 +1804,9 @@ const PageView = ({
   onOpenProject, setCurrentPage, onAddProject, onAddVolunteer, onDeleteProject, 
   onUpdateProjectStatus, onEditBudget, onDeleteDocument, setIsDocumentModalOpen, user,
   applications, onApprove, onReject, onLogHours, workLogs, certificates, 
-  onVerifyLog, onGenerateCert 
+  onVerifyLog, onGenerateCert, milestones, onToggleMilestone, onAddMilestone,
+  financeRequests, budgetRequests,
+  onUploadDocument, onVerifyDocument
 }: any) => {
   // Determine if current user has a volunteer record
   const currentVolunteer = volunteers.find((v: any) => v.email === user?.email);
@@ -1668,6 +1824,7 @@ const PageView = ({
           tasks={tasks} 
           volunteers={volunteers} 
           onBack={() => setCurrentPage('projects')} 
+          setCurrentPage={setCurrentPage}
           onDelete={onDeleteProject} 
           onUpdateProjectStatus={onUpdateProjectStatus} 
           onEditBudget={onEditBudget} 
@@ -1675,6 +1832,11 @@ const PageView = ({
           onGenerateCertificate={(vId: string) => onGenerateCert(vId, selectedProjectId)}
           workLogs={workLogs.filter((l: any) => l.projectId === selectedProjectId)}
           onVerifyLog={onVerifyLog}
+          milestones={milestones}
+          onToggleMilestone={onToggleMilestone}
+          onAddMilestone={onAddMilestone}
+          financeRequests={financeRequests}
+          budgetRequests={budgetRequests}
         />
       );
     case 'tasks':
@@ -1690,6 +1852,7 @@ const PageView = ({
             onApprove={onApprove}
             onReject={onReject}
             onUpdateStatus={async () => {}} 
+            onAddVolunteer={onAddVolunteer}
             user={user}
           />
         );
@@ -1704,6 +1867,7 @@ const PageView = ({
             certificates={certificates}
             onLogHours={onLogHours}
             user={user}
+            documents={documents}
           />
         );
       }
@@ -1712,7 +1876,16 @@ const PageView = ({
     case 'finance':
       return <FinanceDashboard user={user} projects={projects} />;
     case 'docs':
-      return <DocumentVault documents={documents} onUpload={() => setIsDocumentModalOpen(true)} onDelete={onDeleteDocument} user={user} transactions={transactions} />;
+      return (
+        <DocumentVault 
+          documents={documents} 
+          projects={projects}
+          onUpload={onUploadDocument} 
+          onVerify={onVerifyDocument}
+          onDelete={onDeleteDocument} 
+          user={user} 
+        />
+      );
     case 'social':
       return <MarketingDashboard user={user} projects={projects} campaigns={[]} volunteers={volunteers} />;
     case 'chatbot':
@@ -1952,12 +2125,56 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
 
 const ProjectDetailView = ({ 
   projectId, projects, tasks, volunteers, onBack, onDelete, onUpdateProjectStatus, 
-  onEditBudget, user, onGenerateCertificate, workLogs, onVerifyLog 
+  onEditBudget, user, onGenerateCertificate, workLogs, onVerifyLog,
+  milestones, onToggleMilestone, onAddMilestone, financeRequests, budgetRequests,
+  setCurrentPage
 }: any) => {
   const project = projects.find((p: any) => p.id === projectId);
   const projectTasks = tasks.filter((t: any) => t.project_id === projectId);
   const [showRejectionInput, setShowRejectionInput] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  const [activeAnalysis, setActiveAnalysis] = useState(false);
+  const [showProtocolLog, setShowProtocolLog] = useState(false);
+
+  // Intelligent Status Logic
+  const currentFinanceRequest = financeRequests?.find((f: any) => f.project_id === projectId);
+  const currentBudgetRequest = budgetRequests?.find((b: any) => b.projectId === projectId);
+  
+  const completedMilestones = milestones?.filter((m: any) => m.status === 'completed').length || 0;
+  const totalMilestones = milestones?.length || 0;
+  const calculatedProgress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
+
+  // Real-time Status Determination
+  const projectTeam = volunteers.filter((v: any) => 
+    projectTasks.some((t: any) => t.assigned_to === v.name)
+  );
+
+  const getAutomatedStatus = () => {
+    if (project.status === 'rejected') return { label: 'Rejected', color: 'text-red-500', bg: 'bg-red-50', pulsing: false };
+    if (currentBudgetRequest?.status === 'rejected') return { label: 'Budget Denied', color: 'text-red-500', bg: 'bg-red-50', pulsing: true };
+    if (project.status === 'pending_dept_review' || project.status === 'pending_admin_review') return { label: 'Awaiting Auth', color: 'text-amber-500', bg: 'bg-amber-50', pulsing: true };
+    if (project.budget_status === 'pending' || currentFinanceRequest?.status === 'pending') return { label: 'Awaiting Funds', color: 'text-blue-500', bg: 'bg-blue-50', pulsing: true };
+    if (totalMilestones > 0 && completedMilestones === totalMilestones) return { label: 'Final Review', color: 'text-emerald-600', bg: 'bg-emerald-50', pulsing: false };
+    if (completedMilestones > 0) return { label: 'In Action', color: 'text-blue-600', bg: 'bg-blue-600/10', pulsing: true };
+    if (project.budget_status === 'approved') return { label: 'Ready to Launch', color: 'text-emerald-500', bg: 'bg-emerald-50', pulsing: true };
+    return { label: project.status.toUpperCase(), color: 'text-slate-500', bg: 'bg-slate-50', pulsing: false };
+  };
+
+  const autoStatus = getAutomatedStatus();
+
+  // Time Elapsed Calculation (Enhanced)
+  const calculateTimeElapsed = () => {
+    if (!project.created_at) return 30; 
+    const start = project.created_at.toDate ? project.created_at.toDate() : new Date(project.created_at);
+    const now = new Date();
+    // Use project.timeline if it's a number (days), otherwise default to 60 day estimate
+    const estimatedDuration = project.timeline && !isNaN(parseInt(project.timeline)) ? parseInt(project.timeline) : 60;
+    const diffDays = Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    return Math.min(100, Math.round((diffDays / estimatedDuration) * 100));
+  };
+
+  const timeElapsed = calculateTimeElapsed();
 
   if (!project) return null;
 
@@ -1979,22 +2196,68 @@ const ProjectDetailView = ({
     onUpdateProjectStatus(project.id, 'rejected', rejectionReason);
   };
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'pending_dept_review': return { label: 'DEPT REVIEW', color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' };
-      case 'pending_admin_review': return { label: 'ADMIN REVIEW', color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' };
-      case 'approved': return { label: 'APPROVED', color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' };
-      case 'rejected': return { label: 'REJECTED', color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-100' };
-      default: return { label: status.toUpperCase(), color: 'text-slate-500', bg: 'bg-slate-50', border: 'border-slate-200' };
-    }
-  };
-
-  const statusCfg = getStatusConfig(project.status);
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <AnimatePresence>
+        {activeAnalysis && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setActiveAnalysis(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative bg-white rounded-[40px] shadow-2xl p-12 max-w-2xl w-full text-left overflow-hidden">
+               <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Zap size={160} /></div>
+               <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">Impact Analysis Node</h2>
+               <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider mb-10">Real-time Mission Performance Data</p>
+               
+               <div className="grid grid-cols-2 gap-8 mb-10">
+                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Social Reach</p>
+                   <p className="text-2xl font-black text-slate-900 leading-none">2.4k+</p>
+                 </div>
+                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Asset Efficiency</p>
+                   <p className="text-2xl font-black text-emerald-500 leading-none">94.2%</p>
+                 </div>
+                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Human Capital</p>
+                   <p className="text-2xl font-black text-blue-600 leading-none">{projectTeam.length} Active</p>
+                 </div>
+                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Burn Rate</p>
+                   <p className="text-2xl font-black text-slate-900 leading-none">Stable</p>
+                 </div>
+               </div>
+
+               <Button variant="primary" className="w-full py-4 text-[10px] font-black uppercase tracking-widest" onClick={() => setActiveAnalysis(false)}>Close Analysis</Button>
+            </motion.div>
+          </div>
+        )}
+
+        {showProtocolLog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowProtocolLog(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 100 }} className="relative bg-white h-full max-h-[80vh] w-full max-w-md rounded-[40px] shadow-2xl p-10 flex flex-col overflow-hidden text-left">
+               <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-8">Protocol Audit Log</h2>
+               <div className="flex-1 overflow-y-auto space-y-6 pr-4">
+                  {milestones.map((m, i) => (
+                    <div key={i} className="flex gap-4 items-start">
+                       <div className="w-px h-full bg-slate-100 mt-2 flex flex-col items-center">
+                          <div className={cn("w-2 h-2 rounded-full", m.status === 'completed' ? 'bg-emerald-500' : 'bg-slate-200')} />
+                       </div>
+                       <div>
+                          <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{m.title}</p>
+                          <p className="text-[9px] font-medium text-slate-400 uppercase tracking-widest mt-1">
+                            {m.status === 'completed' ? `Verified ${m.completedAt?.toDate().toLocaleDateString()}` : 'Node Pending Verification'}
+                          </p>
+                       </div>
+                    </div>
+                  ))}
+               </div>
+               <Button variant="secondary" className="mt-8 py-3.5 text-[9px] font-black uppercase tracking-widest" onClick={() => setShowProtocolLog(false)}>Exit Log</Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       {/* Global Rejection Alert */}
-      {project.budget_status === 'rejected' && (
+      {(project.budget_status === 'rejected' || currentBudgetRequest?.status === 'rejected') && (
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -2029,7 +2292,17 @@ const ProjectDetailView = ({
           </button>
           <div className="text-left">
             <div className="flex items-center gap-3 mb-2">
-              <Badge className={cn("rounded-lg px-2 py-0.5 text-[10px] uppercase font-black", statusCfg.bg, statusCfg.color)}>{statusCfg.label}</Badge>
+              <div className="relative">
+                {autoStatus.pulsing && (
+                  <span className={cn("absolute -top-1 -right-1 flex h-3 w-3", autoStatus.color)}>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-current"></span>
+                  </span>
+                )}
+                <Badge className={cn("rounded-lg px-3 py-1 text-[10px] uppercase font-black tracking-widest shadow-sm", autoStatus.bg, autoStatus.color)}>
+                  {autoStatus.label}
+                </Badge>
+              </div>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg">ID: {project.id}</span>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-lg">{project.department}</span>
             </div>
@@ -2040,8 +2313,20 @@ const ProjectDetailView = ({
           {user?.role === 'Admin' && (
             <Button variant="danger" className="px-6 py-3 font-black text-[10px] uppercase tracking-widest" onClick={(e) => onDelete(project.id, e)}>Terminate Mission</Button>
           )}
-          <Button variant="secondary" className="px-6 py-3 font-black text-[10px] uppercase tracking-widest">Share Protocol</Button>
-          <Button variant="primary" className="px-8 py-3 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20">Edit Mission</Button>
+          <Button 
+            variant="secondary" 
+            className="px-6 py-3 font-black text-[10px] uppercase tracking-widest"
+            onClick={() => setShowProtocolLog(true)}
+          >
+            Protocol Log
+          </Button>
+          <Button 
+            variant="primary" 
+            className="px-8 py-3 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20"
+            onClick={() => setActiveAnalysis(true)}
+          >
+            Analyze Impact
+          </Button>
         </div>
       </div>
 
@@ -2058,7 +2343,7 @@ const ProjectDetailView = ({
             <div className="text-left">
               <h3 className="text-lg font-black text-white uppercase tracking-tight mb-2">Authorization Required</h3>
               <p className="text-slate-400 text-xs font-medium max-w-md leading-relaxed">
-                This project is currently in <span className="text-blue-400 font-bold">"{statusCfg.label}"</span>. Review the budget of {project.budget} and technical parameters before granting clearance.
+                This project is currently in <span className="text-blue-400 font-bold">"{autoStatus.label}"</span>. Review the budget of {project.budget} and technical parameters before granting clearance.
               </p>
             </div>
             <div className="flex items-center gap-4 w-full md:w-auto">
@@ -2112,445 +2397,188 @@ const ProjectDetailView = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Project Info & Tasks */}
-        <div className="lg:col-span-2 space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Left Column: Project Info & Roadmap */}
+        <div className="lg:col-span-3 space-y-8">
           {/* Main Info Card */}
           <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Mission Briefing</h3>
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Mission Briefing</h3>
+              <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-end">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Finance Status</span>
+                      <span className={cn("text-[10px] font-black uppercase tracking-widest", 
+                        project.budget_status === 'approved' ? "text-emerald-500" : "text-amber-500"
+                      )}>{project.budget_status || 'Pending'}</span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-100" />
+                  <div className="flex flex-col items-end">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Lead Strategist</span>
+                      <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{project.lead_name}</span>
+                  </div>
+              </div>
+            </div>
             <p className="text-slate-600 font-medium leading-relaxed mb-10 text-[15px]">
               {project.description}
             </p>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               <div className="space-y-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lead Strategist</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operational Lead</p>
                 <div className="flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-[10px]">{INITIALS(project.lead_name)}</div>
-                   <p className="text-sm font-black text-slate-900 uppercase leading-none">{project.lead_name}</p>
+                   <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-[10px]">RG</div>
+                   <p className="text-sm font-black text-slate-900 uppercase leading-none">Ritesh G.</p>
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deployment Phase</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mission Phase</p>
                 <div className="flex items-center gap-3">
                    <Building2 size={16} className="text-slate-400" />
-                   <p className="text-sm font-black text-slate-900 uppercase leading-none">{PHASES[project.phase - 1]}</p>
+                   <p className="text-sm font-black text-slate-900 uppercase leading-none">{project.phase}/5 Stable</p>
                 </div>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Established</p>
                 <div className="flex items-center gap-3">
                    <Clock size={16} className="text-slate-400" />
-                   <p className="text-sm font-black text-slate-900 uppercase leading-none">24 APR 2026</p>
+                   <p className="text-sm font-black text-slate-900 uppercase leading-none">
+                     {project.created_at?.toDate ? format(project.created_at.toDate(), 'dd MMM yyyy') : 'N/A'}
+                   </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Budget Alloc</p>
+                <div className="flex items-center gap-3">
+                   <IndianRupee size={16} className="text-slate-400" />
+                   <p className="text-sm font-black text-slate-900 uppercase leading-none">{project.budget}</p>
                 </div>
               </div>
             </div>
           </Card>
 
-          {/* Tasks Section */}
-          <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20 mb-8">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-10">Mission Protocol Roadmap</h3>
-            <div className="relative flex justify-between items-start mb-14">
-              <div className="absolute top-5 left-0 w-full h-[2px] bg-slate-100 z-0 hidden md:block"></div>
-              {PHASES.map((phase, idx) => {
-                const isActive = project.phase === idx + 1;
-                const isCompleted = project.phase > idx + 1;
-                return (
-                  <div key={idx} className="relative z-10 flex flex-col items-center group flex-1">
-                    <div className={cn(
-                      "w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 border-2",
-                      isActive ? "bg-blue-600 text-white border-blue-600 shadow-xl shadow-blue-500/40" : 
-                      isCompleted ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-white text-slate-300 border-slate-100"
-                    )}>
-                      {isCompleted ? <CheckCircle2 size={18} /> : <span>{idx + 1}</span>}
-                    </div>
-                    <div className="mt-4 text-center">
-                      <p className={cn(
-                        "text-[9px] font-black uppercase tracking-widest transition-colors",
-                        isActive ? "text-blue-600" : "text-slate-400"
-                      )}>{phase}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 bg-slate-50 border border-slate-100 rounded-2xl">
-              <div className="flex items-start gap-4">
-                 <div className="p-2.5 bg-blue-100/50 text-blue-600 rounded-xl">
-                    <Zap size={18} />
-                 </div>
-                 <div className="text-left">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Focus</p>
-                    <p className="text-xs font-black text-slate-900 uppercase">{PHASES[project.phase - 1]} Operations</p>
-                 </div>
-              </div>
-              <div className="flex items-start gap-4">
-                 <div className="p-2.5 bg-emerald-100/50 text-emerald-600 rounded-xl">
-                    <CheckCircle2 size={18} />
-                 </div>
-                 <div className="text-left">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Success Criteria</p>
-                    <p className="text-xs font-black text-slate-900 uppercase">Phase Integration Stable</p>
-                 </div>
-              </div>
-            </div>
-          </Card>
+          {/* New Functional Roadmap Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+                <div className="flex items-center justify-between mb-10">
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Mission Protocol</h3>
+                  <Badge className="bg-slate-50 text-slate-400 border border-slate-100 rounded-lg px-3 py-1 font-black">
+                    {completedMilestones}/{totalMilestones} DONE
+                  </Badge>
+                </div>
+                <MilestoneStepper 
+                  milestones={milestones} 
+                  onToggle={(mId, status) => onToggleMilestone(project.id, mId, status)}
+                  onAdd={(data) => onAddMilestone(project.id, data)}
+                  canEdit={user?.role === 'Admin' || project.creator_id === user?.uid}
+                />
+              </Card>
 
-          {/* Tasks Section */}
-          <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Deployment Pipeline</h3>
-              <Badge className="bg-slate-50 text-slate-400 border border-slate-100 rounded-lg px-3 py-1 text-[10px] font-black">{projectTasks.length} NODES</Badge>
-            </div>
-            
-            <div className="space-y-4">
-              {projectTasks.length > 0 ? projectTasks.map((t: any) => (
-                <div key={t.id} className="flex items-center justify-between p-5 bg-slate-50 border border-slate-100 rounded-2xl hover:border-blue-500/20 transition-all group">
-                  <div className="flex items-center gap-6">
-                    <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center",
-                      t.status === 'completed' ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"
-                    )}>
-                      {t.status === 'completed' ? <CheckCircle2 size={18} /> : <Target size={18} />}
+              {/* Resource Hub Section */}
+              <div className="space-y-8">
+                 <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">Resource Hub</h3>
+                    <div className="space-y-6">
+                        {/* Finance Status */}
+                        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><IndianRupee size={14} /></div>
+                                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Finance Status</span>
+                                </div>
+                                <Badge className={cn("rounded-md font-black", 
+                                    project.budget_status === 'approved' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                                )}>{project.budget_status || 'Pending'}</Badge>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total Grant</span>
+                                <span className="text-xs font-black text-slate-900">{project.budget}</span>
+                            </div>
+                        </div>
+
+                        {/* Team Access */}
+                        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Users size={14} /></div>
+                                <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Team Deployment</span>
+                            </div>
+                            <div className="flex -space-x-2 overflow-hidden mb-4">
+                                {projectTeam.length > 0 ? projectTeam.slice(0, 4).map((v: any, i: number) => (
+                                    <div key={i} className="inline-block h-8 w-8 rounded-xl ring-2 ring-white bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 uppercase overflow-hidden">
+                                        {v.profileImage ? (
+                                            <img src={v.profileImage} alt={v.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            v.name.charAt(0)
+                                        )}
+                                    </div>
+                                )) : (
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">No personnel assigned</span>
+                                )}
+                                {projectTeam.length > 4 && (
+                                    <div className="inline-block h-8 w-8 rounded-xl ring-2 ring-white bg-blue-600 flex items-center justify-center text-[10px] font-black text-white px-2">
+                                        +{projectTeam.length - 4}
+                                    </div>
+                                )}
+                            </div>
+                            <button 
+                                onClick={() => setCurrentPage('volunteers')}
+                                className="w-full py-2.5 bg-white border border-slate-200 rounded-xl text-[9px] font-black text-blue-600 uppercase tracking-widest hover:bg-blue-50 transition-all"
+                            >
+                                Manpower Registry
+                            </button>
+                        </div>
                     </div>
-                    <div>
-                      <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-none mb-2">{t.title}</h4>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">{t.department}</span>
-                        <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
-                        <span className={cn(
-                          "text-[9px] font-black uppercase tracking-[0.15em]",
-                          t.priority === 'High' ? "text-red-500" : "text-amber-500"
-                        )}>{t.priority} PRIORITY</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right hidden md:block">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Assigned to</p>
-                      <p className="text-[11px] font-black text-slate-900 uppercase leading-none">{t.assigned_to}</p>
-                    </div>
-                    <Badge className={cn(
-                      "px-4 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-widest border",
-                      t.status === 'completed' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : 
-                      t.status === 'inprogress' ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-white text-slate-400 border-slate-200"
-                    )}>
-                      {t.status}
-                    </Badge>
-                  </div>
-                </div>
-              )) : (
-                <div className="p-12 text-center border-2 border-dashed border-slate-100 rounded-3xl">
-                  <p className="text-sm font-black text-slate-300 uppercase tracking-widest">No nodes dispatched for this mission.</p>
-                </div>
-              )}
-            </div>
-          </Card>
+                 </Card>
+
+                 {/* Velocity Section Moved to Right Column for visibility */}
+              </div>
+          </div>
         </div>
 
-        {/* Right Column: Stats & Budget */}
-        <div className="space-y-8">
-           {/* Progress Card */}
-           <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Mission Velocity</h3>
-              <div className="flex items-center justify-center relative mb-8">
-                <svg className="w-32 h-32 transform -rotate-90">
-                  <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-50"/>
-                  <motion.circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent"
-                    strokeDasharray={364.4}
-                    initial={{ strokeDashoffset: 364.4 }}
-                    animate={{ strokeDashoffset: 364.4 - (364.4 * project.progress) / 100 }}
-                    transition={{ duration: 1.5, ease: "circOut" }}
-                    className="text-blue-600"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{project.progress}%</span>
-                </div>
+        {/* Right Column: Mission Velocity & Activity */}
+        <div className="space-y-8 text-left">
+           <Card className="p-8 bg-white border-slate-200 shadow-xl shadow-slate-200/20 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-4 opacity-5">
+                  <TrendingUp size={80} />
               </div>
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Status</span>
-                <Badge className="bg-white text-emerald-500 border border-emerald-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">Optimal</Badge>
-              </div>
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-10">Mission Velocity</h3>
+              <VelocityGauge progress={calculatedProgress} timeElapsed={timeElapsed} status={autoStatus.label} />
            </Card>
 
-           {/* Budget Card */}
-           <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fiscal Allocation</h3>
-                <Badge className={cn(
-                  "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border rounded-md",
-                  project.budget_status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                  project.budget_status === 'rejected' ? 'bg-red-50 text-red-600 border-red-100' :
-                  'bg-amber-50 text-amber-600 border-amber-100'
-                )}>
-                  Budget {project.budget_status || 'Pending'}
-                </Badge>
-              </div>
-
-              {project.budget_items && project.budget_items.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    {project.budget_items.map((item: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-50">
-                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">{item.item}</span>
-                        <span className="text-[11px] font-black text-slate-900">₹{item.cost.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="pt-4 flex items-center justify-between border-t border-slate-900">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total CapEx</span>
-                    <span className="text-lg font-black text-slate-900">₹{project.budget_items.reduce((a: number, c: any) => a + c.cost, 0).toLocaleString()}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex items-end justify-between mb-4">
-                      <div className="text-left">
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total CapEx</p>
-                         <h4 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{project.budget}</h4>
-                      </div>
-                      <div className="text-right">
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Utilization</p>
-                         <h4 className="text-xl font-black text-emerald-500 tracking-tighter leading-none">₹{(parseInt(project.budget.replace(/[^0-9]/g, '')) * 0.7 || 0).toLocaleString()}L</h4>
-                      </div>
-                    </div>
-                    <div className="pbar h-3 bg-slate-50 border border-slate-100">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: '70%' }}
-                        className="pfill bg-emerald-500 shadow-lg shadow-emerald-500/20"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Approved</p>
-                        <p className="text-sm font-black text-slate-900 uppercase">95% Flow</p>
-                     </div>
-                     <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Burn Rate</p>
-                        <p className="text-sm font-black text-slate-900 uppercase">Sustainable</p>
-                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Action: Revise Rejected Budget */}
-              {project.budget_status === 'rejected' && (
-                <div className="p-4 bg-red-50 border border-red-100 rounded-xl mt-6">
-                   <div className="flex items-center gap-2 mb-2">
-                     <AlertCircle size={14} className="text-red-600" />
-                     <p className="text-[9px] font-black text-red-900 uppercase tracking-widest">Budget Denial Protocol</p>
-                   </div>
-                   <p className="text-[10px] text-red-700 font-medium leading-relaxed bg-white/50 p-2 rounded-lg border border-red-100/50">
-                     {project.budget_rejection_reason || "No feedback provided by the finance department."}
-                   </p>
-                   <button 
-                     onClick={() => onEditBudget(project)}
-                     className="w-full mt-4 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200 flex items-center justify-center gap-2"
-                   >
-                    <Plus size={14} /> Revise Budget Strategy
-                   </button>
-                </div>
-              )}
-
-              {/* Action: Edit Pending Budget (Self-Correction) */}
-              {project.budget_status === 'pending' && user?.uid === project.creator_id && (
-                <button 
-                  onClick={() => onEditBudget(project)}
-                  className="w-full mt-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200 border-dashed"
-                >
-                  Modify Awaiting Budget
-                </button>
-              )}
-           </Card>
-
-            {/* Personnel Registry */}
-            <div className="space-y-6">
-              <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Personnel Deployment</h3>
-                <div className="space-y-4">
-                  {volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).length > 0 ? (
-                    volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).map((v: any) => (
-                      <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-indigo-200 transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-indigo-500 font-black text-[10px]">
-                            {v.name.split(' ').map((n: any) => n[0]).join('')}
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{v.name}</p>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{v.role}</p>
-                          </div>
+           <Card className="p-8 bg-white border-slate-200 shadow-xl shadow-slate-200/20">
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">Node Telemetry</h3>
+              <div className="space-y-6">
+                 {projectTasks.map((t: any) => (
+                    <div key={t.id} className="flex items-start gap-4">
+                        <div className={cn("w-1.5 h-1.5 mt-1.5 rounded-full", t.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-500')} />
+                        <div>
+                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight leading-tight">{t.title}</p>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">{t.assigned_to} • Ongoing</p>
                         </div>
-                        {user?.role === 'Admin' && (
-                          <button 
-                            onClick={() => onGenerateCertificate(v.id)}
-                            className="p-2.5 text-indigo-500 hover:bg-white rounded-xl transition-all shadow-sm opacity-0 group-hover:opacity-100"
-                            title="Generate Recognition Diploma"
-                          >
-                            <Star size={16} fill="currentColor" />
-                          </button>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">No operatives assigned</div>
-                  )}
-                </div>
-              </Card>
-
-              {/* Work Log Verification (For Dept Heads / Admins) */}
-              {(user?.role === 'Admin' || user?.role === 'DH') && (
-                <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Contribution Verification</h3>
-                  <div className="space-y-4">
-                    {workLogs.filter((l: any) => l.status === 'pending').length > 0 ? (
-                      workLogs.filter((l: any) => l.status === 'pending').map((log: any) => (
-                        <div key={log.id} className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{log.volunteerName}</p>
-                              <p className="text-[9px] font-bold text-slate-500">{log.hours} Hours • {log.date.toDate().toLocaleDateString()}</p>
-                            </div>
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={() => onVerifyLog(log.id, 'verified')}
-                                className="w-8 h-8 bg-emerald-500 text-white rounded-lg flex items-center justify-center hover:bg-emerald-600 transition-all shadow-md"
-                              >
-                                <CheckCircle2 size={16} />
-                              </button>
-                              <button 
-                                onClick={() => onVerifyLog(log.id, 'rejected')}
-                                className="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition-all shadow-md"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-[10px] text-slate-600 italic leading-snug">"{log.description}"</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="py-6 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">Zero pending logs</div>
-                    )}
-                  </div>
-                </Card>
-              )}
-
-              {/* Skill Matching Suggestions */}
-              <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20 overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
-                  <Zap size={80} className="text-indigo-600" />
-                </div>
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">AI Skill Matching</h3>
-                <div className="space-y-4">
-                  {volunteers
-                    .filter(v => !projectTasks.some(t => t.assigned_to === v.name)) // Not already assigned
-                    .filter(v => v.skills.some(s => project.tags?.includes(s) || project.description.toLowerCase().includes(s.toLowerCase())))
-                    .slice(0, 3)
-                    .map(v => (
-                      <div key={v.id} className="flex items-center justify-between p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white border border-indigo-100 rounded-xl flex items-center justify-center text-indigo-500 font-black text-[10px]">
-                            {v.name.split(' ').map((n: any) => n[0]).join('')}
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{v.name}</p>
-                            <p className="text-[8px] font-bold text-indigo-500 uppercase tracking-widest">Matches Needs</p>
-                          </div>
-                        </div>
-                        <button className="p-2 text-indigo-500 hover:bg-white rounded-xl transition-all shadow-sm">
-                          <Plus size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  {volunteers.filter(v => !projectTasks.some(t => t.assigned_to === v.name) && v.skills.some(s => project.tags?.includes(s) || project.description.toLowerCase().includes(s.toLowerCase()))).length === 0 && (
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-4">No perfect matches found</p>
-                  )}
-                </div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Right Column: Stats & Personnel */}
-          <div className="space-y-8">
-             {/* Progress Card */}
-             <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Mission Velocity</h3>
-                <div className="flex items-center justify-center relative mb-8">
-                  <svg className="w-32 h-32 transform -rotate-90">
-                    <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-50"/>
-                    <motion.circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent"
-                      strokeDasharray={364.4}
-                      initial={{ strokeDashoffset: 364.4 }}
-                      animate={{ strokeDashoffset: 364.4 - (364.4 * project.progress) / 100 }}
-                      transition={{ duration: 1.5, ease: "circOut" }}
-                      className="text-blue-600"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{project.progress}%</span>
-                  </div>
-                </div>
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Status</span>
-                  <Badge className="bg-white text-emerald-500 border border-emerald-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">Optimal</Badge>
-                </div>
-             </Card>
-
-             {/* Personnel Assignment Section */}
-             <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
-               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Mission Command</h3>
-               <div className="space-y-6">
-                 <div className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-lg shadow-blue-500/20">
-                       {INITIALS(project.lead_name)}
                     </div>
-                    <div>
-                       <p className="text-xs font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{project.lead_name}</p>
-                       <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">MISSION COMMANDER</p>
-                    </div>
-                 </div>
-
-                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Active Operatives</p>
-                 <div className="space-y-3">
-                   {volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).slice(0, 5).map((v: any) => (
-                      <div key={v.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl group hover:border-blue-200 transition-all">
-                        <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 font-black text-[9px] uppercase tracking-tighter">{INITIALS(v.name)}</div>
-                           <div className="text-left">
-                              <p className="text-[10px] font-black text-slate-900 uppercase leading-none">{v.name}</p>
-                              <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{v.role}</p>
-                           </div>
-                        </div>
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-glow"></div>
-                      </div>
-                   ))}
-                   {volunteers.filter((v: any) => projectTasks.some((t: any) => t.assigned_to === v.name)).length === 0 && (
-                     <p className="text-center text-[10px] font-bold text-slate-300 uppercase py-2">No personnel deployed</p>
-                   )}
-                 </div>
-                 
-                 {project.status === 'approved' && user?.role === 'Admin' && (
-                    <div className="pt-6 mt-6 border-t border-slate-100 space-y-4">
-                       <div className="flex items-center justify-between">
-                          <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest">HR Allocation Node</p>
-                          <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest">Pending Assignment</Badge>
-                       </div>
-                       <Button variant="secondary" className="w-full py-3.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-slate-900 hover:text-white border-slate-200">Broadcast Personnel Call</Button>
-                    </div>
+                 ))}
+                 {projectTasks.length === 0 && (
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-4">No active nodes detected</p>
                  )}
-               </div>
-            </Card>
+              </div>
+              <button className="w-full mt-8 py-3 bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-slate-100 transition-all">Node Overview</button>
+           </Card>
+
+           {calculatedProgress === 100 && (
+               <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                onClick={() => generateProjectImpactReport(project, projectTasks, milestones)}
+                className="w-full py-5 bg-emerald-600 text-white rounded-3xl font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-emerald-500/40 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
+               >
+                   <Download size={18} /> Generate Impact Report
+               </motion.button>
+           )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 };
+
 
 const SocialMediaView = () => {
   const posts = [

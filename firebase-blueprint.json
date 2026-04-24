@@ -206,25 +206,32 @@
     },
     "NGODocument": {
       "title": "NGO Document",
-      "description": "A stored document or media file in the NGO vault.",
+      "description": "Evidence documents linked to projects, finances, or volunteers.",
       "type": "object",
       "properties": {
         "fileName": { "type": "string" },
         "fileURL": { "type": "string" },
-        "category": { "type": "string", "enum": ["Project_Reports", "Finance_Records", "Legal_NGO", "Volunteer_Docs"] },
+        "category": { "type": "string", "enum": ["Invoice", "Project_Report", "KYC", "Legal", "Marketing"] },
         "uploadedBy": { "type": "string" },
         "uploaderId": { "type": "string" },
         "projectId": { "type": "string" },
         "projectName": { "type": "string" },
         "uploadDate": { "type": "string", "format": "date-time" },
         "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "rejectionReason": { "type": "string" },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "size": { "type": "string" },
+            "type": { "type": "string" },
+            "uploadedAt": { "type": "string", "format": "date-time" }
+          }
+        },
         "location": { "type": "string" },
-        "expiryDate": { "type": "string", "format": "date-time" },
-        "fileSize": { "type": "number" },
-        "fileType": { "type": "string" },
-        "version": { "type": "number" }
+        "expiryDate": { "type": "string", "format": "date-time" }
       },
-      "required": ["fileName", "fileURL", "category", "uploadedBy", "uploaderId", "uploadDate"]
+      "required": ["fileName", "fileURL", "category", "uploadedBy", "uploaderId", "status"]
     }
   },
   "firestore": {

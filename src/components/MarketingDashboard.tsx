@@ -44,7 +44,7 @@ import {
   increment,
   where
 } from 'firebase/firestore';
-import { Campaign, Donor, Donation, Transaction, Project, AppUser } from '../types';
+import { Campaign, Donor, Donation, Transaction, Project, AppUser, NGODocument } from '../types';
 import DonorCRM from './DonorCRM';
 import CampaignManager from './CampaignManager';
 import ImpactStories from './ImpactStories';
@@ -59,6 +59,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
   const [donors, setDonors] = useState<Donor[]>([]);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [marketingMedia, setMarketingMedia] = useState<NGODocument[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -70,6 +71,13 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
         setCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign)));
       },
       (error) => console.error("Campaign listener error:", error)
+    );
+
+    const subMarketingMedia = onSnapshot(
+      query(collection(db, 'documents'), where('category', '==', 'Marketing'), where('status', '==', 'verified')),
+      (snapshot) => {
+        setMarketingMedia(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NGODocument)));
+      }
     );
 
     // Only Admin or Marketing Heads can see donor/donation details
@@ -109,6 +117,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
       subDonors();
       subDonations();
       subProjects();
+      subMarketingMedia();
     };
   }, [user]);
 
@@ -335,17 +344,38 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
               </div>
 
               <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm text-left">
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-6">Impact Assets</h3>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex justify-between items-center">
+                  Impact Assets
+                  <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[8px] tracking-widest font-black uppercase">Verified Node</span>
+                </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="aspect-square bg-slate-100 rounded-2xl overflow-hidden relative group cursor-pointer border border-slate-200">
-                      <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/40 transition-all flex items-center justify-center">
-                        <ImageIcon className="text-white opacity-0 group-hover:opacity-100 scale-50 group-hover:scale-100 transition-all" size={24} />
+                  {marketingMedia.length === 0 ? (
+                    [1, 2, 3, 4].map(i => (
+                      <div key={i} className="aspect-square bg-slate-50 border border-slate-100 rounded-2xl animate-pulse" />
+                    ))
+                  ) : (
+                    marketingMedia.slice(0, 4).map(doc => (
+                      <div 
+                        key={doc.id} 
+                        onClick={() => window.open(doc.fileURL, '_blank')}
+                        className="aspect-square bg-slate-100 rounded-2xl overflow-hidden relative group cursor-pointer border border-slate-200"
+                      >
+                        <img 
+                          src={doc.fileURL} 
+                          alt="Impact" 
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                        />
+                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/40 transition-all flex items-center justify-center">
+                          <ImageIcon className="text-white opacity-0 group-hover:opacity-100 scale-50 group-hover:scale-100 transition-all" size={24} />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase mt-4 tracking-widest text-center">Manage Media Repository</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mt-4 tracking-widest text-center">
+                  {marketingMedia.length} Media Points Synchronized
+                </p>
               </div>
             </div>
           </div>

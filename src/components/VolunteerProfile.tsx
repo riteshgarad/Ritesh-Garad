@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Star, Clock, Heart, Award, ShieldCheck, Mail, Calendar, 
   MapPin, CheckCircle2, LayoutGrid, List, FileText, Download,
-  ExternalLink, ChevronRight, BarChart, Send, Plus
+  ExternalLink, ChevronRight, BarChart, Send, Plus, MessageCircle, Phone
 } from 'lucide-react';
-import { Volunteer, Project, WorkLog, VolunteerCertificate, AppUser } from '../types';
+import { Volunteer, Project, WorkLog, VolunteerCertificate, AppUser, NGODocument } from '../types';
 import { format } from 'date-fns';
+import { FileCard } from './FileCard';
 
 interface VolunteerProfileProps {
   volunteer: Volunteer;
@@ -15,10 +16,11 @@ interface VolunteerProfileProps {
   certificates: VolunteerCertificate[];
   onLogHours: (log: any) => Promise<void>;
   user: AppUser;
+  documents: NGODocument[];
 }
 
-export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLogHours, user }: VolunteerProfileProps) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'certs'>('overview');
+export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLogHours, user, documents }: VolunteerProfileProps) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'certs' | 'evidence'>('overview');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [logForm, setLogForm] = useState({
     projectId: '',
@@ -69,9 +71,20 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
           </div>
           <div className="mb-8">
             <h1 className="text-4xl font-black text-white uppercase tracking-tighter shadow-sm">{volunteer.name}</h1>
-            <p className="text-white/80 font-black uppercase tracking-widest text-[10px] drop-shadow-sm">
-              {volunteer.role} • {volunteer.department}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-white/80 font-black uppercase tracking-widest text-[10px] drop-shadow-sm">
+                {volunteer.role} • {volunteer.department}
+              </p>
+              {volunteer.phone && (
+                <button 
+                  onClick={() => window.open(`https://wa.me/${volunteer.phone?.replace(/[^0-9]/g, '')}`, '_blank')}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all text-[8px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
+                >
+                  <MessageCircle size={10} fill="currentColor" />
+                  WhatsApp
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -111,7 +124,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
           <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Mastered Skills</h3>
             <div className="flex flex-wrap gap-2">
-              {volunteer.skills.map(skill => (
+              {(Array.isArray(volunteer.skills) ? volunteer.skills : []).map(skill => (
                 <span key={skill} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest">
                   {skill}
                 </span>
@@ -142,7 +155,8 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
             {[
               { id: 'overview', label: 'Impact Grid' },
               { id: 'logs', label: 'Work History' },
-              { id: 'certs', label: 'Recognition' }
+              { id: 'certs', label: 'Recognition' },
+              { id: 'evidence', label: 'KYC & Evidence' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -271,6 +285,33 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
                     <p className="text-xs font-medium text-slate-400 max-w-xs">Complete an active project to earn your first recognition certificate.</p>
                   </div>
                 )}
+              </div>
+            )}
+            {activeTab === 'evidence' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Verified Credentials</h3>
+                  <div className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[8px] font-black uppercase tracking-widest">Vault Synchronized</div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {documents
+                    .filter(doc => doc.uploaderId === volunteer.id && doc.status === 'verified')
+                    .map(doc => (
+                      <FileCard 
+                        key={doc.id} 
+                        doc={doc} 
+                        user={user} 
+                      />
+                    ))
+                  }
+                  {documents.filter(doc => doc.uploaderId === volunteer.id && doc.status === 'verified').length === 0 && (
+                    <div className="col-span-full py-20 bg-slate-50 border-2 border-dashed border-slate-100 rounded-[40px] flex flex-col items-center justify-center text-center">
+                      <ShieldCheck size={40} className="text-slate-200 mb-4" />
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No Verified Nodes Found</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

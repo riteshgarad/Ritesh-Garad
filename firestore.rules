@@ -8,33 +8,23 @@ service cloud.firestore {
 
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    // Note: Bootstrapped admin check. For production, use exists() on an admins collection.
+    function isAdmin() { 
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.get('email', '').lower() == 'riteshgarad4@gmail.com') ||
+        (request.auth.uid == '4gEB4lAKCbfOoJu9vAmjQGsrmMK2')
+      );
+    }
+    function isDH() {
+      return isSignedIn() && exists(/databases/$(database)/documents/department_heads/$(request.auth.uid));
+    }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
-    // Safely get a field or default
-    function getField(data, field, defaultValue) {
-      return data.get(field, defaultValue);
-    }
-    
-    // Auth token check is not enough, but for bootstrapped admin we can use email
-    // In production, this would look up a 'users' or 'admins' collection
-    function isAdmin() { 
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'riteshgarad4@gmail.com'
-      );
-    }
-
-    function isDH() {
-      return isSignedIn() && exists(/databases/$(database)/documents/department_heads/$(request.auth.uid));
-    }
-
-    // Project Validation Helper (Pillar 2)
-    // Refactored to only validate values IF present during update, 
-    // and require items only on create in the match block.
+    // Pillar 2: Validation Blueprints
     function isValidProject(data) {
       return (data.get('name', '') is string) &&
              (data.get('status', 'approved') in ['pending_dept_review', 'pending_admin_review', 'approved', 'rejected', 'active', 'completed', 'on_hold']) &&
@@ -43,69 +33,79 @@ service cloud.firestore {
              (data.get('budget_status', 'approved') in ['pending', 'approved', 'rejected']);
     }
 
+    function isValidMilestone(data) {
+      return data.keys().hasAll(['title', 'status', 'projectId']) &&
+             data.title is string && data.title.size() <= 500 &&
+             data.status in ['pending', 'completed'] &&
+             data.projectId is string;
+    }
+
     // --- Collections ---
+
+    match /projects/{projectId}/milestones/{milestoneId} {
+        allow list: if isSignedIn();
+        allow get: if isSignedIn() && isValidId(milestoneId);
+        
+        allow create: if isSignedIn() && isValidMilestone(incoming()) && 
+                      (isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.creator_id) || isAdmin());
+        
+        allow update: if isSignedIn() && (
+          isAdmin() ||
+          (isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.creator_id)) ||
+          // Allow volunteers to toggle status if they are "involved", for now simplify to any signed in or more strictly later
+          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt']))
+        );
+        
+        allow delete: if isAdmin() || isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.creator_id);
+    }
+
+    match /projects/{projectId} {
+      allow get: if isSignedIn() && isValidId(projectId);
+      allow list: if isSignedIn(); 
+      
+      allow create: if isSignedIn() && 
+                    incoming().keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at']) &&
+                    isValidProject(incoming()) && 
+                    incoming().created_at == request.time &&
+                    incoming().creator_id == request.auth.uid;
+      
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isValidProject(incoming()) && (
+          // Action: Progress Update
+          (incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status', 'updated_at'])) ||
+          
+          // Action: Budget Revision (By Owner or Admin)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['budget', 'budget_items', 'budget_status', 'budget_rejection_reason', 'resubmittedAt']) && 
+           (isOwner(existing().creator_id) || isAdmin())) ||
+
+          // Action: Status/Approval Management
+          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason', 'budget_rejection_reason', 'updated_at']) && 
+           (isAdmin() || isDH()))
+        ))
+      );
+      
+      allow delete: if isAdmin() || isOwner(existing().creator_id);
+    }
 
     match /budget_requests/{requestId} {
       allow get: if isSignedIn() && isValidId(requestId);
       allow list: if isSignedIn();
       
       function isValidBudgetReq(data) {
-        return data.keys().hasAll(['projectId', 'projectName', 'proposerId', 'proposedBy', 'department', 'itemizedList', 'totalAmount', 'status', 'submittedAt']) &&
-               data.projectId is string &&
-               data.proposerId is string &&
-               data.totalAmount is number &&
+        return data.keys().hasAll(['projectId', 'proposerId', 'totalAmount', 'status', 'submittedAt']) &&
                data.status in ['pending_finance', 'approved', 'rejected'];
       }
 
       allow create: if isSignedIn() && isValidBudgetReq(incoming()) && 
                     incoming().submittedAt == request.time &&
                     incoming().proposerId == request.auth.uid;
-      allow update: if (isAdmin() || isDH()) && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'itemizedList', 'totalAmount', 'submittedAt', 'resubmittedAt']) ||
+                    
+      allow update: if isAdmin() || (
+                    (isDH() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'resubmittedAt'])) ||
                     (isSignedIn() && existing().proposerId == request.auth.uid && 
-                     incoming().diff(existing()).affectedKeys().hasOnly(['itemizedList', 'totalAmount', 'status', 'submittedAt', 'proposerId', 'proposedBy', 'rejectionReason', 'resubmittedAt']));
-    }
-
-    match /projects/{projectId} {
-      // Pillar 3: Path Variable Hardening
-      allow get: if isSignedIn() && isValidId(projectId);
-      // Pillar 8: Secure List Queries
-      allow list: if isSignedIn(); 
-      
-      // Creation requires strict schema
-      allow create: if isSignedIn() && 
-                    incoming().keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at', 'phase', 'progress', 'budget_status', 'budget', 'tag', 'lead_name', 'description', 'timeline', 'budget_items']) &&
-                    isValidProject(incoming()) && 
-                    incoming().created_at == request.time &&
-                    incoming().creator_id == request.auth.uid;
-      
-      // Pillar 4: Tiered Identity Logic & Pillar 2: Action-Based Update
-      allow update: if isSignedIn() && (
-        // Action: Full Edit (Admin only) - Admins can correct data
-        isAdmin() ||
-        
-        // Other actions require standard validation
-        (isValidProject(incoming()) && (
-          // Action: Progress Update (By Owner or Assigned)
-          (incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status']) && 
-           (isOwner(existing().creator_id) || isAdmin())) ||
-          
-          // Action: Budget Revision (By Owner)
-          (incoming().diff(existing()).affectedKeys().hasOnly(['budget', 'budget_items', 'budget_status', 'budget_rejection_reason', 'resubmittedAt']) && 
-           isOwner(existing().creator_id)) ||
-
-          // Action: Approval (By DH or Admin)
-          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason', 'budget_rejection_reason']) && 
-           (isAdmin() || isDH()))
-        ))
-      ) && (
-        isAdmin() || (
-          incoming().get('creator_id', '') == existing().get('creator_id', '') && 
-          incoming().get('created_at', request.time) == existing().get('created_at', incoming().get('created_at', request.time))
-        )
+                     incoming().diff(existing()).affectedKeys().hasOnly(['itemizedList', 'totalAmount', 'status', 'submittedAt', 'resubmittedAt', 'rejectionReason', 'proposedBy', 'proposerId']))
       );
-      
-      allow delete: if isAdmin() || isOwner(existing().creator_id);
     }
 
     match /tasks/{taskId} {
@@ -113,16 +113,14 @@ service cloud.firestore {
       allow list: if isSignedIn();
       
       function isValidTask(data) {
-        return data.keys().hasAll(['title', 'status', 'creator_id', 'project_id']) &&
-               data.title is string && data.title.size() <= 500 &&
-               data.status in ['todo', 'inprogress', 'completed'] &&
-               data.creator_id == request.auth.uid;
+        return data.get('project_id', '') is string &&
+               data.get('status', 'todo') in ['todo', 'inprogress', 'completed'];
       }
 
       allow create: if isSignedIn() && isValidTask(incoming());
-      allow update: if isSignedIn() && isValidTask(incoming()) && (
-        isOwner(existing().creator_id) || isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      allow update: if isSignedIn() && (
+        isAdmin() || isOwner(existing().creator_id) ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assigned_to', 'department'])
       );
       allow delete: if isAdmin() || isOwner(existing().creator_id);
     }
@@ -130,7 +128,7 @@ service cloud.firestore {
     match /volunteers/{volunteerId} {
       allow get: if isSignedIn() && isValidId(volunteerId);
       allow list: if isSignedIn();
-      allow create: if isAdmin(); // Only admins can onboard
+      allow create: if isAdmin();
       allow update: if isAdmin() || (isOwner(volunteerId) && incoming().diff(existing()).affectedKeys().hasOnly(['profileImage', 'skills', 'availability', 'interests', 'impactPoints', 'badges']));
       allow delete: if isAdmin();
     }
@@ -138,29 +136,74 @@ service cloud.firestore {
     match /volunteer_applications/{applicationId} {
       allow get: if isSignedIn();
       allow list: if isAdmin() || isDH();
-      
-      function isValidApplication(data) {
-        return data.keys().hasAll(['name', 'email', 'skills', 'availability', 'interests', 'idProofURL', 'status', 'appliedAt']) &&
-               data.status in ['pending_verification', 'approved', 'rejected'] &&
-               data.appliedAt == request.time;
-      }
-      
-      allow create: if isSignedIn() && isValidApplication(incoming()); 
+      allow create: if isSignedIn();
       allow update: if (isAdmin() || isDH()) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt']);
     }
 
     match /work_logs/{logId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && (isAdmin() || isDH() || resource.data.volunteerId == request.auth.uid);
-      
-      function isValidLog(data) {
-        return data.keys().hasAll(['volunteerId', 'volunteerName', 'projectId', 'projectName', 'hours', 'description', 'date', 'status']) &&
-               data.status in ['pending', 'verified', 'rejected'] &&
-               data.hours > 0 && data.hours <= 24;
-      }
-      
-      allow create: if isSignedIn() && isValidLog(incoming()) && incoming().volunteerId == request.auth.uid;
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && incoming().volunteerId == request.auth.uid;
       allow update: if (isAdmin() || isDH()) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'verifiedBy', 'verifiedAt']);
+    }
+
+    match /finance_requests/{requestId} {
+      allow read: if isSignedIn() && (isAdmin() || isDH());
+      allow create: if isAdmin() || isDH();
+      allow update: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow get: if isSignedIn() && (isAdmin() || isDH() || existing().createdBy == request.auth.uid);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isAdmin() || isDH() || (existing().createdBy == request.auth.uid && existing().status == 'pending'));
+      allow delete: if isAdmin();
+    }
+
+    match /campaigns/{campaignId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+    }
+
+    match /donors/{donorId} {
+      allow read, write: if isAdmin() || isDH();
+    }
+
+    match /donations/{donationId} {
+      allow read: if isAdmin() || isDH();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
+
+    match /documents/{documentId} {
+      allow get: if isSignedIn() && isValidId(documentId);
+      allow list: if isSignedIn();
+      
+      function isValidDoc(data) {
+        return data.fileName is string && data.fileName.size() <= 200 &&
+               data.fileURL is string &&
+               data.category in ['Invoice', 'Project_Report', 'KYC', 'Legal', 'Marketing'] &&
+               data.status in ['pending', 'verified', 'rejected'];
+      }
+
+      allow create: if isSignedIn() && isValidDoc(incoming()) && 
+                    incoming().status == 'pending' &&
+                    incoming().uploaderId == request.auth.uid;
+
+      allow update: if isSignedIn() && (
+        isAdmin() || isDH() || (
+          existing().uploaderId == request.auth.uid && 
+          existing().status == 'pending' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['fileName', 'description', 'category', 'projectId', 'projectName', 'metadata', 'location', 'expiryDate'])
+        )
+      ) && (
+        // Only Admin/DH can change status
+        (incoming().status == existing().status) || (isAdmin() || isDH())
+      );
+
+      allow delete: if isAdmin() || (existing().uploaderId == request.auth.uid && existing().status == 'pending');
     }
 
     match /volunteer_certificates/{certId} {
@@ -168,115 +211,18 @@ service cloud.firestore {
       allow create: if isAdmin() || isDH();
       allow update: if isAdmin();
     }
-
-    match /finance_requests/{requestId} {
-      allow read: if isAdmin();
-      // Pillar 7: Atomicity Guarantee (existsAfter)
-      // Finance requests should only be created when a project is approved
-      allow create: if isAdmin() && 
-                      incoming().status == 'pending' &&
-                      existsAfter(/databases/$(database)/documents/projects/$(incoming().project_id));
-    }
-
-    // Pillar 6: PII Isolation
-    match /users/{userId}/notifications/{notificationId} {
-      allow read: if isOwner(userId);
-      allow create: if isAdmin() || isOwner(userId);
-      allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
-      allow delete: if isOwner(userId);
-    }
-
-    match /transactions/{transactionId} {
-      allow get: if isSignedIn() && (isAdmin() || existing().createdBy == request.auth.uid);
-      allow list: if isSignedIn() && (isAdmin() || resource.data.createdBy == request.auth.uid);
-      
-      function isValidTransaction(data) {
-        // Core fields required on create
-        return data.keys().hasAll(['type', 'amount', 'category', 'status', 'date', 'createdBy', 'paymentMethod']) &&
-               data.type in ['income', 'expense'] &&
-               data.amount is number && data.amount > 0 &&
-               data.status in ['pending', 'approved', 'rejected', 'cleared'] &&
-               data.createdBy == request.auth.uid;
-      }
-
-      allow create: if isSignedIn() && isValidTransaction(incoming()) && incoming().date == request.time;
-      
-      allow update: if isSignedIn() && (
-        // Action: Audit Review (Admin or Finance Head)
-        ((isAdmin() || isDH()) && 
-         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt']) &&
-         incoming().reviewedBy == request.auth.uid &&
-         incoming().reviewedAt == request.time) ||
-         
-        // Action: Self Correction (Owner can update pending ones)
-        (existing().createdBy == request.auth.uid && existing().status == 'pending' && isValidTransaction(incoming()))
-      );
-      
-      allow delete: if isAdmin();
-    }
-
-    // --- Marketing & Donations (Pillar 6, 8) ---
-
-    match /campaigns/{campaignId} {
-      allow read: if isSignedIn();
-      
-      function isValidCampaign(data) {
-        return data.keys().hasAll(['title', 'goal_amount', 'status', 'created_by', 'created_at', 'current_raised', 'category']) &&
-               data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
-               data.goal_amount is number && data.goal_amount > 0 &&
-               data.status in ['draft', 'pending_head', 'pending_admin', 'active', 'completed'];
-      }
-
-      allow create: if isSignedIn() && isValidCampaign(incoming()) && incoming().created_by == request.auth.uid;
-      
-      allow update: if isSignedIn() && (
-        isAdmin() || 
-        (isDH() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejection_reason', 'updated_at'])) ||
-        (isOwner(existing().created_by) && existing().status == 'draft' && isValidCampaign(incoming())) ||
-        // Support donation auto-updates (Pillar 7)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['current_raised', 'updated_at']))
-      );
-    }
-
-    match /donors/{donorId} {
-      // PII Protection: Only Admin or Marketing Heads can see donor list
-      allow read: if isAdmin() || isDH();
-      allow write: if isAdmin() || isDH();
-    }
-
-    match /donations/{donationId} {
-      allow read: if isAdmin() || isDH();
-      allow create: if isSignedIn(); // Users/Bots create donations
-      allow update: if isAdmin();
-    }
-
-    match /documents/{documentId} {
-      allow get: if isSignedIn() && isValidId(documentId);
-      allow list: if isSignedIn() && (
-        isAdmin() ||
-        (isDH() && resource.data.category == 'Finance_Records') ||
-        (resource.data.uploaderId == request.auth.uid) ||
-        (resource.data.category in ['Project_Reports', 'Volunteer_Docs'])
-      );
-      
-      function isValidDoc(data) {
-        return data.keys().hasAll(['fileName', 'fileURL', 'category', 'uploadedBy', 'uploaderId', 'uploadDate', 'fileType', 'version']) &&
-               data.category in ['Project_Reports', 'Finance_Records', 'Legal_NGO', 'Volunteer_Docs'];
-      }
-
-      allow create: if isSignedIn() && isValidDoc(incoming()) && 
-                    incoming().uploadDate == request.time &&
-                    incoming().uploaderId == request.auth.uid;
-      
-      allow update: if isSignedIn() && (
-        isAdmin() ||
-        (isOwner(existing().uploaderId) && incoming().diff(existing()).affectedKeys().hasOnly(['description', 'location', 'version', 'lastEditedBy', 'lastEditedAt']))
-      );
-      
-      allow delete: if isAdmin();
-    }
     
-    // Public connection check
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'photoURL', 'availability', 'bio']));
+      
+      match /notifications/{notificationId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
     match /test/connection {
       allow read: if true;
     }

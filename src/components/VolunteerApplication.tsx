@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Mail, Star, Clock, Heart, FileText, Send, CheckCircle2, ChevronRight, Layout } from 'lucide-react';
+import { User, Mail, Star, Clock, Heart, FileText, Send, CheckCircle2, ChevronRight, Layout, Phone, Upload } from 'lucide-react';
 
 interface VolunteerApplicationProps {
   onSubmit: (application: any) => Promise<void>;
@@ -11,6 +11,7 @@ export const VolunteerApplicationForm = ({ onSubmit, isLoading }: VolunteerAppli
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     skills: [] as string[],
     availability: '',
     interests: '',
@@ -123,18 +124,32 @@ export const VolunteerApplicationForm = ({ onSubmit, isLoading }: VolunteerAppli
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">WhatsApp Number</label>
                     <div className="relative group">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={18} />
                       <input 
-                        type="email"
                         required
-                        value={formData.email}
-                        onChange={e => setFormData({...formData, email: e.target.value})}
+                        value={formData.phone}
+                        onChange={e => setFormData({...formData, phone: e.target.value})}
                         className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all outline-none" 
-                        placeholder="john@example.com"
+                        placeholder="+91 00000 00000"
                       />
                     </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                    <input 
+                      type="email"
+                      required
+                      value={formData.email}
+                      onChange={e => setFormData({...formData, email: e.target.value})}
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all outline-none" 
+                      placeholder="john@example.com"
+                    />
                   </div>
                 </div>
 
@@ -187,6 +202,16 @@ export const VolunteerApplicationForm = ({ onSubmit, isLoading }: VolunteerAppli
                         className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all outline-none resize-none" 
                         placeholder="Tell us about your motivation..."
                       />
+                    </div>
+                  </div>
+
+                  {/* section: Verification */}
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ID Verification Proof (Aadhar/Voter ID)</label>
+                    <div className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center group hover:bg-indigo-50/50 hover:border-indigo-200 transition-all cursor-pointer">
+                      <Upload className="text-slate-300 group-hover:text-indigo-500 mb-3" size={32} />
+                      <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Click to upload ID proof</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">PDF or JPG (Max 5MB)</p>
                     </div>
                   </div>
                 </div>
