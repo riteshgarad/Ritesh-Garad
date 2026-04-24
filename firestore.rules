@@ -29,16 +29,16 @@ service cloud.firestore {
 
     // Project Validation Helper (Pillar 2)
     function isValidProject(data) {
-      return data.keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at', 'phase', 'progress', 'budget_status', 'tag', 'lead_name', 'description', 'timeline', 'budget', 'budget_items']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-             data.description is string && data.description.size() <= 2000 &&
+      // Core fields required for basic integrity
+      let hasCore = data.keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at', 'phase', 'progress', 'budget_status', 'budget']);
+      
+      // Type and value validation
+      return hasCore &&
+             data.name is string && data.name.size() > 0 &&
              data.status in ['pending_dept_review', 'pending_admin_review', 'approved', 'rejected', 'active', 'completed', 'on_hold'] &&
-             data.tag in ['Health', 'Education', 'Environment', 'Community', 'Technology'] &&
-             data.phase is int && data.phase >= 1 && data.phase <= 6 &&
-             data.progress is number && data.progress >= 0 && data.progress <= 100 &&
+             data.phase is int && data.progress is number &&
              data.budget_status in ['pending', 'approved', 'rejected'] &&
              (data.creator_id == request.auth.uid || isAdmin());
-             // removed created_at == request.time from here as metadata check is better in create block
     }
 
     // --- Collections ---
@@ -67,24 +67,31 @@ service cloud.firestore {
       // Pillar 8: Secure List Queries
       allow list: if isSignedIn(); 
       
-      allow create: if isSignedIn() && isValidProject(incoming()) && incoming().created_at == request.time;
+      // Creation requires strict schema
+      allow create: if isSignedIn() && 
+                    incoming().keys().hasAll(['tag', 'lead_name', 'description', 'timeline', 'budget_items']) &&
+                    isValidProject(incoming()) && 
+                    incoming().created_at == request.time;
       
       // Pillar 4: Tiered Identity Logic & Pillar 2: Action-Based Update
-      allow update: if isSignedIn() && isValidProject(incoming()) && (
-        // Action: Progress Update (By Owner or Assigned)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status']) && 
-         (isOwner(existing().creator_id) || isAdmin())) ||
+      allow update: if isSignedIn() && (
+        // Action: Full Edit (Admin only) - Admins can correct legacy data
+        isAdmin() ||
         
-        // Action: Budget Revision (By Owner)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['budget', 'budget_items', 'budget_status']) && 
-         isOwner(existing().creator_id)) ||
+        // Other actions require standard validation
+        (isValidProject(incoming()) && (
+          // Action: Progress Update (By Owner or Assigned)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status']) && 
+           (isOwner(existing().creator_id) || isAdmin())) ||
+          
+          // Action: Budget Revision (By Owner)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['budget', 'budget_items', 'budget_status']) && 
+           isOwner(existing().creator_id)) ||
 
-        // Action: Approval (By DH or Admin)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason', 'budget_rejection_reason']) && 
-         (isAdmin() || isDH())) ||
-         
-        // Action: Full Edit (Admin only)
-        isAdmin()
+          // Action: Approval (By DH or Admin)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason', 'budget_rejection_reason']) && 
+           (isAdmin() || isDH()))
+        ))
       ) && incoming().creator_id == existing().creator_id && incoming().created_at == existing().created_at;
       
       allow delete: if isAdmin() || isOwner(existing().creator_id);
