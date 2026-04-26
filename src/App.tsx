@@ -6,7 +6,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import FinanceDashboard from './components/FinanceDashboard';
-import MarketingDashboard from './components/MarketingDashboard';
+import SocialMediaDashboard from './components/SocialMediaDashboard';
+import PublicRelationsDashboard from './components/PublicRelationsDashboard';
+import UserManagement from './components/UserManagement';
 import { BudgetPlanner } from './components/BudgetPlanner';
 import { DocumentVault } from './components/DocumentVault';
 import { FileUploadModal } from './components/FileUploadModal';
@@ -32,6 +34,8 @@ import {
   Search, 
   Bell, 
   Megaphone,
+  Camera,
+  Shield,
   LogOut, 
   Menu, 
   X,
@@ -91,7 +95,7 @@ import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS,
 import { askAssistant } from './services/geminiService';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -264,7 +268,7 @@ const NotificationPanel = ({
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social' | 'fundraising' | 'chatbot' | 'automation' | 'project-detail';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'chatbot' | 'automation' | 'project-detail' | 'users';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -308,23 +312,60 @@ export default function App() {
 
   // --- Auth & Data Fetching ---
   useEffect(() => {
+    let unsubProfile: (() => void) | null = null;
+    
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // Automatically promote the specific user to Admin for module management
-        const role = firebaseUser.email === 'riteshgarad4@gmail.com' ? 'Admin' : 'Staff Operative';
-        
-        setUser({
-          uid: firebaseUser.uid,
-          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
-          email: firebaseUser.email || '',
-          role: role
+        // Listen to user profile in real-time
+        unsubProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), async (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setUser({
+              uid: firebaseUser.uid,
+              name: data.name || firebaseUser.displayName || 'Member',
+              email: firebaseUser.email || '',
+              role: data.role || 'Staff Operative',
+              department: data.department || 'General'
+            });
+          } else {
+            // Auto-provision profile if missing (Migration/Bootstrap)
+            const role = firebaseUser.email === 'riteshgarad4@gmail.com' ? 'Admin' : 'Staff Operative';
+            const initialProfile = {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
+              email: firebaseUser.email || '',
+              role: role,
+              department: 'General',
+              isActive: true,
+              createdAt: serverTimestamp()
+            };
+            
+            try {
+              await setDoc(doc(db, 'users', firebaseUser.uid), initialProfile);
+              setUser(initialProfile as any);
+            } catch (err) {
+              console.error("Profile bootstrap failed:", err);
+              // Fallback to local state so UI doesn't break
+              setUser({
+                uid: firebaseUser.uid,
+                name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
+                email: firebaseUser.email || '',
+                role: role,
+                department: 'General'
+              });
+            }
+          }
         });
       } else {
+        if (unsubProfile) unsubProfile();
         setUser(null);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubProfile) unsubProfile();
+    };
   }, []);
 
   useEffect(() => {
@@ -1076,7 +1117,17 @@ export default function App() {
     setResetSent(false);
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, loginEmail, loginPass);
+        const userCred = await createUserWithEmailAndPassword(auth, loginEmail, loginPass);
+        // Create initial user document
+        await setDoc(doc(db, 'users', userCred.user.uid), {
+          uid: userCred.user.uid,
+          email: loginEmail,
+          name: loginEmail.split('@')[0],
+          role: loginEmail === 'riteshgarad4@gmail.com' ? 'Admin' : 'Staff Operative',
+          department: 'General',
+          isActive: true,
+          createdAt: serverTimestamp()
+        });
       } else {
         await signInWithEmailAndPassword(auth, loginEmail, loginPass);
       }
@@ -1174,16 +1225,44 @@ export default function App() {
   };
 
   // --- Navigation ---
-  const navItems = [
+  const allNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'projects', label: 'Projects', icon: FolderKanban, badge: projects.length },
     { id: 'tasks', label: 'Task Board', icon: CheckSquare },
     { id: 'volunteers', label: 'Volunteers', icon: Users },
     { id: 'finance', label: 'Finance', icon: IndianRupee },
     { id: 'docs', label: 'Documentation', icon: FileText },
-    { id: 'social', label: 'Social & PR', icon: Share2 },
+    { id: 'social-media', label: 'Social Media', icon: Camera, depts: ['Social Media'] },
+    { id: 'public-relations', label: 'Public Relations', icon: Megaphone, depts: ['Public Relations'] },
     { id: 'automation', label: 'Automation', icon: Zap },
+    { id: 'users', label: 'User Network', icon: Shield, roles: ['Admin'] },
   ];
+
+  const navItems = allNavItems.filter(item => {
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+    
+    // Explicit Role restriction
+    if (item.roles && !item.roles.includes(user.role)) return false;
+
+    // Social Media Head restrictions
+    if (user.department === 'Social Media') {
+      return ['social-media', 'tasks', 'docs', 'dashboard'].includes(item.id);
+    }
+    
+    // PR Head restrictions
+    if (user.department === 'Public Relations') {
+      return ['public-relations', 'tasks', 'docs', 'dashboard'].includes(item.id);
+    }
+
+    // Finance/Volunteers/Automation are generally restricted to admins or specific roles
+    if (['finance', 'volunteers', 'automation', 'users'].includes(item.id)) return false;
+
+    // Others (General/Projects/Documentation) are generally visible
+    if (['social-media', 'public-relations'].includes(item.id)) return false;
+
+    return true;
+  });
 
   if (!user) {
     if (isApplying) {
@@ -2052,8 +2131,12 @@ const PageView = ({
           user={user} 
         />
       );
-    case 'social':
-      return <MarketingDashboard user={user} projects={projects} campaigns={[]} volunteers={volunteers} />;
+    case 'social-media':
+      return <SocialMediaDashboard user={user} />;
+    case 'public-relations':
+      return <PublicRelationsDashboard user={user} />;
+    case 'users':
+      return <UserManagement currentUser={user} />;
     case 'chatbot':
       return <ChatbotView projects={projects} tasks={tasks} volunteers={volunteers} />;
     default:
@@ -3430,7 +3513,9 @@ const PAGE_TITLES: Record<Page, string> = {
   volunteers: 'Volunteer Network',
   finance: 'Financial Ledger',
   docs: 'Documentation Hub',
-  social: 'Social Media Pipeline',
+  'social-media': 'Social Media Pipeline',
+  'public-relations': 'Public Relations & Branding',
+  'users': 'Identity & Permissions',
   fundraising: 'Fundraising Campaigns',
   chatbot: 'AI Assistant',
   automation: 'Automation Lab',

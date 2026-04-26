@@ -51,7 +51,7 @@ export interface BudgetRequest {
 }
 
 export type TaskStatus = 'locked' | 'todo' | 'in_progress' | 'done';
-export type TaskCategory = 'Finance' | 'Operations' | 'Marketing' | 'HR' | 'Legal' | 'General';
+export type TaskCategory = 'Finance' | 'Operations' | 'Marketing' | 'HR' | 'Legal' | 'Social Media' | 'Public Relations' | 'General';
 
 export interface Task {
   id: string;
@@ -162,7 +162,7 @@ export interface Transaction {
   rejectionReason?: string;
 }
 
-export type DocumentCategory = 'Invoice' | 'Project_Report' | 'KYC' | 'Legal' | 'Marketing';
+export type DocumentCategory = 'Invoice' | 'Project_Report' | 'KYC' | 'Legal' | 'Marketing' | 'Mission_Report' | 'Field_Media';
 
 export interface NGODocument {
   id: string;

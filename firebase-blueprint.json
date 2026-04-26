@@ -253,9 +253,28 @@
         "expiryDate": { "type": "string", "format": "date-time" }
       },
       "required": ["fileName", "fileURL", "category", "uploadedBy", "uploaderId", "status"]
+    },
+    "AppUser": {
+      "title": "Application User",
+      "description": "System user with role-based access control metadata.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["Admin", "Department Head", "Volunteer", "Staff Operative"] },
+        "department": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "isActive"]
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "AppUser",
+      "description": "User profiles and RBAC metadata."
+    },
     "/projects/{projectId}": {
       "schema": "Project",
       "description": "Collection of NGO projects."

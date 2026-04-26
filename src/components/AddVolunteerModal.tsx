@@ -9,8 +9,8 @@ interface AddVolunteerModalProps {
   isLoading: boolean;
 }
 
-const SKILLS_OPTIONS = ['Teaching', 'Medical', 'Logistics', 'Marketing', 'Fundraising', 'Social Media', 'Design', 'First Aid'];
-const DEPARTMENTS = ['Education', 'Healthcare', 'Crisis Response', 'Admin', 'Finance', 'Logistics'];
+const SKILLS_OPTIONS = ['Teaching', 'Medical', 'Logistics', 'Marketing', 'Fundraising', 'Social Media', 'Design', 'Public Relations', 'Photography', 'Video Editing'];
+const DEPARTMENTS = ['Social Media', 'Public Relations', 'Finance', 'Operations', 'Marketing', 'HR', 'Legal', 'General'];
 
 export const AddVolunteerModal = ({ isOpen, onClose, onSubmit, isLoading }: AddVolunteerModalProps) => {
   const [formData, setFormData] = useState({

@@ -103,7 +103,7 @@ export const DEPT_COLORS: Record<string, [string, string]> = {
   'Finance': ['#DBEAFE', '#1E40AF'],
   'Social Media': ['#FEF3C7', '#92400E'],
   'Volunteers': ['#D1FAE5', '#065F46'],
-  'PR': ['#EDE9FE', '#5B21B6'],
+  'Public Relations': ['#EDE9FE', '#5B21B6'],
   'Project Mgmt': ['#FCE7F3', '#9D174D'],
   'Fundraising': ['#FEE2E2', '#991B1B'],
   'Documentation': ['#F3F4F6', '#374151'],

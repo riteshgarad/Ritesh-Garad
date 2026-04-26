@@ -1,6 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
     // 0. Global Safety Net
     match /{document=**} {
       allow read, write: if false;
@@ -8,241 +9,133 @@ service cloud.firestore {
 
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
-    // Note: Bootstrapped admin check. For production, use exists() on an admins collection.
     function isAdmin() { 
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.get('email', '').lower() == 'riteshgarad4@gmail.com') ||
-        (request.auth.uid == '4gEB4lAKCbfOoJu9vAmjQGsrmMK2')
+             request.auth.token.email == 'riteshgarad4@gmail.com' ||
+             (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin')
       );
     }
-    function isDH() {
-      return isSignedIn() && exists(/databases/$(database)/documents/department_heads/$(request.auth.uid));
+    function isDeptHead(dept) {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Department Head' &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == dept;
     }
-    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
-    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
-    // Pillar 2: Validation Blueprints
-    function isValidProject(data) {
-      return (data.get('name', '') is string) &&
-             (data.get('status', 'approved') in ['pending_dept_review', 'pending_admin_review', 'approved', 'rejected', 'active', 'completed', 'on_hold']) &&
-             (data.get('phase', 1) is int) && 
-             (data.get('progress', 0) is number) &&
-             (data.get('budget_status', 'approved') in ['pending', 'approved', 'rejected']);
-    }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isValidString(val, max) { return val is string && val.size() <= max; }
 
-    function isValidMilestone(data) {
-      return data.keys().hasAll(['title', 'status', 'projectId']) &&
-             data.title is string && data.title.size() <= 500 &&
-             data.status in ['pending', 'completed'] &&
-             data.projectId is string;
-    }
-
-    // --- Collections ---
-
-    match /projects/{projectId}/milestones/{milestoneId} {
-        allow list: if isSignedIn();
-        allow get: if isSignedIn() && isValidId(milestoneId);
-        
-        allow create: if isSignedIn() && isValidMilestone(incoming()) && 
-                      (isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.creator_id) || isAdmin());
-        
-        allow update: if isSignedIn() && (
-          isAdmin() ||
-          (isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.creator_id)) ||
-          // Allow volunteers to toggle status if they are "involved", for now simplify to any signed in or more strictly later
-          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt']))
-        );
-        
-        allow delete: if isAdmin() || isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.creator_id);
-    }
-
-    match /projects/{projectId} {
-      allow get: if isSignedIn() && isValidId(projectId);
-      allow list: if isSignedIn(); 
-      
-      allow create: if isSignedIn() && 
-                    incoming().keys().hasAll(['name', 'status', 'creator_id', 'department', 'created_at']) &&
-                    isValidProject(incoming()) && 
-                    incoming().created_at == request.time &&
-                    incoming().creator_id == request.auth.uid;
-      
-      allow update: if isSignedIn() && (
-        isAdmin() ||
-        (isValidProject(incoming()) && (
-          // Action: Progress Update
-          (incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'phase', 'status', 'updated_at'])) ||
-          
-          // Action: Budget Revision (By Owner or Admin)
-          (incoming().diff(existing()).affectedKeys().hasOnly(['budget', 'budget_items', 'budget_status', 'budget_rejection_reason', 'resubmittedAt']) && 
-           (isOwner(existing().creator_id) || isAdmin())) ||
-
-          // Action: Status/Approval Management
-          (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason', 'budget_rejection_reason', 'updated_at']) && 
-           (isAdmin() || isDH()))
-        ))
-      );
-      
-      allow delete: if isAdmin() || isOwner(existing().creator_id);
-    }
-
-    match /budget_requests/{requestId} {
-      allow get: if isSignedIn() && isValidId(requestId);
-      allow list: if isSignedIn();
-      
-      function isValidBudgetReq(data) {
-        return data.keys().hasAll(['projectId', 'proposerId', 'totalAmount', 'status', 'submittedAt']) &&
-               data.status in ['pending_finance', 'approved', 'rejected'];
-      }
-
-      allow create: if isSignedIn() && isValidBudgetReq(incoming()) && 
-                    incoming().submittedAt == request.time &&
-                    incoming().proposerId == request.auth.uid;
-                    
-      allow update: if isAdmin() || (
-                    (isDH() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'resubmittedAt'])) ||
-                    (isSignedIn() && existing().proposerId == request.auth.uid && 
-                     incoming().diff(existing()).affectedKeys().hasOnly(['itemizedList', 'totalAmount', 'status', 'submittedAt', 'resubmittedAt', 'rejectionReason', 'proposedBy', 'proposerId']))
-      );
-    }
-
-    match /tasks/{taskId} {
-      allow get: if isSignedIn() && isValidId(taskId);
-      allow list: if isSignedIn();
-      
-      function isValidTask(data) {
-        return data.projectId is string &&
-               data.assignedDept in ['Finance', 'Operations', 'Marketing', 'HR', 'Legal', 'General'] &&
-               data.status in ['locked', 'todo', 'in_progress', 'done'] &&
-               data.impactValue is int &&
-               data.proofRequired is bool;
-      }
-
-      allow create: if isSignedIn() && isValidTask(incoming()) && 
-                    incoming().createdAt == request.time &&
-                    incoming().createdBy == request.auth.uid;
-
-      allow update: if isSignedIn() && (
-        isAdmin() || isDH() || (
-          // Owner can update everything if not done
-          (isOwner(existing().createdBy) && existing().status != 'done' && isValidTask(incoming())) ||
-          // Assignee can update status
-          (isOwner(existing().assignedVolunteerId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'relatedDocId']))
-        )
-      );
-      
-      allow delete: if isAdmin() || isOwner(existing().createdBy);
-    }
-
-    match /activity_logs/{logId} {
-      allow list: if isSignedIn();
-      allow get: if isSignedIn();
-      allow create: if isSignedIn(); // System logs will be written by client for now as we don't have functions
-      allow delete: if isAdmin();
-    }
-
-    match /volunteers/{volunteerId} {
-      allow get: if isSignedIn() && isValidId(volunteerId);
-      allow list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() || (isOwner(volunteerId) && incoming().diff(existing()).affectedKeys().hasOnly(['profileImage', 'skills', 'availability', 'interests', 'impactPoints', 'badges']));
-      allow delete: if isAdmin();
-    }
-
-    match /volunteer_applications/{applicationId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin() || isDH();
-      allow create: if isSignedIn();
-      allow update: if (isAdmin() || isDH()) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt']);
-    }
-
-    match /work_logs/{logId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && incoming().volunteerId == request.auth.uid;
-      allow update: if (isAdmin() || isDH()) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'verifiedBy', 'verifiedAt']);
-    }
-
-    match /finance_requests/{requestId} {
-      allow read: if isSignedIn() && (isAdmin() || isDH());
-      allow create: if isAdmin() || isDH();
+    // --- User Profiles ---
+    match /users/{userId} {
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow create: if isSignedIn() && isOwner(userId) && 
+                     incoming().keys().hasAll(['uid', 'email', 'name', 'role', 'department', 'isActive', 'createdAt']) &&
+                     (incoming().role == 'Staff Operative' || request.auth.token.email == 'riteshgarad4@gmail.com');
       allow update: if isAdmin();
     }
 
-    match /transactions/{transactionId} {
-      allow get: if isSignedIn() && (isAdmin() || isDH() || existing().createdBy == request.auth.uid);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (isAdmin() || isDH() || (existing().createdBy == request.auth.uid && existing().status == 'pending'));
-      allow delete: if isAdmin();
+    // --- Projects ---
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn(); // Simplified for now as many roles can propose
+      allow update: if (
+        isAdmin() || 
+        (isDeptHead(existing().department) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason'])) ||
+        (isOwner(existing().creator_id) && existing().status == 'pending_dept_review' && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'budget', 'department', 'lead_name']))
+      );
+      
+      match /milestones/{milestoneId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || isDeptHead(get(/databases/$(database)/documents/projects/$(projectId)).data.department);
+      }
     }
 
-    match /campaigns/{campaignId} {
+    // --- Tasks ---
+    match /tasks/{taskId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-    }
-
-    match /donors/{donorId} {
-      allow read, write: if isAdmin() || isDH();
-    }
-
-    match /donations/{donationId} {
-      allow read: if isAdmin() || isDH();
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-    }
-
-    match /documents/{documentId} {
-      allow get: if isSignedIn() && isValidId(documentId);
-      allow list: if isSignedIn();
-      
-      function isValidDoc(data) {
-        return data.fileName is string && data.fileName.size() <= 200 &&
-               data.fileURL is string &&
-               data.category in ['Invoice', 'Project_Report', 'KYC', 'Legal', 'Marketing'] &&
-               data.status in ['pending', 'verified', 'rejected'];
-      }
-
-      allow create: if isSignedIn() && isValidDoc(incoming()) && 
-                    incoming().status == 'pending' &&
-                    incoming().uploaderId == request.auth.uid;
-
       allow update: if isSignedIn() && (
-        isAdmin() || isDH() || (
-          existing().uploaderId == request.auth.uid && 
-          existing().status == 'pending' &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['fileName', 'description', 'category', 'projectId', 'projectName', 'metadata', 'location', 'expiryDate'])
-        )
-      ) && (
-        // Only Admin/DH can change status
-        (incoming().status == existing().status) || (isAdmin() || isDH())
+        isAdmin() || 
+        isDeptHead(existing().assignedDept) ||
+        (isOwner(existing().assignedVolunteerId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt', 'relatedDocId']))
       );
+    }
 
-      allow delete: if isAdmin() || (existing().uploaderId == request.auth.uid && existing().status == 'pending');
+    // --- Volunteers ---
+    match /volunteers/{volunteerId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Documentation ---
+    match /documents/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if (
+        isAdmin() || 
+        isDeptHead('Operations') || 
+        isDeptHead('Marketing') ||
+        (isOwner(existing().uploaderId) && existing().status == 'pending')
+      );
+    }
+
+    // --- Finance & Transactions ---
+    match /transactions/{tId} {
+      allow read: if isAdmin() || isDeptHead('Finance');
+      allow create: if isAdmin() || isDeptHead('Finance') || isDeptHead('Operations');
+      allow update: if isAdmin() || isDeptHead('Finance');
+    }
+
+    match /finance_requests/{rId} {
+      allow read, write: if isAdmin() || isDeptHead('Finance');
+    }
+
+    match /budget_requests/{rId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isDeptHead('Finance') || isDeptHead(incoming().department);
+    }
+
+    // --- Campaigns ---
+    match /campaigns/{cId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isDeptHead('Marketing') || isDeptHead('Social Media') || isDeptHead('Public Relations');
+    }
+
+    // --- Donors & Donations ---
+    match /donors/{dId} {
+      allow read: if isAdmin() || isDeptHead('Finance') || isDeptHead('Public Relations');
+      allow write: if isAdmin() || isDeptHead('Finance');
+    }
+
+    match /donations/{dId} {
+      allow read: if isAdmin() || isDeptHead('Finance');
+      allow create: if isSignedIn();
+    }
+
+    // --- Misc ---
+    match /activity_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+    
+    match /work_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isDeptHead(existing().department);
+    }
+
+    match /volunteer_applications/{appId} {
+      allow read: if isAdmin() || isDeptHead('HR');
+      allow create: if true; // Public access
+      allow update: if isAdmin() || isDeptHead('HR');
     }
 
     match /volunteer_certificates/{certId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin() || isDH();
-      allow update: if isAdmin();
-    }
-    
-    match /users/{userId} {
-      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow list: if isAdmin();
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'photoURL', 'availability', 'bio']));
-      
-      match /notifications/{notificationId} {
-        allow read, write: if isOwner(userId);
-      }
-    }
-
-    match /test/connection {
-      allow read: if true;
+      allow create: if isAdmin() || isDeptHead('HR');
     }
   }
 }

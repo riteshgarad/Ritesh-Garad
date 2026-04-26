@@ -3,7 +3,8 @@ import { motion } from 'motion/react';
 import { 
   CheckCircle2, Lock, Clock, User, 
   Database, Zap, Shield, Folder, 
-  Camera, ArrowRight, MessageSquare
+  Camera, ArrowRight, MessageSquare,
+  Megaphone
 } from 'lucide-react';
 import { Task, TaskStatus, TaskCategory } from '../types';
 
@@ -27,7 +28,9 @@ export const InterlinkedCard = ({ task, onStatusChange, onUploadProof, isClickab
   const deptConfig: Record<TaskCategory, { icon: any; color: string }> = {
     Finance: { icon: Database, color: 'text-emerald-600' },
     Operations: { icon: Zap, color: 'text-blue-600' },
-    Marketing: { icon: Zap, color: 'text-purple-600' },
+    Marketing: { icon: MessageSquare, color: 'text-purple-600' },
+    'Social Media': { icon: Camera, color: 'text-pink-500' },
+    'Public Relations': { icon: Megaphone, color: 'text-purple-600' },
     HR: { icon: User, color: 'text-orange-600' },
     Legal: { icon: Shield, color: 'text-red-600' },
     General: { icon: Folder, color: 'text-slate-600' },
