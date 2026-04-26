@@ -93,19 +93,24 @@ import {
 } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
 import { askAssistant } from './services/geminiService';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // --- Firebase Initialization ---
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const db = firebaseConfig.firestoreDatabaseId 
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// Secondary App (Used only for creating users to avoid logout)
+const secondaryApp = getApps().find(a => a.name === "Secondary") 
+                     || initializeApp(firebaseConfig, "Secondary");
+export const secondaryAuth = getAuth(secondaryApp);
 
 const handleFirestoreError = (error: any, operationType: string, path: string | null = null) => {
   const authInfo = auth.currentUser ? {

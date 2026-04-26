@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import fs from "fs";
 
 dotenv.config();
@@ -14,20 +14,30 @@ const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "firebase
 
 async function startServer() {
   // Initialize Firebase Admin with project identification
-  if (admin.apps.length === 0) {
-    admin.initializeApp();
+  for (const app of admin.apps) {
+    if (app) {
+      console.log(`[Firebase Admin] Deleting existing app: ${app.name}`);
+      await app.delete();
+    }
   }
-  const adminApp = admin.app();
 
-  const auth = admin.auth(adminApp);
+  const projectToUse = firebaseConfig.projectId;
   const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
   
-  // Use the modern getFirestore with databaseId support
-  const db = firebaseConfig.firestoreDatabaseId 
-    ? getFirestore(firebaseConfig.firestoreDatabaseId)
-    : getFirestore();
+  const adminApp = admin.initializeApp({ 
+    projectId: projectToUse
+  });
+
+  console.log(`[Firebase Admin] Active Project: ${adminApp.options.projectId}`);
+
+  const auth = adminApp.auth();
   
-  console.log(`[Firebase Admin] SDK Initialized. Project: ${firebaseConfig.projectId}, Target Database: ${dbId}`);
+  // Use the modern getFirestore with databaseId support
+  const db = dbId === '(default)' 
+    ? getFirestore(adminApp)
+    : getFirestore(adminApp, dbId);
+  
+  console.log(`[Firebase Admin] SDK Active. Project: ${adminApp.options.projectId}, Database: ${dbId}`);
 
   const app = express();
   const PORT = 3000;
@@ -47,9 +57,22 @@ async function startServer() {
       const decodedToken = await auth.verifyIdToken(idToken);
       console.log(`[Auth] User verified: ${decodedToken.email} (${decodedToken.uid})`);
 
-      console.log(`[Firestore] Fetching profile from ${dbId}/users/${decodedToken.uid}...`);
-      const userDoc = await db.collection("users").doc(decodedToken.uid).get();
-      const userData = userDoc.data();
+      console.log(`[Firestore] Fetching profile for ${decodedToken.uid} from ${dbId}...`);
+      let userData: any = null;
+      try {
+        const userDoc = await db.collection("users").doc(decodedToken.uid).get();
+        userData = userDoc.data();
+        console.log(`[Firestore] Profile fetched:`, userData ? "exists" : "not found");
+      } catch (dbError: any) {
+        console.error(`[Firestore Error] Failed to fetch user document for ${decodedToken.uid}:`, dbError);
+        // Fallback to bootstrap admin if db fails (e.g. initial setup)
+        if (decodedToken.email === "riteshgarad4@gmail.com") {
+          console.log(`[Auth] Bootstrap admin detected via email fallback`);
+          userData = { role: "Admin" };
+        } else {
+          return res.status(500).json({ error: `Database error: ${dbError.message}` });
+        }
+      }
 
       const role = userData?.role || (decodedToken.email === "riteshgarad4@gmail.com" ? "Admin" : null);
 
@@ -88,7 +111,7 @@ async function startServer() {
         role,
         department: department || "General",
         isActive: true,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
 
       res.json({ success: true, uid: userRecord.uid });
@@ -101,10 +124,13 @@ async function startServer() {
   // Admin: List Users
   app.get("/api/admin/users", verifyAdmin, async (req, res) => {
     try {
+      console.log(`[Firestore] Fetching all users from ${dbId}...`);
       const usersSnapshot = await db.collection("users").get();
       const users = usersSnapshot.docs.map(doc => doc.data());
+      console.log(`[Firestore] Successfully fetched ${users.length} users`);
       res.json(users);
     } catch (error: any) {
+      console.error("[Firestore Error] Failed to list users:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -117,7 +143,7 @@ async function startServer() {
     try {
       await db.collection("users").doc(uid).update({
         ...updates,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       res.json({ success: true });
     } catch (error: any) {
