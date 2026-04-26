@@ -101,7 +101,9 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 // --- Firebase Initialization ---
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = firebaseConfig.firestoreDatabaseId 
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
@@ -132,7 +134,8 @@ const handleFirestoreError = (error: any, operationType: string, path: string | 
   };
   
   console.error("Firestore Failure:", JSON.stringify(errorInfo, null, 2));
-  throw new Error(JSON.stringify(errorInfo));
+  toast.error(`Security Clearance Error: ${operationType} on ${path}`);
+  // Do NOT throw, to keep the app alive
 };
 
 async function testConnection() {
@@ -272,6 +275,7 @@ type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'doc
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -308,6 +312,8 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotifOpen, setNotifOpen] = useState(false);
   const [isUpdateLoading, setIsUpdateLoading] = useState(false);
+  const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   // --- Auth & Data Fetching ---
@@ -327,6 +333,7 @@ export default function App() {
               role: data.role || 'Staff Operative',
               department: data.department || 'General'
             });
+            setAuthInitialized(true);
           } else {
             // Auto-provision profile if missing (Migration/Bootstrap)
             const role = firebaseUser.email === 'riteshgarad4@gmail.com' ? 'Admin' : 'Staff Operative';
@@ -343,9 +350,9 @@ export default function App() {
             try {
               await setDoc(doc(db, 'users', firebaseUser.uid), initialProfile);
               setUser(initialProfile as any);
+              setAuthInitialized(true);
             } catch (err) {
               console.error("Profile bootstrap failed:", err);
-              // Fallback to local state so UI doesn't break
               setUser({
                 uid: firebaseUser.uid,
                 name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
@@ -353,12 +360,18 @@ export default function App() {
                 role: role,
                 department: 'General'
               });
+              setAuthInitialized(true);
             }
           }
+        }, (err) => {
+          console.error("Profile Snapshot Error:", err);
+          handleFirestoreError(err, 'get' as any, `users/${firebaseUser.uid}`);
+          setAuthInitialized(true);
         });
       } else {
         if (unsubProfile) unsubProfile();
         setUser(null);
+        setAuthInitialized(true);
       }
     });
 
@@ -367,6 +380,7 @@ export default function App() {
       if (unsubProfile) unsubProfile();
     };
   }, []);
+
 
   useEffect(() => {
     if (!user) return;
@@ -1150,9 +1164,6 @@ export default function App() {
     }
   };
 
-  const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-
   const handleUpdateBudget = async (projectId: string, budgetItems: BudgetItem[]) => {
     if (!auth.currentUser || !user) return;
     setIsUpdateLoading(true);
@@ -1263,6 +1274,19 @@ export default function App() {
 
     return true;
   });
+
+  if (!authInitialized) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-4">
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], rotate: [0, 90, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="w-12 h-12 bg-blue-600 rounded-xl mb-6 shadow-2xl shadow-blue-500/50"
+        />
+        <h2 className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] animate-pulse">Initializing OS Kernels</h2>
+      </div>
+    );
+  }
 
   if (!user) {
     if (isApplying) {

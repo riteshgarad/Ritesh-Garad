@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
 
 dotenv.config();
@@ -11,15 +12,23 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "firebase-applet-config.json"), "utf8"));
 
-// Initialize Firebase Admin
-admin.initializeApp({
-  projectId: firebaseConfig.projectId,
-});
-
-const auth = admin.auth();
-const db = admin.firestore(firebaseConfig.firestoreDatabaseId || '(default)');
-
 async function startServer() {
+  // Initialize Firebase Admin with project identification
+  if (admin.apps.length === 0) {
+    admin.initializeApp();
+  }
+  const adminApp = admin.app();
+
+  const auth = admin.auth(adminApp);
+  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+  
+  // Use the modern getFirestore with databaseId support
+  const db = firebaseConfig.firestoreDatabaseId 
+    ? getFirestore(firebaseConfig.firestoreDatabaseId)
+    : getFirestore();
+  
+  console.log(`[Firebase Admin] SDK Initialized. Project: ${firebaseConfig.projectId}, Target Database: ${dbId}`);
+
   const app = express();
   const PORT = 3000;
 
@@ -34,7 +43,11 @@ async function startServer() {
 
     const idToken = authHeader.split("Bearer ")[1];
     try {
+      console.log(`[Auth] Verifying token for user...`);
       const decodedToken = await auth.verifyIdToken(idToken);
+      console.log(`[Auth] User verified: ${decodedToken.email} (${decodedToken.uid})`);
+
+      console.log(`[Firestore] Fetching profile from ${dbId}/users/${decodedToken.uid}...`);
       const userDoc = await db.collection("users").doc(decodedToken.uid).get();
       const userData = userDoc.data();
 
