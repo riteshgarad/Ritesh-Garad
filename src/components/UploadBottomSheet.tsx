@@ -7,10 +7,13 @@ import {
 } from 'lucide-react';
 import { Project, DocumentCategory } from '../types';
 
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../App';
+
 interface UploadBottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpload: (file: File, metadata: any) => Promise<void>;
+  onUpload: (data: any) => Promise<void>;
   projects: Project[];
 }
 
@@ -31,7 +34,7 @@ export const UploadBottomSheet = ({ isOpen, onClose, onUpload, projects }: Uploa
     onDrop,
     multiple: false,
     maxSize: 10 * 1024 * 1024 // 10MB
-  });
+  } as any);
 
   const categories: { id: DocumentCategory; label: string; icon: any }[] = [
     { id: 'Project_Report', label: 'Mission Report', icon: Folder },
@@ -46,7 +49,18 @@ export const UploadBottomSheet = ({ isOpen, onClose, onUpload, projects }: Uploa
     setIsUploading(true);
     try {
       const selectedProject = projects.find(p => p.id === selectedProjectId);
-      await onUpload(file, {
+      
+      // Perform Storage upload internally to be consistent with FileUploadModal
+      const storagePath = `documents/${category}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      await onUpload({
+        fileName: file.name,
+        fileURL: downloadURL,
+        fileSize: file.size,
+        fileType: file.type,
         category,
         projectId: selectedProjectId,
         projectName: selectedProject?.name || 'General',

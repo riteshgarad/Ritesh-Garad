@@ -36,24 +36,45 @@
       "required": ["project_id", "amount", "status"]
     },
     "Task": {
-      "title": "Task",
-      "description": "A specific task or action item within a project.",
+      "title": "Interlinked Task",
+      "description": "A cross-departmental data bridge for mission orchestration.",
       "type": "object",
       "properties": {
-        "project_id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "assignedDept": { "type": "string", "enum": ["Finance", "Operations", "Marketing", "HR", "Legal", "General"] },
+        "assignedVolunteerId": { "type": "string" },
+        "assignedVolunteerName": { "type": "string" },
+        "relatedDocId": { "type": "string" },
         "title": { "type": "string" },
-        "department": { "type": "string" },
-        "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
-        "assigned_to": { "type": "string" },
-        "due_date": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["todo", "inprogress", "completed"] },
-        "task_type": { "type": "string", "enum": ["execution", "approval"] },
-        "is_locked": { "type": "boolean" },
-        "decision": { "type": "string", "enum": ["approved", "rejected"] },
-        "created_at": { "type": "string", "format": "date-time" },
-        "creator_id": { "type": "string" }
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["locked", "todo", "in_progress", "done"] },
+        "dependencyId": { "type": "string" },
+        "impactValue": { "type": "integer" },
+        "proofRequired": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "budget": { "type": "number" }
       },
-      "required": ["title", "status", "creator_id"]
+      "required": ["projectId", "assignedDept", "title", "status", "impactValue", "proofRequired", "createdAt", "updatedAt"]
+    },
+    "ActivityLog": {
+      "title": "System Activity Log",
+      "description": "Logs cross-departmental events and system triggers.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" }
+      },
+      "required": ["type", "message", "timestamp"]
     },
     "Volunteer": {
       "title": "Volunteer",
@@ -286,6 +307,10 @@
     "/documents/{documentId}": {
       "schema": "NGODocument",
       "description": "Centralized NGO document repository."
+    },
+    "/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Live feed of mission orchestration events."
     }
   }
 }

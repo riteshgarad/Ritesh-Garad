@@ -14,7 +14,7 @@ import { Skeleton } from './ui/Skeleton';
 interface DocumentVaultProps {
   documents: NGODocument[];
   projects: Project[];
-  onUpload: (file: File, metadata: any) => Promise<void>;
+  onUpload: (data: any) => Promise<void>;
   onVerify: (id: string, status: 'verified' | 'rejected', reason?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   user: AppUser;
@@ -271,18 +271,19 @@ export const DocumentVault = ({
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredDocs.map(doc => (
-                    <FileCard 
-                      key={doc.id} 
-                      doc={doc} 
-                      user={user}
-                      onSelect={(selected) => {
-                        // Handle preview logic here or selection
-                        console.log('Selected:', selected);
-                      }}
-                      onVerify={async (id, status, reason) => {
-                        await handleVerify(id, status, reason);
-                      }}
-                    />
+                    <div key={doc.id}>
+                      <FileCard 
+                        doc={doc} 
+                        user={user}
+                        onSelect={(selected) => {
+                          // Handle preview logic here or selection
+                          console.log('Selected:', selected);
+                        }}
+                        onVerify={async (id, status, reason) => {
+                          await handleVerify(id, status, reason);
+                        }}
+                      />
+                    </div>
                   ))}
                 </div>
               )}

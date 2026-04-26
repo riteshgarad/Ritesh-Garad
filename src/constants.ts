@@ -34,15 +34,18 @@ export const INITIAL_PROJECTS: Project[] = [
 export const INITIAL_TASKS: Task[] = [
   {
     id: '101',
-    project_id: '1',
+    projectId: '1',
+    projectName: 'Clean Water Initiative',
     title: 'Site assessment at Satara',
-    department: 'Volunteers',
-    priority: 'High',
-    assigned_to: 'Siddhesh Garad',
-    status: 'inprogress',
-    task_type: 'execution',
-    is_locked: false,
-    created_at: new Date().toISOString(),
+    description: 'Initial topographical layout and population density mapping.',
+    assignedDept: 'Operations',
+    impactValue: 15,
+    proofRequired: true,
+    status: 'in_progress',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'system',
+    creatorName: 'System'
   }
 ];
 

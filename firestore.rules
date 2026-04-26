@@ -113,16 +113,34 @@ service cloud.firestore {
       allow list: if isSignedIn();
       
       function isValidTask(data) {
-        return data.get('project_id', '') is string &&
-               data.get('status', 'todo') in ['todo', 'inprogress', 'completed'];
+        return data.projectId is string &&
+               data.assignedDept in ['Finance', 'Operations', 'Marketing', 'HR', 'Legal', 'General'] &&
+               data.status in ['locked', 'todo', 'in_progress', 'done'] &&
+               data.impactValue is int &&
+               data.proofRequired is bool;
       }
 
-      allow create: if isSignedIn() && isValidTask(incoming());
+      allow create: if isSignedIn() && isValidTask(incoming()) && 
+                    incoming().createdAt == request.time &&
+                    incoming().createdBy == request.auth.uid;
+
       allow update: if isSignedIn() && (
-        isAdmin() || isOwner(existing().creator_id) ||
-        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assigned_to', 'department'])
+        isAdmin() || isDH() || (
+          // Owner can update everything if not done
+          (isOwner(existing().createdBy) && existing().status != 'done' && isValidTask(incoming())) ||
+          // Assignee can update status
+          (isOwner(existing().assignedVolunteerId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'relatedDocId']))
+        )
       );
-      allow delete: if isAdmin() || isOwner(existing().creator_id);
+      
+      allow delete: if isAdmin() || isOwner(existing().createdBy);
+    }
+
+    match /activity_logs/{logId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn(); // System logs will be written by client for now as we don't have functions
+      allow delete: if isAdmin();
     }
 
     match /volunteers/{volunteerId} {

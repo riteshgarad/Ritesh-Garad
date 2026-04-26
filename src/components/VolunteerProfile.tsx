@@ -29,9 +29,13 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
     date: format(new Date(), 'yyyy-MM-dd')
   });
 
-  const activeProjects = projects.filter(p => p.status === 'active');
-  const myLogs = logs.filter(l => l.volunteerId === volunteer.id).sort((a, b) => b.date.toDate() - a.date.toDate());
-  const myCerts = certificates.filter(c => c.volunteerId === volunteer.id);
+  const activeProjects = (projects || []).filter(p => p && p.status === 'active');
+  const myLogs = (logs || []).filter(l => l && l.volunteerId === volunteer.id).sort((a, b) => {
+    const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+    const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+    return dateB.getTime() - dateA.getTime();
+  });
+  const myCerts = (certificates || []).filter(c => c && c.volunteerId === volunteer.id);
 
   const handleLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,11 +302,12 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
                   {documents
                     .filter(doc => doc.uploaderId === volunteer.id && doc.status === 'verified')
                     .map(doc => (
-                      <FileCard 
-                        key={doc.id} 
-                        doc={doc} 
-                        user={user} 
-                      />
+                      <div key={doc.id}>
+                        <FileCard 
+                          doc={doc} 
+                          user={user} 
+                        />
+                      </div>
                     ))
                   }
                   {documents.filter(doc => doc.uploaderId === volunteer.id && doc.status === 'verified').length === 0 && (

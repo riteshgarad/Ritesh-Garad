@@ -50,19 +50,40 @@ export interface BudgetRequest {
   reviewedAt?: any;
 }
 
+export type TaskStatus = 'locked' | 'todo' | 'in_progress' | 'done';
+export type TaskCategory = 'Finance' | 'Operations' | 'Marketing' | 'HR' | 'Legal' | 'General';
+
 export interface Task {
   id: string;
-  project_id?: string;
+  projectId: string; // FKey to projects
+  projectName?: string;
+  assignedDept: TaskCategory;
+  assignedVolunteerId?: string;
+  assignedVolunteerName?: string;
+  relatedDocId?: string; // FKey to documentation
   title: string;
-  department: string;
-  priority: 'High' | 'Medium' | 'Low';
-  assigned_to: string;
-  due_date?: string;
-  status: 'todo' | 'inprogress' | 'completed';
-  task_type: 'execution' | 'approval';
-  is_locked: boolean;
-  decision?: 'approved' | 'rejected';
-  created_at: string;
+  description: string;
+  status: TaskStatus;
+  dependencyId?: string; // Links to another Task.id
+  impactValue: number; // Adds to Project.progress
+  proofRequired: boolean; // Requires file upload to complete
+  createdAt: any;
+  updatedAt: any;
+  completedAt?: any;
+  createdBy: string;
+  creatorName: string;
+  budget?: number; // Optional budget linked to this task
+}
+
+export interface ActivityLog {
+  id: string;
+  type: 'task_completed' | 'project_updated' | 'finance_unlocked' | 'document_verified' | 'system';
+  message: string;
+  timestamp: any;
+  userId?: string;
+  userName?: string;
+  projectId?: string;
+  projectName?: string;
 }
 
 export interface Volunteer {

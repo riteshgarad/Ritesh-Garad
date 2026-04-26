@@ -17,6 +17,7 @@ import { MilestoneStepper } from './components/MilestoneStepper';
 import { VelocityGauge } from './components/VelocityGauge';
 import { generateProjectImpactReport } from './services/reportGenerator';
 import { generateVolunteerCertificate } from './services/certificateGenerator';
+import { TaskEngine } from './components/TaskEngine';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -45,7 +46,8 @@ import {
   Clock,
   AlertCircle,
   Download,
-  Trash2
+  Trash2,
+  Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -81,7 +83,9 @@ import {
   VolunteerApplication,
   WorkLog,
   VolunteerCertificate,
-  Milestone
+  Milestone,
+  ActivityLog,
+  TaskStatus
 } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
 import { askAssistant } from './services/geminiService';
@@ -282,6 +286,7 @@ export default function App() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [financeRequests, setFinanceRequests] = useState<FinanceRequest[]>([]);
   const [budgetRequests, setBudgetRequests] = useState<BudgetRequest[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   
@@ -293,6 +298,7 @@ export default function App() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isVolunteerModalOpen, setIsVolunteerModalOpen] = useState(false);
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
+  const [proofTaskTargetId, setProofTaskTargetId] = useState<string | null>(null);
 
   // Notifications State
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -381,6 +387,11 @@ export default function App() {
       (err) => handleFirestoreError(err, 'list', 'budget_requests')
     );
 
+    const unsubActivityLogs = onSnapshot(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)),
+      (snapshot) => setActivityLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ActivityLog))),
+      (err) => handleFirestoreError(err, 'list', 'activity_logs')
+    );
+
     return () => {
       unsubProjects();
       unsubTasks();
@@ -392,6 +403,7 @@ export default function App() {
       unsubCerts();
       unsubFinance();
       unsubBudgets();
+      unsubActivityLogs();
     };
   }, [user]);
 
@@ -447,8 +459,12 @@ export default function App() {
 
       // Check Task Deadlines
       tasks.forEach(task => {
-        if (task.status !== 'completed' && task.due_date) {
-          const dueDate = parseISO(task.due_date);
+        if (!task) return;
+        const status = task.status as any;
+        const dueDateStr = (task as any).due_date || (task as any).dueDate;
+        
+        if (status !== 'done' && status !== 'completed' && dueDateStr) {
+          const dueDate = parseISO(dueDateStr);
           const daysTo = differenceInDays(dueDate, now);
 
           if (daysTo >= 0 && daysTo <= 3) {
@@ -477,6 +493,7 @@ export default function App() {
 
       // Check Project Milestones (Phase advancements)
       projects.forEach(project => {
+        if (!project) return;
         if (project.status === 'active' && project.progress >= 90) {
            newNotifs.push({
             id: `project-milestone-${project.id}`,
@@ -659,37 +676,41 @@ export default function App() {
     }
   };
 
-  const handleUploadDocument = async (file: File, metadata: any) => {
+  const handleUploadDocument = async (data: any) => {
     if (!user || !auth.currentUser) return;
     try {
-      // 1. Upload to Firebase Storage
-      const storageRef = ref(storage, `vault/${Date.now()}_${file.name}`);
-      const uploadTask = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(uploadTask.ref);
-
-      // 2. Create status-based triggers (e.g. Finance link)
+      // 1. Create status-based triggers (e.g. Finance link)
       const docData: Partial<NGODocument> = {
-        fileName: file.name,
-        fileURL: downloadURL,
-        category: metadata.category,
-        description: metadata.description || '',
-        projectId: metadata.projectId || '',
-        projectName: metadata.projectName || 'General',
+        fileName: data.fileName,
+        fileURL: data.fileURL,
+        category: data.category,
+        description: data.description || '',
+        projectId: data.projectId || '',
+        projectName: data.projectName || 'General',
         status: 'pending',
         uploadedBy: user.name,
         uploaderId: user.uid,
         uploadDate: serverTimestamp(),
         metadata: {
-          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-          type: file.type,
+          size: `${((data.fileSize || 0) / 1024 / 1024).toFixed(2)} MB`,
+          type: data.fileType || 'unknown',
           uploadedAt: serverTimestamp()
         }
       };
 
-      await addDoc(collection(db, 'documents'), docData);
+      const docRef = await addDoc(collection(db, 'documents'), docData);
+      
+      // Handle task proof-of-work link
+      if (proofTaskTargetId) {
+        await handleTaskStatusChange(proofTaskTargetId, 'done');
+        await updateDoc(doc(db, 'tasks', proofTaskTargetId), {
+          relatedDocId: docRef.id
+        });
+        setProofTaskTargetId(null);
+      }
       
       // Inter-departmental trigger: Auto-link Invoice to a transaction if relevant info exists
-      if (metadata.category === 'Invoice' && metadata.projectId) {
+      if (data.category === 'Invoice' && data.projectId) {
         toast('Finance node notified of new invoice receipt.', { icon: '📊' });
       }
 
@@ -784,6 +805,133 @@ export default function App() {
       toast.success(`Protocol executed. ${app.name} has been onboarded.`);
     } catch (err) {
       handleFirestoreError(err, 'update', `volunteer_applications/${app.id}`);
+    }
+  };
+
+  const logActivity = async (log: Partial<ActivityLog>) => {
+    try {
+      await addDoc(collection(db, 'activity_logs'), {
+        ...log,
+        timestamp: serverTimestamp(),
+        userId: user?.uid,
+        userName: user?.name
+      });
+    } catch (err) {
+      console.error("Activity logging failed:", err);
+    }
+  };
+
+  const handleAddTask = async (taskData: Partial<Task>) => {
+    if (!user) return;
+    try {
+      const project = projects.find(p => p.id === taskData.projectId);
+      await addDoc(collection(db, 'tasks'), {
+        ...taskData,
+        projectName: project?.name || 'Unknown Project',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user.uid,
+        creatorName: user.name
+      });
+      
+      logActivity({
+        type: 'system',
+        message: `New data bridge created: "${taskData.title}" for ${project?.name}`,
+        projectId: taskData.projectId,
+        projectName: project?.name
+      });
+      
+      toast.success("Protocol Injected. Data bridge established.");
+    } catch (err) {
+      handleFirestoreError(err, 'create', 'tasks');
+    }
+  };
+
+  const handleTaskStatusChange = async (id: string, newStatus: TaskStatus) => {
+    if (!user) return;
+    try {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      const batch = writeBatch(db);
+      const taskRef = doc(db, 'tasks', id);
+
+      // 1. Update Task Status
+      batch.update(taskRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+        ...(newStatus === 'done' ? { completedAt: serverTimestamp() } : {})
+      });
+
+      // 2. Cascade Logic if status is 'done'
+      if (newStatus === 'done') {
+        // A. Velocity Sync: Update Project Progress
+        const projectRef = doc(db, 'projects', task.projectId);
+        const project = projects.find(p => p.id === task.projectId);
+        if (project) {
+          const newProgress = Math.min(100, (project.progress || 0) + task.impactValue);
+          batch.update(projectRef, { 
+            progress: newProgress,
+            // If progress hits 100, maybe mark project as completed? No, keep it active until manual closure.
+          });
+          
+          logActivity({
+            type: 'project_updated',
+            message: `${project.name} Velocity increased to ${newProgress}%`,
+            projectId: task.projectId,
+            projectName: project.name
+          });
+        }
+
+        // B. Dependency Engine: Unlock dependent tasks
+        const dependents = tasks.filter(t => t.dependencyId === task.id);
+        dependents.forEach(dep => {
+          batch.update(doc(db, 'tasks', dep.id), {
+            status: 'todo',
+            updatedAt: serverTimestamp()
+          });
+          logActivity({
+            type: 'finance_unlocked',
+            message: `Dependency cleared: "${dep.title}" is now UNLOCKED`,
+            projectId: dep.projectId,
+            projectName: dep.projectName
+          });
+        });
+
+        // C. Finance Inter-link: If Finance task, create ledger entry
+        if (task.assignedDept === 'Finance' && task.budget) {
+          const transRef = doc(collection(db, 'transactions'));
+          batch.set(transRef, {
+            type: 'expense',
+            amount: task.budget,
+            category: 'Operational',
+            description: `Automated disbursement for Task: ${task.title}`,
+            projectID: task.projectId,
+            status: 'cleared',
+            date: serverTimestamp(),
+            createdBy: 'System (TaskEngine)',
+            expenditureType: 'Procurement'
+          });
+          logActivity({
+            type: 'finance_unlocked',
+            message: `Disbursement protocol executed for "${task.title}": $${task.budget}`,
+            projectId: task.projectId,
+            projectName: task.projectName
+          });
+        }
+
+        logActivity({
+          type: 'task_completed',
+          message: `Mission Node Completed: "${task.title}"`,
+          projectId: task.projectId,
+          projectName: task.projectName
+        });
+      }
+
+      await batch.commit();
+      toast.success(`Protocol status: ${newStatus.toUpperCase()}`);
+    } catch (err) {
+      handleFirestoreError(err, 'update', `tasks/${id}`);
     }
   };
 
@@ -1383,6 +1531,10 @@ export default function App() {
                 budgetRequests={budgetRequests}
                 onUploadDocument={handleUploadDocument}
                 onVerifyDocument={handleVerifyDocument}
+                onTaskStatusChange={handleTaskStatusChange}
+                onAddTask={handleAddTask}
+                activityLogs={activityLogs}
+                setProofTaskTargetId={setProofTaskTargetId}
               />
             </motion.div>
           </AnimatePresence>
@@ -1806,7 +1958,8 @@ const PageView = ({
   applications, onApprove, onReject, onLogHours, workLogs, certificates, 
   onVerifyLog, onGenerateCert, milestones, onToggleMilestone, onAddMilestone,
   financeRequests, budgetRequests,
-  onUploadDocument, onVerifyDocument
+  onUploadDocument, onVerifyDocument,
+  onTaskStatusChange, onAddTask, activityLogs, setProofTaskTargetId
 }: any) => {
   // Determine if current user has a volunteer record
   const currentVolunteer = volunteers.find((v: any) => v.email === user?.email);
@@ -1840,7 +1993,20 @@ const PageView = ({
         />
       );
     case 'tasks':
-      return <TasksView tasks={tasks} projects={projects} />;
+      return (
+        <TaskEngine 
+          tasks={tasks} 
+          projects={projects} 
+          user={user} 
+          onStatusChange={onTaskStatusChange}
+          onAddTask={onAddTask}
+          onUploadProof={(id: string) => {
+            setProofTaskTargetId(id);
+            setIsDocumentModalOpen(true);
+          }}
+          logs={activityLogs}
+        />
+      );
     case 'volunteers':
       const canManage = user.role === 'Admin' || user.role === 'Department Head' || user.role === 'DH';
       
@@ -1908,13 +2074,14 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
   const isAdmin = user?.role === 'Admin';
   
   const pendingByMe = projects.filter((p: any) => {
+    if (!p) return false;
     if (isAdmin) return p.status === 'pending_admin_review';
     if (isDH) return p.status === 'pending_dept_review' && p.department === user.department;
     return false;
   });
 
   const activeMissions = projects.filter((p: any) => 
-    p.status === 'approved' || p.status === 'active'
+    p && (p.status === 'approved' || p.status === 'active')
   );
 
   const stats = [
@@ -1979,16 +2146,16 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
         <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">High Response Nodes</h3>
-            <Badge className="bg-red-50 text-red-600 border border-red-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">Critical: {tasks.filter((t: any) => t.priority === 'High' && t.status !== 'completed').length}</Badge>
+            <Badge className="bg-red-50 text-red-600 border border-red-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">Critical: {tasks.filter((t: any) => t.priority === 'High' && t.status !== 'done' && t.status !== 'completed').length}</Badge>
           </div>
           <div className="space-y-4">
-            {tasks.filter((t: any) => t.priority === 'High' && t.status !== 'completed').slice(0, 4).map((t: any) => (
+            {tasks.filter((t: any) => t && t.priority === 'High' && t.status !== 'done' && t.status !== 'completed').slice(0, 4).map((t: any) => (
               <div key={t.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                 <div className="flex items-center gap-4">
                    <div className="w-1.5 h-6 bg-red-500 rounded-full"></div>
                    <div className="text-left">
                       <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{t.title}</p>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.assigned_to}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.assignedVolunteerName || t.assigned_to}</p>
                    </div>
                 </div>
                 <button className="p-2 text-slate-300 hover:text-blue-600 transition-colors">
@@ -2130,24 +2297,28 @@ const ProjectDetailView = ({
   setCurrentPage
 }: any) => {
   const project = projects.find((p: any) => p.id === projectId);
-  const projectTasks = tasks.filter((t: any) => t.project_id === projectId);
+  
   const [showRejectionInput, setShowRejectionInput] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
   const [activeAnalysis, setActiveAnalysis] = useState(false);
   const [showProtocolLog, setShowProtocolLog] = useState(false);
 
+  if (!project) return null;
+
+  const projectTasks = tasks.filter((t: any) => t && (t.projectId || t.project_id) === projectId);
+
   // Intelligent Status Logic
-  const currentFinanceRequest = financeRequests?.find((f: any) => f.project_id === projectId);
-  const currentBudgetRequest = budgetRequests?.find((b: any) => b.projectId === projectId);
+  const currentFinanceRequest = financeRequests?.find((f: any) => f && f.project_id === projectId);
+  const currentBudgetRequest = budgetRequests?.find((b: any) => b && b.projectId === projectId);
   
-  const completedMilestones = milestones?.filter((m: any) => m.status === 'completed').length || 0;
+  const completedMilestones = milestones?.filter((m: any) => m && (m.status === 'completed' || m.status === 'done')).length || 0;
   const totalMilestones = milestones?.length || 0;
   const calculatedProgress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
 
   // Real-time Status Determination
   const projectTeam = volunteers.filter((v: any) => 
-    projectTasks.some((t: any) => t.assigned_to === v.name)
+    v && projectTasks.some((t: any) => t && t.assigned_to === v.name)
   );
 
   const getAutomatedStatus = () => {
@@ -2158,7 +2329,7 @@ const ProjectDetailView = ({
     if (totalMilestones > 0 && completedMilestones === totalMilestones) return { label: 'Final Review', color: 'text-emerald-600', bg: 'bg-emerald-50', pulsing: false };
     if (completedMilestones > 0) return { label: 'In Action', color: 'text-blue-600', bg: 'bg-blue-600/10', pulsing: true };
     if (project.budget_status === 'approved') return { label: 'Ready to Launch', color: 'text-emerald-500', bg: 'bg-emerald-50', pulsing: true };
-    return { label: project.status.toUpperCase(), color: 'text-slate-500', bg: 'bg-slate-50', pulsing: false };
+    return { label: (project.status || 'Active').toUpperCase(), color: 'text-slate-500', bg: 'bg-slate-50', pulsing: false };
   };
 
   const autoStatus = getAutomatedStatus();
@@ -2175,8 +2346,6 @@ const ProjectDetailView = ({
   };
 
   const timeElapsed = calculateTimeElapsed();
-
-  if (!project) return null;
 
   const canApprove = (
     (user?.role === 'DH' && project.status === 'pending_dept_review' && project.department === user?.department) ||
@@ -2777,67 +2946,6 @@ const ProjectsView = ({ projects, onOpenProject, onAdd, onDelete, user }: any) =
   );
 };
 
-const TasksView = ({ tasks }: any) => {
-  const columns = [
-    { id: 'todo', label: 'Mission Backlog', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-    { id: 'inprogress', label: 'Operational Pipeline', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-    { id: 'completed', label: 'Archived Output', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' }
-  ];
-
-  return (
-    <div className="space-y-6 md:space-y-10 h-[calc(100vh-220px)] md:h-auto overflow-hidden">
-      <div className="flex overflow-x-auto pb-8 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory gap-6 md:gap-8 custom-scrollbar">
-        {columns.map(col => (
-          <div key={col.id} className="min-w-[85vw] md:min-w-0 md:flex-1 space-y-6 snap-center first:pl-2 last:pr-2 md:first:pl-0 md:last:pr-0">
-            <div className={cn("px-6 py-4 border rounded-3xl flex items-center justify-between bg-white shadow-xl shadow-slate-200/20", col.border)}>
-              <span className={cn("text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] px-2.5 py-1 rounded-xl", col.bg, col.color)}>{col.label}</span>
-              <span className="text-[9px] md:text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-xl border border-slate-100 uppercase">
-                {tasks.filter((t: any) => t.status === col.id).length} units
-              </span>
-            </div>
-            
-            <div className="space-y-4 md:space-y-5 text-left h-[calc(100vh-320px)] md:h-auto overflow-y-auto pr-1 custom-scrollbar">
-              {tasks.filter((t: any) => t.status === col.id).map((task: any) => (
-                <Card key={task.id} className="p-7 border-l-4 border-l-blue-600 transition-all hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1">
-                  <div className="flex items-start justify-between mb-6">
-                    <h5 className="text-[13px] font-black text-slate-900 uppercase tracking-widest leading-relaxed">{task.title}</h5>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-8">
-                    <Badge className="bg-slate-50 text-slate-400 border border-slate-100 font-black text-[9px] px-3 py-1 rounded-lg uppercase tracking-widest">{task.department}</Badge>
-                    <Badge className={cn(
-                      "text-[9px] font-black tracking-[0.2em] px-3 py-1 border rounded-lg",
-                      task.priority === 'High' ? "bg-red-50 text-red-600 border-red-100" : "bg-blue-50 text-blue-600 border-blue-100"
-                    )}>{task.priority}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-2xl bg-white flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200 shadow-sm uppercase tracking-widest leading-none">
-                        {INITIALS(task.assigned_to)}
-                      </div>
-                      <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest leading-none">{task.assigned_to}</span>
-                    </div>
-                    {task.status !== 'completed' && (
-                      <button className="text-slate-300 hover:text-blue-600 transition-all p-2 bg-slate-50 rounded-xl hover:bg-blue-50 group">
-                        <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
-                      </button>
-                    )}
-                  </div>
-                </Card>
-              ))}
-              {tasks.filter((t: any) => t.status === col.id).length === 0 && (
-                <div className="py-24 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-400 bg-white/50">
-                  <CheckSquare size={44} className="mb-6 opacity-10" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">Zero Tasks Pending</p>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const VolunteersView = ({ volunteers, onAdd }: any) => {
   return (
     <Card className="shadow-2xl shadow-slate-200/40 border-slate-200">
@@ -3156,7 +3264,7 @@ const ChatbotView = ({ projects, tasks, volunteers }: any) => {
   const context = useMemo(() => {
     return `
       PROJECTS: ${projects.map((p: any) => p.name).join(', ')}
-      TASKS: ${tasks.length} total, ${tasks.filter((t: any) => t.status === 'completed').length} completed
+      TASKS: ${tasks.length} total, ${tasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length} completed
       VOLUNTEERS: ${volunteers.length} total active members
     `;
   }, [projects, tasks, volunteers]);

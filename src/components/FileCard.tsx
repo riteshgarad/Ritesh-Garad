@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 
 interface FileCardProps {
   doc: NGODocument;
-  onSelect: (doc: NGODocument) => void;
+  onSelect?: (doc: NGODocument) => void;
   onVerify?: (id: string, status: 'verified' | 'rejected', reason?: string) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   user: AppUser;
@@ -31,7 +31,7 @@ export const FileCard = ({ doc, onSelect, onVerify, onDelete, user, isSelected }
     rejected: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-50', label: 'Rejected' },
   };
 
-  const config = statusConfig[doc.status];
+  const config = statusConfig[doc.status as keyof typeof statusConfig] || statusConfig.pending;
   const StatusIcon = config.icon;
 
   return (
