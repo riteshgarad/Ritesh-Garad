@@ -14,30 +14,37 @@ const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "firebase
 
 async function startServer() {
   // Initialize Firebase Admin with project identification
-  for (const app of admin.apps) {
-    if (app) {
-      console.log(`[Firebase Admin] Deleting existing app: ${app.name}`);
-      await app.delete();
-    }
-  }
 
   const projectToUse = firebaseConfig.projectId;
   const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
   
-  const adminApp = admin.initializeApp({ 
-    projectId: projectToUse
-  });
+  console.log(`[Firebase Admin] Detected Project ID from config: ${projectToUse}`);
+  console.log(`[Firebase Admin] Detected Database ID from config: ${dbId}`);
+  console.log(`[Firebase Admin] Process Environment Project: ${process.env.GOOGLE_CLOUD_PROJECT || 'not set'}`);
 
-  console.log(`[Firebase Admin] Active Project: ${adminApp.options.projectId}`);
+  let adminApp: admin.app.App;
+  if (admin.apps.length > 0) {
+    adminApp = admin.apps[0]!;
+    console.log(`[Firebase Admin] Re-using existing app: ${adminApp.name}`);
+  } else {
+    // Attempt to initialize with specific project ID first
+    try {
+      adminApp = admin.initializeApp({ 
+        projectId: projectToUse
+      });
+      console.log(`[Firebase Admin] Initialized with config projectId: ${projectToUse}`);
+    } catch (e: any) {
+      console.warn(`[Firebase Admin] Failed initializing with projectId ${projectToUse}, trying default:`, e.message);
+      adminApp = admin.initializeApp();
+    }
+  }
 
   const auth = adminApp.auth();
   
-  // Use the modern getFirestore with databaseId support
-  const db = dbId === '(default)' 
-    ? getFirestore(adminApp)
-    : getFirestore(adminApp, dbId);
+  // Use getFirestore with explicit databaseId if provided
+  const db = getFirestore(adminApp, dbId === '(default)' ? undefined : dbId);
   
-  console.log(`[Firebase Admin] SDK Active. Project: ${adminApp.options.projectId}, Database: ${dbId}`);
+  console.log(`[Firebase Admin] SDK Active. Effective Project: ${adminApp.options.projectId || 'Implicit'}, Database: ${dbId}`);
 
   const app = express();
   const PORT = 3000;
@@ -60,17 +67,29 @@ async function startServer() {
       console.log(`[Firestore] Fetching profile for ${decodedToken.uid} from ${dbId}...`);
       let userData: any = null;
       try {
+        console.log(`[Firestore] Attempting to fetch document users/${decodedToken.uid} on database ${dbId}`);
         const userDoc = await db.collection("users").doc(decodedToken.uid).get();
         userData = userDoc.data();
         console.log(`[Firestore] Profile fetched:`, userData ? "exists" : "not found");
       } catch (dbError: any) {
         console.error(`[Firestore Error] Failed to fetch user document for ${decodedToken.uid}:`, dbError);
-        // Fallback to bootstrap admin if db fails (e.g. initial setup)
+        console.error(`[Firestore Debug] App Options:`, JSON.stringify(adminApp.options));
+        console.error(`[Firestore Debug] Database ID used: ${dbId}`);
+        
+        // Fallback to bootstrap admin if db fails (e.g. initial setup or IAM delay)
         if (decodedToken.email === "riteshgarad4@gmail.com") {
           console.log(`[Auth] Bootstrap admin detected via email fallback`);
-          userData = { role: "Admin" };
+          userData = { 
+            role: "Admin", 
+            email: decodedToken.email, 
+            name: decodedToken.name || "Master Admin",
+            uid: decodedToken.uid 
+          };
         } else {
-          return res.status(500).json({ error: `Database error: ${dbError.message}` });
+          return res.status(500).json({ 
+            error: `Database error: ${dbError.message}`,
+            details: dbError.code === 7 ? "IAM Permission Denied. Ensure the service account has access to the Firestore database." : undefined
+          });
         }
       }
 
@@ -146,6 +165,33 @@ async function startServer() {
         updatedAt: FieldValue.serverTimestamp(),
       });
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Delete User (Hard Delete)
+  app.delete("/api/admin/users/:uid", verifyAdmin, async (req, res) => {
+    const { uid } = req.params;
+    try {
+      // 1. Delete from Firebase Auth
+      await auth.deleteUser(uid);
+      // 2. Delete from Firestore
+      await db.collection("users").doc(uid).delete();
+      
+      res.json({ success: true, message: "Operative scrubbed from system" });
+    } catch (error: any) {
+      console.error("Delete User Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Get User Email (Helper for client-side reset)
+  app.get("/api/admin/users/:uid/email", verifyAdmin, async (req, res) => {
+    const { uid } = req.params;
+    try {
+      const userRecord = await auth.getUser(uid);
+      res.json({ email: userRecord.email });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

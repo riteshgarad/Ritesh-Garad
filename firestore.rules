@@ -11,7 +11,6 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
       return isSignedIn() && (
-             request.auth.uid == '4gEB4lAKCbfOoJu9vAmjQGsrmMK2' ||
              request.auth.token.email == 'riteshgarad4@gmail.com' ||
              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin')
@@ -19,7 +18,8 @@ service cloud.firestore {
     }
     function isDeptHead(dept) {
       return isSignedIn() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Department Head' &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Dept Head' &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == dept;
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
@@ -32,10 +32,13 @@ service cloud.firestore {
     // --- User Profiles ---
     match /users/{userId} {
       allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow create: if isSignedIn() && isOwner(userId) && 
-                     incoming().keys().hasAll(['uid', 'email', 'name', 'role', 'department', 'isActive', 'createdAt']) &&
-                     (incoming().role == 'Staff Operative' || request.auth.token.email == 'riteshgarad4@gmail.com');
-      allow update: if isAdmin();
+      allow create: if isAdmin() || (
+        isSignedIn() && isOwner(userId) && 
+        incoming().keys().hasAll(['uid', 'email', 'name', 'role', 'department', 'isActive', 'createdAt']) &&
+        (incoming().role == 'Volunteer' || incoming().role == 'Staff Operative' || request.auth.token.email == 'riteshgarad4@gmail.com')
+      );
+      allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'department']));
+      allow delete: if isAdmin();
     }
 
     // --- Projects ---

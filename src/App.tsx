@@ -417,15 +417,40 @@ export default function App() {
       (err) => handleFirestoreError(err, 'list', 'documents')
     );
 
-    const unsubTransactions = onSnapshot(collection(db, 'transactions'),
-      (snapshot) => setTransactions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction))),
-      (err) => handleFirestoreError(err, 'list', 'transactions')
-    );
+    const unsubFinance = (user.role === 'Admin' || (user.role === 'Dept Head' && user.department === 'Finance')) 
+      ? onSnapshot(collection(db, 'finance_requests'),
+          (snapshot) => setFinanceRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FinanceRequest))),
+          (err) => handleFirestoreError(err, 'list', 'finance_requests')
+        )
+      : () => {};
 
-    const unsubApps = onSnapshot(collection(db, 'volunteer_applications'),
-      (snapshot) => setApplications(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerApplication))),
-      (err) => handleFirestoreError(err, 'list', 'volunteer_applications')
-    );
+    const unsubBudgets = (user.role === 'Admin' || user.role === 'Dept Head')
+      ? onSnapshot(collection(db, 'budget_requests'),
+          (snapshot) => setBudgetRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BudgetRequest))),
+          (err) => handleFirestoreError(err, 'list', 'budget_requests')
+        )
+      : () => {};
+
+    const unsubActivityLogs = (user.role === 'Admin')
+      ? onSnapshot(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)),
+          (snapshot) => setActivityLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ActivityLog))),
+          (err) => handleFirestoreError(err, 'list', 'activity_logs')
+        )
+      : () => {};
+
+    const unsubApps = (user.role === 'Admin' || (user.role === 'Dept Head' && user.department === 'HR'))
+      ? onSnapshot(collection(db, 'volunteer_applications'),
+          (snapshot) => setApplications(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerApplication))),
+          (err) => handleFirestoreError(err, 'list', 'volunteer_applications')
+        )
+      : () => {};
+
+    const unsubTransactions = (user.role === 'Admin' || (user.role === 'Dept Head' && user.department === 'Finance'))
+      ? onSnapshot(collection(db, 'transactions'),
+          (snapshot) => setTransactions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction))),
+          (err) => handleFirestoreError(err, 'list', 'transactions')
+        )
+      : () => {};
 
     const unsubLogs = onSnapshot(collection(db, 'work_logs'),
       (snapshot) => setWorkLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))),
@@ -437,33 +462,18 @@ export default function App() {
       (err) => handleFirestoreError(err, 'list', 'volunteer_certificates')
     );
 
-    const unsubFinance = onSnapshot(collection(db, 'finance_requests'),
-      (snapshot) => setFinanceRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FinanceRequest))),
-      (err) => handleFirestoreError(err, 'list', 'finance_requests')
-    );
-
-    const unsubBudgets = onSnapshot(collection(db, 'budget_requests'),
-      (snapshot) => setBudgetRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BudgetRequest))),
-      (err) => handleFirestoreError(err, 'list', 'budget_requests')
-    );
-
-    const unsubActivityLogs = onSnapshot(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)),
-      (snapshot) => setActivityLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ActivityLog))),
-      (err) => handleFirestoreError(err, 'list', 'activity_logs')
-    );
-
     return () => {
       unsubProjects();
       unsubTasks();
       unsubVolunteers();
       unsubDocuments();
-      unsubTransactions();
-      unsubApps();
-      unsubLogs();
-      unsubCerts();
       unsubFinance();
       unsubBudgets();
       unsubActivityLogs();
+      unsubApps();
+      unsubTransactions();
+      unsubLogs();
+      unsubCerts();
     };
   }, [user]);
 

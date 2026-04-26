@@ -27,7 +27,8 @@ import { cn } from '../lib/utils';
 import { toast } from 'react-hot-toast';
 import { 
   createUserWithEmailAndPassword, 
-  signOut as secondarySignOut 
+  signOut as secondarySignOut,
+  sendPasswordResetEmail 
 } from 'firebase/auth';
 import { 
   collection, 
@@ -117,8 +118,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
       setIsAddModalOpen(false);
       setFormData({ email: '', password: '', name: '', role: 'Volunteer', department: 'General' });
     } catch (error: any) {
-      toast.error(error.message || 'Email already in use or creation failed');
       console.error(error);
+      if (error.code === 'auth/email-already-in-use') {
+        toast.error('Identity Conflict: This email is already registered in the mission network.');
+      } else {
+        toast.error(error.message || 'Mission identity creation failed');
+      }
+      // Ensure secondary auth is signed out even on failure
+      try { await secondarySignOut(secondaryAuth); } catch(e) {}
     } finally {
       setIsSubmitting(false);
     }
@@ -135,13 +142,36 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
     }
   };
 
-  const handleDeleteUser = async (uid: string) => {
-    if (!window.confirm('Revoke access for this operative permanently?')) return;
+  const handleResetPassword = async (uid: string) => {
     try {
-      await deleteDoc(doc(db, 'users', uid));
-      toast.success('Operative access revoked');
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(`/api/admin/users/${uid}/email`, {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch user credentials');
+      const { email } = await response.json();
+      
+      await sendPasswordResetEmail(auth, email);
+      toast.success(`Encrypted reset logic sent to ${email}`);
     } catch (error: any) {
-      toast.error('Access revocation failed');
+      toast.error('Password reset protocol failed');
+    }
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    if (!window.confirm('REVOKE ACCESS: Permanently scrub this operative from Auth and Database?')) return;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(`/api/admin/users/${uid}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      
+      if (!response.ok) throw new Error('Hard deletion failed');
+      
+      toast.success('Operative scrubbed from mission records');
+    } catch (error: any) {
+      toast.error('Identity erasure failed');
     }
   };
 
@@ -271,8 +301,16 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
                         {user.isActive ? 'Lock Access' : 'Restore'}
                       </button>
                       <button 
+                        onClick={() => handleResetPassword(user.uid)}
+                        className="p-3.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-100"
+                        title="Send Reset Email"
+                      >
+                        <Shield size={14} />
+                      </button>
+                      <button 
                         onClick={() => handleDeleteUser(user.uid)}
                         className="p-3.5 rounded-xl bg-slate-50 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
+                        title="Revoke Access"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -300,7 +338,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed left-1/2 top-[10%] -translate-x-1/2 w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 z-[101] text-left"
+              className="fixed left-1/2 top-[5%] -translate-x-1/2 w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 z-[101] text-left max-h-[90vh] overflow-y-auto no-scrollbar"
             >
               <div className="flex items-center justify-between mb-8">
                 <div>
