@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import ExpenseApprovalDashboard from './components/ExpenseApprovalDashboard';
 import { VolunteerFinanceDashboard } from './components/VolunteerFinanceDashboard';
+import { MobileShell } from './components/MobileShell';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { 
@@ -1440,396 +1441,75 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-700 overflow-hidden text-xs md:text-sm tracking-tight select-none">
-      <Toaster position="top-right" />
-      {/* Sidebar Overlay for Mobile */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[45] md:hidden"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar */}
-      <aside className={cn(
-        "bg-[#0f172a] shadow-2xl shadow-blue-900/10 transition-all duration-500 ease-out flex flex-col fixed md:relative h-full z-50",
-        isSidebarOpen 
-          ? "w-68 translate-x-0" 
-          : "-translate-x-full md:translate-x-0 md:w-20"
-      )}>
-        <div className="p-5 md:p-8 flex items-center justify-between h-20 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-black text-white shrink-0 shadow-lg shadow-blue-500/30">G</div>
-            {(isSidebarOpen) && (
-              <div className="overflow-hidden text-left">
-                <h2 className="font-black text-white text-sm tracking-tight truncate">Garad Foundation</h2>
-                <p className="text-[9px] text-blue-400 font-black truncate tracking-[0.1em] uppercase">NGO Operating System</p>
-              </div>
-            )}
-          </div>
-          {/* Mobile Close Button */}
-          <button 
-            onClick={() => setSidebarOpen(false)}
-            className="p-2 text-slate-500 hover:text-white md:hidden"
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
+      <Toaster position="top-center" />
+      
+      <MobileShell 
+        activePath={currentPage} 
+        onNavigate={(id) => setCurrentPage(id as Page)}
+        title={PAGE_TITLES[currentPage as Page] || currentPage}
+        user={user}
+        hasNotifications={unreadCount > 0}
+      >
+        {/* Content area is now managed by MobileShell, but we keep the child logic here */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentPage}
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           >
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1.5 scrollbar-none">
-          {isSidebarOpen && <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 mt-2 px-3 opacity-60 text-left">Operational</div>}
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setCurrentPage(item.id as Page);
-                if (window.innerWidth < 768) setSidebarOpen(false);
+            <PageView 
+              page={currentPage} 
+              user={user} 
+              projects={projects} 
+              tasks={tasks}
+              volunteers={volunteers}
+              documents={documents}
+              selectedProjectId={selectedProjectId}
+              setCurrentPage={setCurrentPage}
+              onOpenProject={(id: string) => {
+                setSelectedProjectId(id);
+                setCurrentPage('project-detail');
               }}
-              className={cn(
-                "w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl transition-all group",
-                currentPage === item.id 
-                  ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30" 
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
-              )}
-            >
-              <item.icon 
-                size={18} 
-                className={cn(
-                  "shrink-0", 
-                  currentPage === item.id ? "text-white" : "group-hover:scale-110 transition-transform",
-                  item.id === 'expense-approvals' && item.badge && "animate-pulse text-blue-500"
-                )} 
-              />
-              {(isSidebarOpen) && (
-                <>
-                  <span className={cn("flex-1 text-left font-bold text-[11px] tracking-wide", currentPage === item.id ? "text-white" : "text-slate-400")}>{item.label}</span>
-                  {item.badge && (
-                    <span className={cn(
-                      "text-[9px] font-black px-2 py-0.5 rounded-lg border",
-                      currentPage === item.id ? "bg-white/20 border-white/20 text-white" : "bg-blue-600 text-white border-transparent shadow-lg shadow-blue-600/20"
-                    )}>
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-6 border-t border-white/5 shrink-0">
-          <div className={cn("flex items-center gap-4 p-4 bg-white/5 rounded-3xl border border-white/5", !isSidebarOpen && "md:justify-center px-1 md:px-2")}>
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-black shadow-lg shrink-0">RI</div>
-            {(isSidebarOpen) && (
-              <div className="flex-1 overflow-hidden text-left">
-                <p className="text-[11px] font-black text-white truncate mb-0.5">{user.name}</p>
-                <div className="flex items-center gap-2 text-left">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                  <p className="text-[9px] font-black text-emerald-500/80 uppercase tracking-widest leading-none">{user.role}</p>
-                </div>
-              </div>
-            )}
-            {(isSidebarOpen) && (
-              <button 
-                onClick={handleLogout}
-                className="p-2 text-slate-500 hover:text-red-400 transition-colors bg-white/5 rounded-xl hover:bg-red-500/10"
-              >
-                <LogOut size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-slate-50">
-        {/* Header */}
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-10 shrink-0 shadow-sm sticky top-0 z-[40]">
-          <div className="flex items-center gap-4 md:gap-6">
-            <button 
-              onClick={() => setSidebarOpen(!isSidebarOpen)}
-              className="p-2.5 transition-all duration-200 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:text-slate-900 shadow-sm"
-            >
-              <Menu size={20}/>
-            </button>
-            <h2 className="font-bold text-base md:text-xl text-slate-900 tracking-tight truncate max-w-[120px] md:max-w-none">
-              {PAGE_TITLES[currentPage as Page] || currentPage}
-            </h2>
-          </div>
-
-          <div className="hidden lg:flex items-center gap-4 flex-1 max-w-xl px-12">
-            <div className="relative w-full group text-left">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
-              <input 
-                type="text" 
-                placeholder="SEARCH OPERATIONAL DATA..." 
-                className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500/50 py-2.5 pl-12 pr-4 rounded-xl text-[10px] font-black tracking-widest uppercase text-slate-900 transition-all focus:ring-0 placeholder-slate-400"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 md:gap-4 relative text-left">
-            <button 
-              onClick={() => {
-                downloadCSV(projects, 'garad_foundation_projects');
-                downloadCSV(tasks, 'garad_foundation_tasks');
-                downloadCSV(volunteers, 'garad_foundation_volunteers');
+              onAddProject={handleAddProject}
+              onAddVolunteer={handleAddVolunteer}
+              onDeleteProject={handleDeleteProject}
+              onUpdateProjectStatus={handleUpdateProjectStatus}
+              onEditBudget={(p: any) => {
+                setEditingProject(p);
+                setIsEditBudgetModalOpen(true);
               }}
-              className="p-3 bg-white text-slate-500 border border-slate-200 rounded-xl hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all flex items-center gap-2 group"
-              title="Export Full Dataset (CSV)"
-            >
-              <Download size={18} className="group-hover:-translate-y-0.5 transition-transform" />
-              <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest">Master Export</span>
-            </button>
-
-            <button 
-              onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
-              className="lg:hidden p-3 bg-slate-50 text-slate-500 border border-slate-200 rounded-xl hover:text-slate-900 active:scale-95 transition-all"
-            >
-              <Search size={18} />
-            </button>
-            <button 
-              onClick={() => setNotifOpen(!isNotifOpen)}
-              className={cn(
-                "relative p-3 bg-slate-50 text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-all shadow-sm group",
-                unreadCount > 0 && "text-blue-600 border-blue-100"
-              )}
-            >
-              <Bell size={18} className={cn("group-hover:rotate-12 transition-transform", unreadCount > 0 && "animate-pulse")} />
-              {unreadCount > 0 && (
-                <span className="absolute top-2.5 right-2.5 w-4 h-4 bg-red-500 text-white text-[8px] font-black flex items-center justify-center rounded-full ring-2 ring-white">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            <AnimatePresence>
-              {isNotifOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-[50]" 
-                    onClick={() => setNotifOpen(false)}
-                  />
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-16 right-0 w-[320px] md:w-[400px] bg-white border border-slate-200 rounded-[32px] shadow-2xl z-[60] overflow-hidden flex flex-col"
-                  >
-                    <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <Bell size={14} className="text-blue-600" />
-                        Communications
-                      </h3>
-                      {notifications.length > 0 && (
-                        <button 
-                          onClick={async () => {
-                             const batch = writeBatch(db);
-                             notifications.forEach(n => {
-                               if (!n.isRead) batch.update(doc(db, `users/${user.uid}/notifications`, n.id), { isRead: true });
-                             });
-                             await batch.commit();
-                          }}
-                          className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline"
-                        >
-                          Clear All
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-[400px] overflow-y-auto no-scrollbar">
-                      {notifications.length > 0 ? (
-                        <div className="divide-y divide-slate-50">
-                          {notifications.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).map((n) => (
-                            <div 
-                              key={n.id} 
-                              className={cn(
-                                "p-5 hover:bg-slate-50 transition-all cursor-pointer flex gap-4 text-left",
-                                !n.isRead && "bg-blue-50/30"
-                              )}
-                              onClick={async () => {
-                                if (!n.isRead) {
-                                  await updateDoc(doc(db, `users/${user.uid}/notifications`, n.id), { isRead: true });
-                                }
-                                if (n.relatedId) {
-                                  if (n.type === 'approval') setCurrentPage('expense-approvals');
-                                  if (n.type === 'project') {
-                                    setSelectedProjectId(n.relatedId);
-                                    setCurrentPage('project-detail');
-                                  }
-                                }
-                                setNotifOpen(false);
-                              }}
-                            >
-                              <div className={cn(
-                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
-                                n.type === 'approval' ? "bg-amber-100 text-amber-600" : 
-                                n.type === 'milestone' ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600"
-                              )}>
-                                {n.type === 'approval' ? <ShieldCheck size={18} /> : 
-                                 n.type === 'milestone' ? <Trophy size={18} /> : <Zap size={18} />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                  <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-tight truncate">{n.title}</h4>
-                                  {!n.isRead && <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />}
-                                </div>
-                                <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed mb-2">{n.message}</p>
-                                <span className="text-[8px] font-black text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded uppercase tracking-widest bg-white">
-                                  {n.timestamp?.seconds ? new Date(n.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="py-20 flex flex-col items-center justify-center text-slate-300">
-                          <Wind size={40} className="mb-4 opacity-10" />
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">Signal Silo Empty</p>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <AnimatePresence>
-            {isMobileSearchOpen && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="absolute top-24 left-4 right-4 z-[60] lg:hidden"
-              >
-                <div className="relative group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
-                  <input 
-                    autoFocus
-                    type="text" 
-                    placeholder="SEARCH TERMINAL..." 
-                    className="w-full bg-[#121214] border border-blue-500/30 focus:border-blue-500 py-4 pl-12 pr-4 rounded-2xl text-[10px] font-bold tracking-widest uppercase text-white shadow-2xl focus:ring-0"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onBlur={() => setIsMobileSearchOpen(false)}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </header>
-
-        {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar relative">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPage}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3, ease: "circOut" }}
-            >
-              <PageView 
-                page={currentPage} 
-                user={user} 
-                projects={projects} 
-                tasks={tasks}
-                volunteers={volunteers}
-                documents={documents}
-                selectedProjectId={selectedProjectId}
-                setCurrentPage={setCurrentPage}
-                onOpenProject={(id: string) => {
-                  setSelectedProjectId(id);
-                  setCurrentPage('project-detail');
-                }}
-                onAddProject={handleAddProject}
-                onAddVolunteer={handleAddVolunteer}
-                onDeleteProject={handleDeleteProject}
-                onUpdateProjectStatus={handleUpdateProjectStatus}
-                onEditBudget={(p: any) => {
-                  setEditingProject(p);
-                  setIsEditBudgetModalOpen(true);
-                }}
-                onDeleteDocument={handleDeleteDocument}
-                setIsDocumentModalOpen={setIsDocumentModalOpen}
-                transactions={transactions}
-                expenseRequests={expenseRequests}
-                applications={applications}
-                onApprove={handleApproveApplication}
-                onReject={async (id: string) => {
-                  await updateDoc(doc(db, 'volunteer_applications', id), { status: 'rejected' });
-                }}
-                onLogHours={handleLogHours}
-                workLogs={workLogs}
-                certificates={certificates}
-                onVerifyLog={handleVerifyWorkLog}
-                onGenerateCert={handleGenerateCertificate}
-                milestones={milestones}
-                onToggleMilestone={handleToggleMilestone}
-                onAddMilestone={handleAddMilestone}
-                financeRequests={financeRequests}
-                budgetRequests={budgetRequests}
-                onUploadDocument={handleUploadDocument}
-                onVerifyDocument={handleVerifyDocument}
-                onTaskStatusChange={handleTaskStatusChange}
-                onAddTask={handleAddTask}
-                activityLogs={activityLogs}
-                setProofTaskTargetId={setProofTaskTargetId}
-              />
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Fixed Status Footer */}
-        <footer className="h-auto md:h-12 bg-white border-t border-slate-200 px-4 md:px-10 py-3 md:py-0 flex flex-col md:flex-row items-center justify-between text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] shrink-0 gap-2 md:gap-0 relative z-30 pb-20 md:pb-0">
-          <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8">
-            <span className="flex items-center gap-2 whitespace-nowrap">Core Service: <span className="text-emerald-500">Live</span></span>
-            <span className="flex items-center gap-2 whitespace-nowrap hidden sm:flex">Environment: <span className="text-blue-600">Production</span></span>
-          </div>
-          <div className="flex gap-4 md:gap-8">
-            <span>© 2026 Garad Foundation Hub</span>
-          </div>
-        </footer>
-
-        {/* Mobile Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-t border-slate-200 flex items-center justify-around px-6 md:hidden z-50">
-          {[
-            { id: 'dashboard', icon: LayoutDashboard, label: 'Hub' },
-            { id: 'projects', icon: FolderKanban, label: 'Missions' },
-            { id: 'tasks', icon: CheckSquare, label: 'Nodes' },
-            { id: 'volunteers', icon: Users, label: 'Ops' },
-            { id: 'chatbot', icon: Bot, label: 'AI' },
-          ].map((item) => {
-            const isActive = currentPage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setCurrentPage(item.id as Page)}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-1 transition-all relative w-12",
-                  isActive ? "text-blue-600" : "text-slate-400"
-                )}
-              >
-                {isActive && (
-                  <motion.div 
-                    layoutId="active-dot"
-                    className="absolute -top-1 w-1 h-1 bg-blue-600 rounded-full"
-                  />
-                )}
-                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                <span className="text-[8px] font-black uppercase tracking-[0.1em]">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </main>
+              onDeleteDocument={handleDeleteDocument}
+              setIsDocumentModalOpen={setIsDocumentModalOpen}
+              transactions={transactions}
+              expenseRequests={expenseRequests}
+              applications={applications}
+              onApprove={handleApproveApplication}
+              onReject={async (id: string) => {
+                await updateDoc(doc(db, 'volunteer_applications', id), { status: 'rejected' });
+              }}
+              onLogHours={handleLogHours}
+              workLogs={workLogs}
+              certificates={certificates}
+              onVerifyLog={handleVerifyWorkLog}
+              onGenerateCert={handleGenerateCertificate}
+              milestones={milestones}
+              onToggleMilestone={handleToggleMilestone}
+              onAddMilestone={handleAddMilestone}
+              financeRequests={financeRequests}
+              budgetRequests={budgetRequests}
+              onUploadDocument={handleUploadDocument}
+              onVerifyDocument={handleVerifyDocument}
+              onTaskStatusChange={handleTaskStatusChange}
+              onAddTask={handleAddTask}
+              activityLogs={activityLogs}
+              setProofTaskTargetId={setProofTaskTargetId}
+            />
+          </motion.div>
+        </AnimatePresence>
+      </MobileShell>
 
       <AnimatePresence>
         {isProjectModalOpen && (
@@ -2313,6 +1993,56 @@ const PageView = ({
       return <ExpenseApprovalDashboard user={user} requests={expenseRequests} />;
     case 'chatbot':
       return <ChatbotView projects={projects} tasks={tasks} volunteers={volunteers} />;
+    case 'create':
+      return (
+        <div className="space-y-6 pt-4 text-left">
+          <div className="px-2">
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">Operational Quick Launch</h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Deploy new assets or initialize mission parameters</p>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4">
+            <button 
+              onClick={() => onAddProject()}
+              className="flex items-center gap-6 p-6 bg-white border border-slate-200 rounded-[32px] shadow-lg shadow-slate-200/40 group active:scale-[0.98] transition-all text-left"
+            >
+              <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 group-hover:rotate-6 transition-transform">
+                <FolderKanban size={24} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">New Mission</h3>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">Initialize foundation project</p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => onAddTask()}
+              className="flex items-center gap-6 p-6 bg-white border border-slate-200 rounded-[32px] shadow-lg shadow-slate-200/40 group active:scale-[0.98] transition-all text-left"
+            >
+              <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 group-hover:rotate-6 transition-transform">
+                <CheckSquare size={24} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Log Node</h3>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">Assign operational task</p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => onAddVolunteer()}
+              className="flex items-center gap-6 p-6 bg-white border border-slate-200 rounded-[32px] shadow-lg shadow-slate-200/40 group active:scale-[0.98] transition-all text-left"
+            >
+              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 group-hover:rotate-6 transition-transform">
+                <Users size={24} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Add Unit</h3>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">Onboard mission operative</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      );
     default:
       return (
         <div className="flex flex-col items-center justify-center p-20 text-slate-400">
