@@ -14,37 +14,26 @@ const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "firebase
 
 async function startServer() {
   // Initialize Firebase Admin with project identification
+  for (const app of admin.apps) {
+    if (app) {
+      console.log(`[Firebase Admin] Deleting existing app: ${app.name}`);
+      await app.delete();
+    }
+  }
 
   const projectToUse = firebaseConfig.projectId;
   const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
   
-  console.log(`[Firebase Admin] Detected Project ID from config: ${projectToUse}`);
-  console.log(`[Firebase Admin] Detected Database ID from config: ${dbId}`);
-  console.log(`[Firebase Admin] Process Environment Project: ${process.env.GOOGLE_CLOUD_PROJECT || 'not set'}`);
+  console.log(`[Firebase Admin] Initializing with Project ID: ${projectToUse}, Database ID: ${dbId}`);
 
-  let adminApp: admin.app.App;
-  if (admin.apps.length > 0) {
-    adminApp = admin.apps[0]!;
-    console.log(`[Firebase Admin] Re-using existing app: ${adminApp.name}`);
-  } else {
-    // Attempt to initialize with specific project ID first
-    try {
-      adminApp = admin.initializeApp({ 
-        projectId: projectToUse
-      });
-      console.log(`[Firebase Admin] Initialized with config projectId: ${projectToUse}`);
-    } catch (e: any) {
-      console.warn(`[Firebase Admin] Failed initializing with projectId ${projectToUse}, trying default:`, e.message);
-      adminApp = admin.initializeApp();
-    }
-  }
+  const adminApp = admin.initializeApp({ 
+    projectId: projectToUse
+  });
 
   const auth = adminApp.auth();
-  
-  // Use getFirestore with explicit databaseId if provided
   const db = getFirestore(adminApp, dbId === '(default)' ? undefined : dbId);
   
-  console.log(`[Firebase Admin] SDK Active. Effective Project: ${adminApp.options.projectId || 'Implicit'}, Database: ${dbId}`);
+  console.log(`[Firebase Admin] SDK Active. Project: ${adminApp.options.projectId}, Database: ${dbId}`);
 
   const app = express();
   const PORT = 3000;

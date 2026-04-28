@@ -254,6 +254,24 @@
       },
       "required": ["fileName", "fileURL", "category", "uploadedBy", "uploaderId", "status"]
     },
+    "expense_requests": {
+      "title": "Expense Request",
+      "description": "Manual expense requests from operatives requiring high-level authorization.",
+      "type": "object",
+      "properties": {
+        "requesterId": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "requesterEmail": { "type": "string" },
+        "department": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "professionalMessage": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "reviewedBy": { "type": "string" }
+      },
+      "required": ["requesterId", "amount", "status", "submittedAt"]
+    },
     "AppUser": {
       "title": "Application User",
       "description": "System user with role-based access control metadata.",
@@ -326,6 +344,10 @@
     "/documents/{documentId}": {
       "schema": "NGODocument",
       "description": "Centralized NGO document repository."
+    },
+    "/expense_requests/{requestId}": {
+      "schema": "expense_requests",
+      "description": "Mission-critical fiscal authorization requests."
     },
     "/activity_logs/{logId}": {
       "schema": "ActivityLog",

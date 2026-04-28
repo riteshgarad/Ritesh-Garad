@@ -51,8 +51,10 @@ import {
   AlertCircle,
   Download,
   Trash2,
-  Database
+  Database,
+  ClipboardCheck
 } from 'lucide-react';
+import ExpenseApprovalDashboard from './components/ExpenseApprovalDashboard';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { 
@@ -89,7 +91,8 @@ import {
   VolunteerCertificate,
   Milestone,
   ActivityLog,
-  TaskStatus
+  TaskStatus,
+  ExpenseRequest
 } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
 import { askAssistant } from './services/geminiService';
@@ -276,7 +279,7 @@ const NotificationPanel = ({
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'chatbot' | 'automation' | 'project-detail' | 'users';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'chatbot' | 'automation' | 'project-detail' | 'users' | 'expense-approvals';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -300,6 +303,7 @@ export default function App() {
   const [financeRequests, setFinanceRequests] = useState<FinanceRequest[]>([]);
   const [budgetRequests, setBudgetRequests] = useState<BudgetRequest[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   
@@ -452,6 +456,13 @@ export default function App() {
         )
       : () => {};
 
+    const unsubExpenseRequests = (user.role === 'Admin' || (user.role === 'Department Head' && user.department === 'Finance'))
+      ? onSnapshot(collection(db, 'expense_requests'),
+          (snapshot) => setExpenseRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ExpenseRequest))),
+          (err) => handleFirestoreError(err, 'list', 'expense_requests')
+        )
+      : () => {};
+
     const unsubLogs = onSnapshot(collection(db, 'work_logs'),
       (snapshot) => setWorkLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))),
       (err) => handleFirestoreError(err, 'list', 'work_logs')
@@ -472,6 +483,7 @@ export default function App() {
       unsubActivityLogs();
       unsubApps();
       unsubTransactions();
+      unsubExpenseRequests();
       unsubLogs();
       unsubCerts();
     };
@@ -1261,6 +1273,13 @@ export default function App() {
     { id: 'social-media', label: 'Social Media', icon: Camera, depts: ['Social Media'] },
     { id: 'public-relations', label: 'Public Relations', icon: Megaphone, depts: ['Public Relations'] },
     { id: 'automation', label: 'Automation', icon: Zap },
+    { 
+      id: 'expense-approvals', 
+      label: 'Expense Approvals', 
+      icon: ClipboardCheck, 
+      roles: ['Admin', 'Department Head'],
+      badge: expenseRequests.filter(r => r.status === 'pending').length || undefined 
+    },
     { id: 'users', label: 'User Network', icon: Shield, roles: ['Admin'] },
   ];
 
@@ -1279,6 +1298,11 @@ export default function App() {
     // PR Head restrictions
     if (user.department === 'Public Relations') {
       return ['public-relations', 'tasks', 'docs', 'dashboard'].includes(item.id);
+    }
+
+    // Expense Approvals visibility
+    if (item.id === 'expense-approvals') {
+       return user.role === 'Admin' || (user.role === 'Department Head' && user.department === 'Finance');
     }
 
     // Finance/Volunteers/Automation are generally restricted to admins or specific roles
@@ -1632,6 +1656,7 @@ export default function App() {
                 onDeleteDocument={handleDeleteDocument}
                 setIsDocumentModalOpen={setIsDocumentModalOpen}
                 transactions={transactions}
+                expenseRequests={expenseRequests}
                 applications={applications}
                 onApprove={handleApproveApplication}
                 onReject={async (id: string) => {
@@ -2075,7 +2100,7 @@ const PageView = ({
   onUpdateProjectStatus, onEditBudget, onDeleteDocument, setIsDocumentModalOpen, user,
   applications, onApprove, onReject, onLogHours, workLogs, certificates, 
   onVerifyLog, onGenerateCert, milestones, onToggleMilestone, onAddMilestone,
-  financeRequests, budgetRequests,
+  financeRequests, budgetRequests, expenseRequests,
   onUploadDocument, onVerifyDocument,
   onTaskStatusChange, onAddTask, activityLogs, setProofTaskTargetId
 }: any) => {
@@ -2176,6 +2201,8 @@ const PageView = ({
       return <PublicRelationsDashboard user={user} />;
     case 'users':
       return <UserManagement currentUser={user} />;
+    case 'expense-approvals':
+      return <ExpenseApprovalDashboard user={user} requests={expenseRequests} />;
     case 'chatbot':
       return <ChatbotView projects={projects} tasks={tasks} volunteers={volunteers} />;
     default:
@@ -3558,5 +3585,6 @@ const PAGE_TITLES: Record<Page, string> = {
   fundraising: 'Fundraising Campaigns',
   chatbot: 'AI Assistant',
   automation: 'Automation Lab',
-  'project-detail': 'Project Details'
+  'project-detail': 'Project Details',
+  'expense-approvals': 'Expense Approval Command Center'
 };

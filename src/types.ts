@@ -226,6 +226,22 @@ export interface Donation {
   payment_method: string;
 }
 
+export interface ExpenseRequest {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  requesterEmail: string;
+  department: string;
+  amount: number;
+  description: string;
+  professionalMessage: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  submittedAt: any;
+  reviewedBy?: string;
+  reviewedAt?: any;
+}
+
 export interface AppNotification {
   id: string;
   type: 'deadline' | 'milestone' | 'system' | 'approval';

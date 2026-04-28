@@ -10,7 +10,8 @@ import {
   Search,
   LayoutGrid,
   ChevronDown,
-  X
+  X,
+  Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
@@ -18,6 +19,7 @@ import { collection, query, onSnapshot, orderBy, updateDoc, doc, where, serverTi
 import { Transaction, Project, AppUser } from '../types';
 import TransactionTable from './TransactionTable';
 import AddTransactionModal from './AddTransactionModal';
+import AddExpenseRequestModal from './AddExpenseRequestModal';
 import { BudgetReviewDashboard } from './BudgetReviewDashboard';
 import { exportTransactionsToExcel } from '../lib/exportService';
 
@@ -30,6 +32,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeTab, setActiveTab] = useState<'ledger' | 'budgets'>('ledger');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isExpenseRequestModalOpen, setIsExpenseRequestModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   
   // Filters
@@ -169,6 +172,12 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
               className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black hover:bg-slate-800 transition-all uppercase tracking-widest shadow-lg shadow-slate-200"
             >
               <Plus size={16} /> Log Entry
+            </button>
+            <button 
+              onClick={() => setIsExpenseRequestModalOpen(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl text-xs font-black hover:bg-blue-700 transition-all uppercase tracking-widest shadow-lg shadow-blue-500/20"
+            >
+              <Send className="rotate-[-20deg]" size={16} /> Request Expense
             </button>
           </div>
         )}
@@ -436,6 +445,14 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
         onClose={() => setIsAddModalOpen(false)} 
         projects={projects}
       />
+
+      {user && (
+        <AddExpenseRequestModal
+          isOpen={isExpenseRequestModalOpen}
+          onClose={() => setIsExpenseRequestModalOpen(false)}
+          user={user}
+        />
+      )}
     </div>
   );
 };

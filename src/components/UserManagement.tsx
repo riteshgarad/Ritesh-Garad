@@ -48,7 +48,7 @@ interface UserManagementProps {
 }
 
 const DEPARTMENTS = ['Finance', 'Projects', 'Social Media', 'Public Relations', 'HR', 'General'];
-const ROLES = ['Admin', 'Dept Head', 'Volunteer'];
+const ROLES = ['Admin', 'Department Head', 'Volunteer'];
 
 const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -259,7 +259,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
                       <Badge className={cn(
                         "px-3 py-1 border-none text-[9px] font-black uppercase tracking-widest",
                         user.role === 'Admin' ? 'bg-red-50 text-red-600' : 
-                        user.role === 'Dept Head' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                        user.role === 'Department Head' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
                       )}>
                         {user.role}
                       </Badge>

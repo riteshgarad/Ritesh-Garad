@@ -19,7 +19,8 @@ service cloud.firestore {
     function isDeptHead(dept) {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Dept Head' &&
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Dept Head' || 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Department Head') &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == dept;
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
@@ -95,6 +96,13 @@ service cloud.firestore {
 
     match /finance_requests/{rId} {
       allow read, write: if isAdmin() || isDeptHead('Finance');
+    }
+
+    match /expense_requests/{rId} {
+      allow list: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && resource.data.requesterId == request.auth.uid);
+      allow get: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && resource.data.requesterId == request.auth.uid);
+      allow update, delete: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && existing().requesterId == request.auth.uid);
+      allow create: if isSignedIn();
     }
 
     match /budget_requests/{rId} {
