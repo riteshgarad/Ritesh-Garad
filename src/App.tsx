@@ -61,6 +61,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import ExpenseApprovalDashboard from './components/ExpenseApprovalDashboard';
+import { VolunteerFinanceDashboard } from './components/VolunteerFinanceDashboard';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { 
@@ -2266,6 +2267,7 @@ const PageView = ({
             onUpdateStatus={async () => {}} 
             onAddVolunteer={onAddVolunteer}
             user={user}
+            projects={projects}
           />
         );
       }
@@ -2284,8 +2286,11 @@ const PageView = ({
         );
       }
 
-      return <VolunteersView volunteers={volunteers} onAdd={onAddVolunteer} setCurrentPage={setCurrentPage} />;
+      return <VolunteerDirectory volunteers={volunteers} applications={applications} projects={projects} onAddVolunteer={onAddVolunteer} user={user} onApprove={onApprove} onReject={onReject} onUpdateStatus={async () => {}} />;
     case 'finance':
+      if (user?.role === 'Volunteer') {
+        return <VolunteerFinanceDashboard user={user} />;
+      }
       return <FinanceDashboard user={user} projects={projects} />;
     case 'docs':
       return (
@@ -3198,93 +3203,9 @@ const ProjectsView = ({ projects, onOpenProject, onAdd, onDelete, user }: any) =
   );
 };
 
-const VolunteersView = ({ volunteers, onAdd, setCurrentPage }: any) => {
-  return (
-    <Card className="shadow-2xl shadow-slate-200/40 border-slate-200">
-      <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div className="text-left">
-          <h3 className="font-black text-slate-900 uppercase tracking-[0.2em] text-xs">Mission Personnel Hub</h3>
-          <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">Direct Deployment Registry</p>
-        </div>
-        <Button variant="primary" className="text-[10px] font-black px-6 py-3 uppercase tracking-widest rounded-xl" onClick={onAdd}>+ Onboard Operative</Button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-separate border-spacing-0">
-          <thead>
-            <tr className="bg-slate-50/80 border-b border-slate-100 font-black text-slate-400 text-[10px] uppercase tracking-[0.2em]">
-              <th className="px-10 py-6">Operative Identity</th>
-              <th className="px-10 py-6">Assigned Sector</th>
-              <th className="px-10 py-6">Skill Matrix</th>
-              <th className="px-10 py-6">Runtime</th>
-              <th className="px-10 py-6">Protocol Status</th>
-              <th className="px-10 py-6 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {volunteers.map((v: any) => (
-              <tr key={v.id} className="hover:bg-slate-50/50 transition-all group border-none">
-                <td className="px-10 py-6">
-                  <div className="flex items-center gap-5">
-                    <div className="w-11 h-11 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 text-xs font-black shadow-sm group-hover:scale-110 transition-transform">
-                      {INITIALS(v.name)}
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-black text-slate-900 tracking-tight">{v.name}</p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{v.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-10 py-6">
-                  <Badge className="bg-slate-100 text-slate-500 border border-slate-200 px-4 py-1.5 rounded-xl">{v.department}</Badge>
-                </td>
-                <td className="px-10 py-6">
-                  <p className="text-[12px] text-slate-600 font-bold truncate max-w-[200px]">{v.skills}</p>
-                </td>
-                <td className="px-10 py-6">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
-                    <span className="font-mono text-[12px] font-black text-slate-900 tracking-tight">{v.hours}H LOGGED</span>
-                  </div>
-                </td>
-                <td className="px-10 py-6">
-                  <Badge className={cn(
-                    "font-black tracking-[0.2em] px-4 py-2 border rounded-2xl",
-                    v.status === 'Active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100 opacity-60"
-                  )}>
-                    {v.status}
-                  </Badge>
-                </td>
-                <td className="px-10 py-6 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {v.phone && (
-                      <button 
-                        onClick={() => window.open(getWhatsAppLink(v.phone), '_blank')}
-                        className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm"
-                        title="Connect via WhatsApp"
-                      >
-                        <MessageCircle size={16} fill="currentColor" />
-                      </button>
-                    )}
-                    <button 
-                      className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"
-                      onClick={() => {
-                        // For now we don't have a shared state for selected volunteer profile, 
-                        // so we just show an alert or do nothing.
-                        // Ideally we'd set a selectedVolunteerId and change page.
-                      }}
-                    >
-                      <ExternalLink size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
-};
+
+// Old VolunteersView purged for tactical upgrade
+
 
 // --- Finance View Data ---
 const EXPENDITURE_DATA = [

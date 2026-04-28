@@ -40,6 +40,11 @@ service cloud.firestore {
       );
       allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'department']));
       allow delete: if isAdmin();
+
+      match /notifications/{notifId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isAdmin() || isDeptHead('Finance') || isDeptHead('HR') || isDeptHead('Operations');
+      }
     }
 
     // --- Projects ---
@@ -88,6 +93,11 @@ service cloud.firestore {
     }
 
     // --- Finance & Transactions ---
+    match /finance/{fId} {
+      allow read: if isAdmin() || isDeptHead('Finance');
+      allow create: if isAdmin() || isDeptHead('Finance');
+    }
+
     match /transactions/{tId} {
       allow read: if isAdmin() || isDeptHead('Finance');
       allow create: if isAdmin() || isDeptHead('Finance') || isDeptHead('Operations');

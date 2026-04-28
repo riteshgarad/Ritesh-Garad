@@ -89,6 +89,24 @@ async function startServer() {
     }
   };
 
+  // User Management: Permanent Deletion
+  app.delete("/api/users/:uid", verifyAdmin, async (req, res) => {
+    const { uid } = req.params;
+    try {
+      // 1. Delete from Auth
+      await auth.deleteUser(uid);
+      
+      // 2. Delete from Firestore (Users collection)
+      await db.collection("users").doc(uid).delete();
+      
+      console.log(`[Admin] User ${uid} permanently purged from system.`);
+      res.json({ success: true, message: "User permanently deleted." });
+    } catch (error: any) {
+      console.error("[Admin Error] Failed to delete user:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Middleware to verify ANY authenticated user (Volunteer, Admin, Dept Head)
   const verifyAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -176,45 +194,44 @@ async function startServer() {
     const { requestId, amount, requesterName, description } = req.body;
 
     try {
-      // Use targeted queries to potentially avoid permission issues on full collection listing
-      const adminsRef = db.collection('users').where('role', '==', 'Admin');
-      const financeHeadsRef = db.collection('users').where('role', '==', 'Department Head').where('department', '==', 'Finance');
+      console.log(`[Notification] Fetching all users to identify recipients...`);
+      const usersSnap = await db.collection('users').get();
       
-      const [adminsSnap, financeSnap] = await Promise.all([
-        adminsRef.get(),
-        financeHeadsRef.get()
-      ]);
-
       const batch = db.batch();
       const notifiedUids = new Set<string>();
+      let recipientsCount = 0;
 
-      const processDocs = (snap: admin.firestore.QuerySnapshot) => {
-        snap.forEach(doc => {
-          if (!notifiedUids.has(doc.id)) {
-            const notificationRef = db.collection(`users/${doc.id}/notifications`).doc();
-            batch.set(notificationRef, {
-              type: 'approval',
-              title: 'New Expense Authorization Required',
-              message: `${requesterName} is requesting ₹${amount} for ${description}.`,
-              timestamp: FieldValue.serverTimestamp(),
-              isRead: false,
-              relatedId: requestId,
-              priority: 'high'
-            });
-            notifiedUids.add(doc.id);
-          }
-        });
-      };
+      usersSnap.forEach(doc => {
+        const userData = doc.data();
+        const isAdmin = userData.role === 'Admin';
+        const isFinanceHead = (userData.role === 'Department Head' || userData.role === 'Dept Head') && userData.department === 'Finance';
 
-      processDocs(adminsSnap);
-      processDocs(financeSnap);
+        if ((isAdmin || isFinanceHead) && !notifiedUids.has(doc.id)) {
+          const notificationRef = db.collection(`users/${doc.id}/notifications`).doc();
+          batch.set(notificationRef, {
+            type: 'approval',
+            title: 'New Expense Authorization Required',
+            message: `${requesterName} is requesting ₹${amount} for ${description}.`,
+            timestamp: FieldValue.serverTimestamp(),
+            isRead: false,
+            relatedId: requestId,
+            priority: 'high'
+          });
+          notifiedUids.add(doc.id);
+          recipientsCount++;
+        }
+      });
 
-      await batch.commit();
-      res.json({ success: true });
+      if (recipientsCount > 0) {
+        await batch.commit();
+        console.log(`[Notification] Successfully sent notifications to ${recipientsCount} recipients.`);
+      } else {
+        console.warn(`[Notification] No eligible recipients (Admins or Finance Heads) found in system.`);
+      }
+
+      res.json({ success: true, count: recipientsCount });
     } catch (error: any) {
       console.error("[Notification Error]:", error);
-      // Even if app notifications fail, we don't want to break the whole flow 
-      // if email was already sent or if user just wants the request to be saved.
       res.status(500).json({ error: error.message });
     }
   });
