@@ -52,7 +52,13 @@ import {
   Download,
   Trash2,
   Database,
-  ClipboardCheck
+  ClipboardCheck,
+  ShieldCheck,
+  Trophy,
+  Wind,
+  Send,
+  MessageCircle,
+  ExternalLink
 } from 'lucide-react';
 import ExpenseApprovalDashboard from './components/ExpenseApprovalDashboard';
 import { motion, AnimatePresence } from 'motion/react';
@@ -73,7 +79,7 @@ import {
   Legend 
 } from 'recharts';
 import { differenceInDays, parseISO, isFuture, isPast, format } from 'date-fns';
-import { cn } from './lib/utils';
+import { cn, getWhatsAppLink } from './lib/utils';
 import { 
   BudgetItem, 
   Project, 
@@ -1490,7 +1496,14 @@ export default function App() {
                   : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
               )}
             >
-              <item.icon size={18} className={cn("shrink-0", currentPage === item.id ? "text-white" : "group-hover:scale-110 transition-transform")} />
+              <item.icon 
+                size={18} 
+                className={cn(
+                  "shrink-0", 
+                  currentPage === item.id ? "text-white" : "group-hover:scale-110 transition-transform",
+                  item.id === 'expense-approvals' && item.badge && "animate-pulse text-blue-500"
+                )} 
+              />
               {(isSidebarOpen) && (
                 <>
                   <span className={cn("flex-1 text-left font-bold text-[11px] tracking-wide", currentPage === item.id ? "text-white" : "text-slate-400")}>{item.label}</span>
@@ -1595,6 +1608,96 @@ export default function App() {
                 </span>
               )}
             </button>
+
+            <AnimatePresence>
+              {isNotifOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[50]" 
+                    onClick={() => setNotifOpen(false)}
+                  />
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-16 right-0 w-[320px] md:w-[400px] bg-white border border-slate-200 rounded-[32px] shadow-2xl z-[60] overflow-hidden flex flex-col"
+                  >
+                    <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Bell size={14} className="text-blue-600" />
+                        Communications
+                      </h3>
+                      {notifications.length > 0 && (
+                        <button 
+                          onClick={async () => {
+                             const batch = writeBatch(db);
+                             notifications.forEach(n => {
+                               if (!n.isRead) batch.update(doc(db, `users/${user.uid}/notifications`, n.id), { isRead: true });
+                             });
+                             await batch.commit();
+                          }}
+                          className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline"
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto no-scrollbar">
+                      {notifications.length > 0 ? (
+                        <div className="divide-y divide-slate-50">
+                          {notifications.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).map((n) => (
+                            <div 
+                              key={n.id} 
+                              className={cn(
+                                "p-5 hover:bg-slate-50 transition-all cursor-pointer flex gap-4 text-left",
+                                !n.isRead && "bg-blue-50/30"
+                              )}
+                              onClick={async () => {
+                                if (!n.isRead) {
+                                  await updateDoc(doc(db, `users/${user.uid}/notifications`, n.id), { isRead: true });
+                                }
+                                if (n.relatedId) {
+                                  if (n.type === 'approval') setCurrentPage('expense-approvals');
+                                  if (n.type === 'project') {
+                                    setSelectedProjectId(n.relatedId);
+                                    setCurrentPage('project-detail');
+                                  }
+                                }
+                                setNotifOpen(false);
+                              }}
+                            >
+                              <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+                                n.type === 'approval' ? "bg-amber-100 text-amber-600" : 
+                                n.type === 'milestone' ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600"
+                              )}>
+                                {n.type === 'approval' ? <ShieldCheck size={18} /> : 
+                                 n.type === 'milestone' ? <Trophy size={18} /> : <Zap size={18} />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-tight truncate">{n.title}</h4>
+                                  {!n.isRead && <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />}
+                                </div>
+                                <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed mb-2">{n.message}</p>
+                                <span className="text-[8px] font-black text-slate-400 border border-slate-100 px-1.5 py-0.5 rounded uppercase tracking-widest bg-white">
+                                  {n.timestamp?.seconds ? new Date(n.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-20 flex flex-col items-center justify-center text-slate-300">
+                          <Wind size={40} className="mb-4 opacity-10" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">Signal Silo Empty</p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
 
           <AnimatePresence>
@@ -2181,7 +2284,7 @@ const PageView = ({
         );
       }
 
-      return <VolunteersView volunteers={volunteers} onAdd={onAddVolunteer} />;
+      return <VolunteersView volunteers={volunteers} onAdd={onAddVolunteer} setCurrentPage={setCurrentPage} />;
     case 'finance':
       return <FinanceDashboard user={user} projects={projects} />;
     case 'docs':
@@ -3095,7 +3198,7 @@ const ProjectsView = ({ projects, onOpenProject, onAdd, onDelete, user }: any) =
   );
 };
 
-const VolunteersView = ({ volunteers, onAdd }: any) => {
+const VolunteersView = ({ volunteers, onAdd, setCurrentPage }: any) => {
   return (
     <Card className="shadow-2xl shadow-slate-200/40 border-slate-200">
       <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -3113,7 +3216,8 @@ const VolunteersView = ({ volunteers, onAdd }: any) => {
               <th className="px-10 py-6">Assigned Sector</th>
               <th className="px-10 py-6">Skill Matrix</th>
               <th className="px-10 py-6">Runtime</th>
-              <th className="px-10 py-6 text-center">Protocol Status</th>
+              <th className="px-10 py-6">Protocol Status</th>
+              <th className="px-10 py-6 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -3142,13 +3246,36 @@ const VolunteersView = ({ volunteers, onAdd }: any) => {
                     <span className="font-mono text-[12px] font-black text-slate-900 tracking-tight">{v.hours}H LOGGED</span>
                   </div>
                 </td>
-                <td className="px-10 py-6 text-center">
+                <td className="px-10 py-6">
                   <Badge className={cn(
                     "font-black tracking-[0.2em] px-4 py-2 border rounded-2xl",
                     v.status === 'Active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100 opacity-60"
                   )}>
                     {v.status}
                   </Badge>
+                </td>
+                <td className="px-10 py-6 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {v.phone && (
+                      <button 
+                        onClick={() => window.open(getWhatsAppLink(v.phone), '_blank')}
+                        className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm"
+                        title="Connect via WhatsApp"
+                      >
+                        <MessageCircle size={16} fill="currentColor" />
+                      </button>
+                    )}
+                    <button 
+                      className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                      onClick={() => {
+                        // For now we don't have a shared state for selected volunteer profile, 
+                        // so we just show an alert or do nothing.
+                        // Ideally we'd set a selectedVolunteerId and change page.
+                      }}
+                    >
+                      <ExternalLink size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

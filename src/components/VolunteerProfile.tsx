@@ -8,6 +8,7 @@ import {
 import { Volunteer, Project, WorkLog, VolunteerCertificate, AppUser, NGODocument } from '../types';
 import { format } from 'date-fns';
 import { FileCard } from './FileCard';
+import { getWhatsAppLink } from '../lib/utils';
 
 interface VolunteerProfileProps {
   volunteer: Volunteer;
@@ -81,7 +82,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
               </p>
               {volunteer.phone && (
                 <button 
-                  onClick={() => window.open(`https://wa.me/${volunteer.phone?.replace(/[^0-9]/g, '')}`, '_blank')}
+                  onClick={() => window.open(getWhatsAppLink(volunteer.phone), '_blank')}
                   className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all text-[8px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
                 >
                   <MessageCircle size={10} fill="currentColor" />

@@ -8,6 +8,7 @@ import {
 import { Volunteer, VolunteerApplication, AppUser } from '../types';
 import { format } from 'date-fns';
 import { AddVolunteerModal } from './AddVolunteerModal';
+import { getWhatsAppLink } from '../lib/utils';
 
 interface VolunteerDirectoryProps {
   volunteers: Volunteer[];
@@ -174,7 +175,7 @@ export const VolunteerDirectory = ({ volunteers, applications, onApprove, onReje
                   {/* Action Bar */}
                   <div className="flex items-center gap-3">
                     <button 
-                      onClick={() => window.open(`https://wa.me/${volunteer.phone?.replace(/[^0-9]/g, '')}`, '_blank')}
+                      onClick={() => window.open(getWhatsAppLink(volunteer.phone), '_blank')}
                       className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 active:scale-95"
                     >
                       <MessageCircle size={18} fill="currentColor" />

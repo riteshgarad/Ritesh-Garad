@@ -20,6 +20,7 @@ import { db } from '../App';
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
+import { sendEmail } from '../services/emailService';
 
 interface ExpenseApprovalDashboardProps {
   user: AppUser;
@@ -70,6 +71,22 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
         relatedId: request.id
       });
 
+      // Automated Email Notification to Requester
+      await sendEmail({
+        to: request.requesterEmail,
+        subject: `[FISCAL CLEARANCE] Expense Request Approved: ₹${request.amount}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; padding: 20px; border: 1px solid #10b981; border-radius: 12px; background-color: #f0fdf4;">
+            <h2 style="color: #059669; text-transform: uppercase;">Clearance Granted</h2>
+            <p>Hello ${request.requesterName},</p>
+            <p>Your request for <strong>₹${request.amount}</strong> for "<em>${request.description}</em>" has been <strong>APPROVED</strong> by the Finance Department.</p>
+            <p>The funds have been logged in the mission ledger and are ready for disbursement.</p>
+            <hr style="border: 0; border-top: 1px solid #d1fae5; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #6b7280;">Authorized by Mission Control Finance Hub.</p>
+          </div>
+        `
+      });
+
       toast.success('Expense Strategy Approved and Logged');
       setSelectedRequestId(null);
     } catch (error: any) {
@@ -100,6 +117,26 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
         timestamp: serverTimestamp(),
         isRead: false,
         relatedId: selectedRequest.id
+      });
+
+      // Automated Email Notification to Requester
+      await sendEmail({
+        to: selectedRequest.requesterEmail,
+        subject: `[FISCAL NOTICE] Expense Request Declined: ₹${selectedRequest.amount}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; padding: 20px; border: 1px solid #ef4444; border-radius: 12px; background-color: #fef2f2;">
+            <h2 style="color: #dc2626; text-transform: uppercase;">Request Denied</h2>
+            <p>Hello ${selectedRequest.requesterName},</p>
+            <p>Your request for <strong>₹${selectedRequest.amount}</strong> for "<em>${selectedRequest.description}</em>" has been <strong>DECLINED</strong>.</p>
+            <div style="background-color: white; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+              <p style="margin: 0; font-weight: bold; color: #7f1d1d;">Reason for Rejection:</p>
+              <p style="margin: 5px 0 0 0; color: #b91c1c;">${rejectionReason}</p>
+            </div>
+            <p>Please contact the Finance Department for further clarification or adjust your request parameters.</p>
+            <hr style="border: 0; border-top: 1px solid #fee2e2; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #6b7280;">Decision Finalized by Mission Control Finance Hub.</p>
+          </div>
+        `
       });
 
       toast.success('Rejection Finalized');

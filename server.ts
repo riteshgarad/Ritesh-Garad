@@ -6,11 +6,13 @@ import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import fs from "fs";
+import { Resend } from "resend";
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "firebase-applet-config.json"), "utf8"));
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 async function startServer() {
   // Initialize Firebase Admin with project identification
@@ -96,9 +98,86 @@ async function startServer() {
     }
   };
 
+  // Middleware to verify ANY authenticated user
+  const verifyAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    try {
+      const decodedToken = await auth.verifyIdToken(idToken);
+      (req as any).user = decodedToken;
+      next();
+    } catch (error) {
+      res.status(401).json({ error: "Invalid token" });
+    }
+  };
+
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // Email Automation Route
+  app.post("/api/automation/send-email", verifyAuth, async (req, res) => {
+    const { to, subject, html, text } = req.body;
+
+    if (!resend) {
+      console.warn("[Resend] API Key missing. Skipping email.");
+      return res.status(503).json({ error: "Email service not configured. Add RESEND_API_KEY to secrets." });
+    }
+
+    try {
+      const data = await resend.emails.send({
+        from: "NGO Mission Control <onboarding@resend.dev>",
+        to: to || "riteshgarad4@gmail.com", // Default to admin if none provided
+        subject,
+        html,
+        text
+      });
+
+      res.json({ success: true, id: data.data?.id });
+    } catch (error: any) {
+      console.error("[Resend Error]:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Notify Admins & Finance Head about new requests
+  app.post("/api/notify/expense-request", verifyAuth, async (req, res) => {
+    const { requestId, amount, requesterName, description } = req.body;
+
+    try {
+      const usersSnapshot = await db.collection('users').get();
+      const batch = db.batch();
+
+      usersSnapshot.forEach(doc => {
+        const userData = doc.data();
+        const isAdmin = userData.role === 'Admin';
+        const isFinanceHead = userData.role === 'Department Head' && userData.department === 'Finance';
+
+        if (isAdmin || isFinanceHead) {
+          const notificationRef = db.collection(`users/${doc.id}/notifications`).doc();
+          batch.set(notificationRef, {
+            type: 'approval',
+            title: 'New Expense Authorization Required',
+            message: `${requesterName} is requesting ₹${amount} for ${description}.`,
+            timestamp: FieldValue.serverTimestamp(),
+            isRead: false,
+            relatedId: requestId,
+            priority: 'high'
+          });
+        }
+      });
+
+      await batch.commit();
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Notification Error]:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Admin: Create User
