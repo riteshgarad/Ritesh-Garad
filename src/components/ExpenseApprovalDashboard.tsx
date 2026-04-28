@@ -40,65 +40,88 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
     if (isProcessing) return;
     setIsProcessing(true);
     try {
+      // PHASE 1: DATABASE INTEGRITY (Critical)
       const requestRef = doc(db, 'expense_requests', request.id);
       await updateDoc(requestRef, {
         status: 'approved',
         reviewedBy: user.name,
-        reviewedAt: serverTimestamp()
+        reviewedAt: serverTimestamp(),
+        approvedBy: user.uid, // Add as requested
+        approvedAt: serverTimestamp() // Add as requested
       });
 
-      // Create ledger entry
+      // Create ledger entry in transactions (Existing system)
       await addDoc(collection(db, 'transactions'), {
         type: 'expense',
         amount: request.amount,
         category: 'Approved Expense',
-        description: `Expense approved for ${request.requesterName}: ${request.description}`,
+        description: `Approved request from ${request.requesterName}: ${request.description}`,
         status: 'cleared',
         date: serverTimestamp(),
         createdBy: user.uid,
         paymentMethod: 'Bank Transfer',
         expenditureType: 'General',
-        requesterId: request.requesterId
+        requesterId: request.requesterId || request.requesterUid
       });
 
-      // Notify requester
-      await addDoc(collection(db, `users/${request.requesterId}/notifications`), {
-        type: 'approval',
-        title: 'Expense Request Approved',
-        message: `Your request for ₹${request.amount} has been approved by Finance.`,
-        timestamp: serverTimestamp(),
-        isRead: false,
-        relatedId: request.id
-      });
-
-      // Automated Email Notification to Requester
-      await sendEmail({
-        type: 'DECISION_TO_VOLUNTEER',
-        to: request.requesterEmail,
-        amount: request.amount.toString(),
-        requesterName: request.requesterName,
+      // Create ledger entry in finance (As suggested by user)
+      await addDoc(collection(db, 'finance'), {
+        type: 'expense',
+        amount: request.amount,
+        category: request.category || 'General',
+        description: `Approved request from ${request.requesterName}`,
+        date: serverTimestamp(),
         requesterEmail: request.requesterEmail,
-        status: 'Approved',
-        subject: `[FISCAL CLEARANCE] Expense Request Approved: ₹${request.amount}`
+        status: 'approved'
       });
 
-      // Success Animation
+      // Notify requester via in-app notification
+      try {
+        await addDoc(collection(db, `users/${request.requesterId || request.requesterUid}/notifications`), {
+          type: 'approval',
+          title: 'Expense Request Approved',
+          message: `Your request for ₹${request.amount} has been approved by Finance.`,
+          timestamp: serverTimestamp(),
+          isRead: false,
+          relatedId: request.id
+        });
+      } catch (e) {
+        console.warn('In-app notification failed, but DB update succeeded');
+      }
+
+      // Database updates are successful
       toast.success(
-        <div className="flex items-center gap-2">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          >
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600" />
-          </motion.div>
-          <span>Fiscal Clearance Transmitted</span>
+            <span className="font-bold">Budget Approved & Entry Recorded</span>
+          </div>
         </div>
       );
+
+      // PHASE 2: INDEPENDENT EMAIL AUTOMATION
+      try {
+        await sendEmail({
+          type: 'DECISION_TO_VOLUNTEER',
+          to: request.requesterEmail,
+          amount: request.amount.toString(),
+          requesterName: request.requesterName,
+          requesterEmail: request.requesterEmail,
+          status: 'Approved',
+          subject: `[FISCAL CLEARANCE] Expense Request Approved: ₹${request.amount}`
+        });
+      } catch (mailError) {
+        console.error("Mail Error:", mailError);
+        toast("Email could not be sent, but budget is securely approved.", {
+          icon: '⚠️',
+          duration: 4000
+        });
+      }
+
       setSelectedRequestId(null);
     } catch (error: any) {
-      console.error(error);
-      toast.error('Approval Protocol Failed');
+      console.error("Database Error:", error);
+      toast.error('Approval Protocol Failed: Database update error.');
     } finally {
       setIsProcessing(false);
     }
@@ -108,6 +131,7 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
     if (!selectedRequest || isProcessing || !rejectionReason.trim()) return;
     setIsProcessing(true);
     try {
+      // PHASE 1: DATABASE INTEGRITY
       const requestRef = doc(db, 'expense_requests', selectedRequest.id);
       await updateDoc(requestRef, {
         status: 'rejected',
@@ -116,47 +140,55 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
         reviewedAt: serverTimestamp()
       });
 
-      // Notify requester
-      await addDoc(collection(db, `users/${selectedRequest.requesterId}/notifications`), {
-        type: 'approval',
-        title: 'Expense Request Declined',
-        message: `Your request for ₹${selectedRequest.amount} was rejected. Reason: ${rejectionReason}`,
-        timestamp: serverTimestamp(),
-        isRead: false,
-        relatedId: selectedRequest.id
-      });
+      // Notify requester via in-app
+      try {
+        const targetUid = selectedRequest.requesterId || selectedRequest.requesterUid;
+        if (targetUid) {
+          await addDoc(collection(db, `users/${targetUid}/notifications`), {
+            type: 'approval',
+            title: 'Expense Request Declined',
+            message: `Your request for ₹${selectedRequest.amount} was rejected. Reason: ${rejectionReason}`,
+            timestamp: serverTimestamp(),
+            isRead: false,
+            relatedId: selectedRequest.id
+          });
+        }
+      } catch (e) {
+        console.warn('In-app notification failed');
+      }
 
-      // Automated Email Notification to Requester
-      await sendEmail({
-        type: 'DECISION_TO_VOLUNTEER',
-        to: selectedRequest.requesterEmail,
-        amount: selectedRequest.amount.toString(),
-        requesterName: selectedRequest.requesterName,
-        requesterEmail: selectedRequest.requesterEmail,
-        status: 'Rejected',
-        reason: rejectionReason,
-        subject: `[FISCAL NOTICE] Expense Request Declined: ₹${selectedRequest.amount}`
-      });
-
-      // Success Animation
       toast.success(
         <div className="flex items-center gap-2">
-          <motion.div
-            initial={{ rotate: -45, scale: 0.5, opacity: 0 }}
-            animate={{ rotate: 0, scale: 1, opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <XCircle size={16} className="text-rose-600" />
-          </motion.div>
-          <span>Rejection Logged & Communicated</span>
+          <XCircle size={16} className="text-rose-600" />
+          <span className="font-bold">Rejection Logged & Finalized</span>
         </div>
       );
+
+      // PHASE 2: INDEPENDENT EMAIL AUTOMATION
+      try {
+        await sendEmail({
+          type: 'DECISION_TO_VOLUNTEER',
+          to: selectedRequest.requesterEmail,
+          amount: selectedRequest.amount.toString(),
+          requesterName: selectedRequest.requesterName,
+          requesterEmail: selectedRequest.requesterEmail,
+          status: 'Rejected',
+          reason: rejectionReason,
+          subject: `[FISCAL NOTICE] Expense Request Declined: ₹${selectedRequest.amount}`
+        });
+      } catch (mailError) {
+        console.error("Mail Error:", mailError);
+        toast("Notification email could not be sent, but decision is logged.", {
+          icon: '⚠️'
+        });
+      }
+
       setIsRejectionModalOpen(false);
       setRejectionReason('');
       setSelectedRequestId(null);
     } catch (error: any) {
-      console.error(error);
-      toast.error('Rejection Protocol Failed');
+      console.error("Database Error:", error);
+      toast.error('Rejection Protocol Failed: Database update error.');
     } finally {
       setIsProcessing(false);
     }

@@ -229,15 +229,19 @@ export interface Donation {
 export interface ExpenseRequest {
   id: string;
   requesterId: string;
+  requesterUid?: string;
   requesterName: string;
   requesterEmail: string;
   department: string;
+  category?: string;
   amount: number;
   description: string;
   professionalMessage: string;
+  message?: string;
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
   submittedAt: any;
+  createdAt?: any;
   reviewedBy?: string;
   reviewedAt?: any;
 }

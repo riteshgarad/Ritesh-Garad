@@ -43,15 +43,19 @@ export default function AddExpenseRequestModal({ isOpen, onClose, user }: AddExp
     setIsSubmitting(true);
     try {
       const expenseRef = await addDoc(collection(db, 'expense_requests'), {
-        requesterId: user.uid,
+        requesterId: user.uid, // Keeping both for backward compat if needed
+        requesterUid: user.uid,
         requesterName: user.name,
         requesterEmail: user.email,
         department: formData.department,
+        category: formData.department, // Adding category as requested
         amount: parseFloat(formData.amount),
         description: formData.description,
         professionalMessage: formData.professionalMessage,
+        message: formData.professionalMessage, // Adding message as requested
         status: 'pending',
-        submittedAt: serverTimestamp()
+        submittedAt: serverTimestamp(),
+        createdAt: serverTimestamp() // Adding createdAt as requested
       });
 
       // Notify Admin/Finance Head via App Notification
