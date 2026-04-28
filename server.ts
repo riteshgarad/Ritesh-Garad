@@ -32,10 +32,10 @@ async function startServer() {
     projectId: projectToUse
   });
 
-  const auth = adminApp.auth();
+  const auth = admin.auth(adminApp);
   const db = getFirestore(adminApp, dbId === '(default)' ? undefined : dbId);
   
-  console.log(`[Firebase Admin] SDK Active. Project: ${adminApp.options.projectId}, Database: ${dbId}`);
+  console.log(`[Firebase Admin] SDK Active. Project: ${projectToUse}, Database: ${dbId}`);
 
   const app = express();
   const PORT = 3000;
@@ -51,25 +51,17 @@ async function startServer() {
 
     const idToken = authHeader.split("Bearer ")[1];
     try {
-      console.log(`[Auth] Verifying token for user...`);
       const decodedToken = await auth.verifyIdToken(idToken);
-      console.log(`[Auth] User verified: ${decodedToken.email} (${decodedToken.uid})`);
-
-      console.log(`[Firestore] Fetching profile for ${decodedToken.uid} from ${dbId}...`);
+      
       let userData: any = null;
       try {
-        console.log(`[Firestore] Attempting to fetch document users/${decodedToken.uid} on database ${dbId}`);
         const userDoc = await db.collection("users").doc(decodedToken.uid).get();
         userData = userDoc.data();
-        console.log(`[Firestore] Profile fetched:`, userData ? "exists" : "not found");
       } catch (dbError: any) {
         console.error(`[Firestore Error] Failed to fetch user document for ${decodedToken.uid}:`, dbError);
-        console.error(`[Firestore Debug] App Options:`, JSON.stringify(adminApp.options));
-        console.error(`[Firestore Debug] Database ID used: ${dbId}`);
         
         // Fallback to bootstrap admin if db fails (e.g. initial setup or IAM delay)
         if (decodedToken.email === "riteshgarad4@gmail.com") {
-          console.log(`[Auth] Bootstrap admin detected via email fallback`);
           userData = { 
             role: "Admin", 
             email: decodedToken.email, 
@@ -78,8 +70,7 @@ async function startServer() {
           };
         } else {
           return res.status(500).json({ 
-            error: `Database error: ${dbError.message}`,
-            details: dbError.code === 7 ? "IAM Permission Denied. Ensure the service account has access to the Firestore database." : undefined
+            error: `Database error: ${dbError.message}`
           });
         }
       }
@@ -98,7 +89,7 @@ async function startServer() {
     }
   };
 
-  // Middleware to verify ANY authenticated user
+  // Middleware to verify ANY authenticated user (Volunteer, Admin, Dept Head)
   const verifyAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
@@ -122,7 +113,7 @@ async function startServer() {
 
   // Email Automation Route
   app.post("/api/automation/send-email", verifyAuth, async (req, res) => {
-    const { to, subject, html, text } = req.body;
+    const { type, to, subject, html, text, amount, requesterName, requesterEmail, message, status, reason } = req.body;
 
     if (!resend) {
       console.warn("[Resend] API Key missing. Skipping email.");
@@ -130,14 +121,49 @@ async function startServer() {
     }
 
     try {
-      const data = await resend.emails.send({
-        from: "NGO Mission Control <onboarding@resend.dev>",
-        to: to || "riteshgarad4@gmail.com", // Default to admin if none provided
-        subject,
-        html,
-        text
-      });
+      let emailOptions: any = {};
 
+      if (type === 'REQUEST_TO_FINANCE') {
+        // Notify Finance Head
+        emailOptions = {
+          from: "NGO Mission Control <notifications@resend.dev>",
+          to: "yukta-finance-head@gmail.com", // Finance Head Email
+          subject: subject || `[FISCAL ALERT] New Expense Request: ₹${amount || '0'}`,
+          html: html || `<div style="font-family: sans-serif; padding: 20px;">
+            <h2 style="color: #1e40af;">New Expense Authorization Required</h2>
+            <p><strong>From:</strong> ${requesterName}</p>
+            <p><strong>Amount:</strong> ₹${amount}</p>
+            <p><strong>Professional Message:</strong></p>
+            <blockquote style="border-left: 4px solid #1e40af; padding-left: 15px; font-style: italic;">${message}</blockquote>
+            <p style="margin-top: 20px;">Review this in the Command Center Dashboard.</p>
+          </div>`
+        };
+      } else if (type === 'DECISION_TO_VOLUNTEER') {
+        // Send back to Volunteer
+        emailOptions = {
+          from: "NGO Finance Department <finance@resend.dev>",
+          to: requesterEmail || to,
+          subject: subject || `Update on your Expense Request: ${status}`,
+          html: html || `<div style="font-family: sans-serif; padding: 20px; border: 1px solid ${status === 'Approved' ? '#10b981' : '#ef4444'}; border-radius: 12px; background-color: ${status === 'Approved' ? '#f0fdf4' : '#fef2f2'};">
+            <h2 style="color: ${status === 'Approved' ? '#059669' : '#dc2626'}; text-transform: uppercase;">Request ${status}</h2>
+            <p>Hello ${requesterName},</p>
+            <p>Your request for <strong>₹${amount}</strong> has been <strong>${status.toUpperCase()}</strong>.</p>
+            ${reason ? `<div style="background-color: white; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Note:</strong> ${reason}</p></div>` : ''}
+            <p style="font-size: 12px; color: #6b7280; margin-top: 30px;">Mission Control Finance Hub.</p>
+          </div>`
+        };
+      } else {
+        // Generic send
+        emailOptions = {
+          from: "NGO Mission Control <onboarding@resend.dev>",
+          to: to || "riteshgarad4@gmail.com",
+          subject,
+          html,
+          text
+        };
+      }
+
+      const data = await resend.emails.send(emailOptions);
       res.json({ success: true, id: data.data?.id });
     } catch (error: any) {
       console.error("[Resend Error]:", error);
@@ -150,32 +176,45 @@ async function startServer() {
     const { requestId, amount, requesterName, description } = req.body;
 
     try {
-      const usersSnapshot = await db.collection('users').get();
+      // Use targeted queries to potentially avoid permission issues on full collection listing
+      const adminsRef = db.collection('users').where('role', '==', 'Admin');
+      const financeHeadsRef = db.collection('users').where('role', '==', 'Department Head').where('department', '==', 'Finance');
+      
+      const [adminsSnap, financeSnap] = await Promise.all([
+        adminsRef.get(),
+        financeHeadsRef.get()
+      ]);
+
       const batch = db.batch();
+      const notifiedUids = new Set<string>();
 
-      usersSnapshot.forEach(doc => {
-        const userData = doc.data();
-        const isAdmin = userData.role === 'Admin';
-        const isFinanceHead = userData.role === 'Department Head' && userData.department === 'Finance';
+      const processDocs = (snap: admin.firestore.QuerySnapshot) => {
+        snap.forEach(doc => {
+          if (!notifiedUids.has(doc.id)) {
+            const notificationRef = db.collection(`users/${doc.id}/notifications`).doc();
+            batch.set(notificationRef, {
+              type: 'approval',
+              title: 'New Expense Authorization Required',
+              message: `${requesterName} is requesting ₹${amount} for ${description}.`,
+              timestamp: FieldValue.serverTimestamp(),
+              isRead: false,
+              relatedId: requestId,
+              priority: 'high'
+            });
+            notifiedUids.add(doc.id);
+          }
+        });
+      };
 
-        if (isAdmin || isFinanceHead) {
-          const notificationRef = db.collection(`users/${doc.id}/notifications`).doc();
-          batch.set(notificationRef, {
-            type: 'approval',
-            title: 'New Expense Authorization Required',
-            message: `${requesterName} is requesting ₹${amount} for ${description}.`,
-            timestamp: FieldValue.serverTimestamp(),
-            isRead: false,
-            relatedId: requestId,
-            priority: 'high'
-          });
-        }
-      });
+      processDocs(adminsSnap);
+      processDocs(financeSnap);
 
       await batch.commit();
       res.json({ success: true });
     } catch (error: any) {
       console.error("[Notification Error]:", error);
+      // Even if app notifications fail, we don't want to break the whole flow 
+      // if email was already sent or if user just wants the request to be saved.
       res.status(500).json({ error: error.message });
     }
   });

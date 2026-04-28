@@ -1,6 +1,18 @@
 import { auth } from '../App';
 
-export async function sendEmail({ to, subject, html, text }: { to?: string; subject: string; html: string; text?: string }) {
+export async function sendEmail(payload: { 
+  type?: 'REQUEST_TO_FINANCE' | 'DECISION_TO_VOLUNTEER';
+  to?: string; 
+  subject?: string; 
+  html?: string; 
+  text?: string;
+  amount?: string;
+  requesterName?: string;
+  requesterEmail?: string;
+  message?: string;
+  status?: string;
+  reason?: string;
+}) {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
@@ -12,7 +24,7 @@ export async function sendEmail({ to, subject, html, text }: { to?: string; subj
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ to, subject, html, text })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {

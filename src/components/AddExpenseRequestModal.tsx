@@ -56,6 +56,21 @@ export default function AddExpenseRequestModal({ isOpen, onClose, user }: AddExp
 
       // Notify Admin/Finance Head via App Notification
       const token = await auth.currentUser?.getIdToken();
+      
+      // Success Flight Animation
+      toast.success(
+        <div className="flex items-center gap-2">
+          <motion.div
+            initial={{ x: -20, y: 20, opacity: 0, scale: 0.5 }}
+            animate={{ x: 20, y: -20, opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <Send size={16} className="text-blue-600" />
+          </motion.div>
+          <span>Message Transmitted to Finance Hub</span>
+        </div>
+      );
+
       if (token) {
         await fetch('/api/notify/expense-request', {
           method: 'POST',
@@ -74,23 +89,14 @@ export default function AddExpenseRequestModal({ isOpen, onClose, user }: AddExp
 
       // Automated Email Notification to Finance Head
       await sendEmail({
-        subject: `[FISCAL ALERT] New Expense Request: ₹${formData.amount} - ${user.name}`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #1e40af; text-transform: uppercase; letter-spacing: 1px;">Mission Fiscal Request</h2>
-            <p><strong>From:</strong> ${user.name} (${user.department})</p>
-            <p><strong>Amount:</strong> ₹${formData.amount}</p>
-            <p><strong>Description:</strong> ${formData.description}</p>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-style: italic; color: #475569;">" ${formData.professionalMessage} "</p>
-            <div style="margin-top: 30px;">
-              <a href="${window.location.origin}/expense-approvals" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Review in Command Center</a>
-            </div>
-          </div>
-        `
+        type: 'REQUEST_TO_FINANCE',
+        amount: formData.amount,
+        requesterName: user.name,
+        requesterEmail: user.email,
+        message: formData.professionalMessage,
+        subject: `[FISCAL ALERT] New Expense Request: ₹${formData.amount} - ${user.name}`
       });
-
-      toast.success('Expense Transaction Transmitted to Finance');
+      
       setFormData({
         amount: '',
         description: '',
