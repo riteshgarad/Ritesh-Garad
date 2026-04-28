@@ -112,19 +112,29 @@ export const VolunteerDirectory = ({
 
     setIsDeleting(volunteer.id);
     try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error("Unauthorized");
+      // Delete from volunteers collection first (client-side)
+      await deleteDoc(doc(db, 'volunteers', volunteer.id));
 
-      const response = await fetch(`/api/users/${volunteer.uid}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // Attempt to delete from Auth/Users via API if uid exists
+      if (volunteer.uid) {
+        const token = await auth.currentUser?.getIdToken();
+        if (token) {
+          try {
+            const response = await fetch(`/api/admin/users/${volunteer.uid}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (!response.ok) {
+              console.warn("Auth deletion skipped or failed, but profile removed locally.");
+            }
+          } catch (apiErr) {
+            console.warn("API call failed, but Firestore document was removed.");
+          }
         }
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Deletion failed");
       }
 
       toast.success(
@@ -145,18 +155,35 @@ export const VolunteerDirectory = ({
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
 
+    // Use uid if available, otherwise fallback to document id
+    const volunteerIdentifier = volunteer.uid || volunteer.id;
+
+    if (!volunteerIdentifier) {
+      toast.error('Invalid Volunteer Identifier');
+      return;
+    }
+
     try {
       // 1. Update Project assignedTeam
       const projectRef = doc(db, 'projects', projectId);
       await updateDoc(projectRef, {
-        assignedTeam: arrayUnion(volunteer.uid)
+        assignedTeam: arrayUnion(volunteerIdentifier)
       });
 
-      // 2. Update User activeMissions
-      const userRef = doc(db, 'users', volunteer.uid);
-      await updateDoc(userRef, {
-        activeMissions: arrayUnion(projectId),
-        status: 'On Mission'
+      // 2. Update User activeMissions if uid exists (representing a linked account)
+      if (volunteer.uid) {
+        const userRef = doc(db, 'users', volunteer.uid);
+        await updateDoc(userRef, {
+          activeMissions: arrayUnion(projectId),
+          status: 'On Mission'
+        });
+      }
+
+      // Also update the volunteer document itself
+      const volunteerRef = doc(db, 'volunteers', volunteer.id);
+      await updateDoc(volunteerRef, {
+        status: 'On Mission',
+        activeMissions: arrayUnion(projectId)
       });
 
       // 3. Send Notification

@@ -89,24 +89,6 @@ async function startServer() {
     }
   };
 
-  // User Management: Permanent Deletion
-  app.delete("/api/users/:uid", verifyAdmin, async (req, res) => {
-    const { uid } = req.params;
-    try {
-      // 1. Delete from Auth
-      await auth.deleteUser(uid);
-      
-      // 2. Delete from Firestore (Users collection)
-      await db.collection("users").doc(uid).delete();
-      
-      console.log(`[Admin] User ${uid} permanently purged from system.`);
-      res.json({ success: true, message: "User permanently deleted." });
-    } catch (error: any) {
-      console.error("[Admin Error] Failed to delete user:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   // Middleware to verify ANY authenticated user (Volunteer, Admin, Dept Head)
   const verifyAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;

@@ -103,6 +103,7 @@ export interface Volunteer {
   idProofUrl?: string;
   availability?: 'Full-time' | 'Weekends' | 'Freelance';
   joinDate: any;
+  activeMissions?: string[];
 }
 
 export interface WorkLog {
