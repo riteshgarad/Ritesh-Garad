@@ -322,6 +322,7 @@ export default function App() {
   // Modal States
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isVolunteerModalOpen, setIsVolunteerModalOpen] = useState(false);
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
   const [proofTaskTargetId, setProofTaskTargetId] = useState<string | null>(null);
 
@@ -911,8 +912,12 @@ export default function App() {
     }
   };
 
-  const handleAddTask = async (taskData: Partial<Task>) => {
+  const handleAddTask = async (taskData?: Partial<Task>) => {
     if (!user) return;
+    if (!taskData || !taskData.title) {
+      setIsAddTaskModalOpen(true);
+      return;
+    }
     try {
       const project = projects.find(p => p.id === taskData.projectId);
       await addDoc(collection(db, 'tasks'), {
@@ -931,6 +936,7 @@ export default function App() {
         projectName: project?.name
       });
       
+      setIsAddTaskModalOpen(false);
       toast.success("Protocol Injected. Data bridge established.");
     } catch (err) {
       handleFirestoreError(err, 'create', 'tasks');
@@ -1544,6 +1550,14 @@ export default function App() {
             projects={projects}
           />
         )}
+        {isAddTaskModalOpen && (
+          <TaskModal 
+            isOpen={isAddTaskModalOpen}
+            onClose={() => setIsAddTaskModalOpen(false)}
+            onCreate={handleAddTask}
+            projects={projects}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -1615,6 +1629,151 @@ const EditBudgetModal = ({ isOpen, onClose, onUpdate, project, isLoading }: any)
             )}
           </button>
         </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const TaskModal = ({ isOpen, onClose, onCreate, projects }: any) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    projectId: '',
+    assignedDept: 'General' as any,
+    priority: 'Medium' as any,
+    impactValue: 10,
+    proofRequired: false,
+    status: 'todo'
+  });
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 text-left">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+      />
+      <motion.div 
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 100 }}
+        className="relative bg-white w-full max-w-lg rounded-t-[32px] md:rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="sticky top-0 z-10 p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md">
+          <div className="text-left">
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-1">Inject Node Protocol</h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Task Network Orchestration</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-slate-50 rounded-xl border border-slate-200">
+            <X size={18} />
+          </button>
+        </div>
+        
+        <form className="p-6 md:p-8 space-y-6" onSubmit={(e) => { e.preventDefault(); onCreate(formData); }}>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Target Project</label>
+            <select 
+              required
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 appearance-none"
+              value={formData.projectId}
+              onChange={e => setFormData({...formData, projectId: e.target.value})}
+            >
+              <option value="">Select Mission...</option>
+              {projects.filter((p: any) => p.status === 'approved' || p.status === 'active').map((p: any) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Task identifier</label>
+            <input 
+              required
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900"
+              placeholder="Primary Objective Title"
+              value={formData.title}
+              onChange={e => setFormData({...formData, title: e.target.value})}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Functional allocation</label>
+            <select 
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 appearance-none"
+              value={formData.assignedDept}
+              onChange={e => setFormData({...formData, assignedDept: e.target.value as any})}
+            >
+              {['Finance', 'Operations', 'Marketing', 'HR', 'Legal', 'Social Media', 'Public Relations', 'General'].map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Priority level</label>
+              <select 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 appearance-none"
+                value={formData.priority}
+                onChange={e => setFormData({...formData, priority: e.target.value as any})}
+              >
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Velocity Weight (%)</label>
+              <input 
+                type="number"
+                required
+                min="1"
+                max="100"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900"
+                value={formData.impactValue}
+                onChange={e => setFormData({...formData, impactValue: parseInt(e.target.value)})}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Objective Parameters</label>
+            <textarea 
+              rows={3}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 resize-none"
+              placeholder="Detailed instructions..."
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div>
+              <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight">Proof of Result Required</p>
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Forces document upload for closure</p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setFormData({...formData, proofRequired: !formData.proofRequired})}
+              className={cn(
+                "w-12 h-6 rounded-full transition-all relative border",
+                formData.proofRequired ? "bg-blue-600 border-blue-600 shadow-lg shadow-blue-200" : "bg-slate-200 border-slate-300"
+              )}
+            >
+              <div className={cn("absolute top-1 w-3.5 h-3.5 rounded-full bg-white transition-all", formData.proofRequired ? "left-7" : "left-1")} />
+            </button>
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <Button variant="secondary" type="button" className="flex-1 py-4 uppercase tracking-widest bg-white border-slate-200" onClick={onClose}>Abort</Button>
+            <Button variant="primary" type="submit" className="flex-1 py-4 uppercase tracking-widest shadow-xl shadow-blue-500/20">Inject Signal</Button>
+          </div>
+        </form>
       </motion.div>
     </div>
   );
