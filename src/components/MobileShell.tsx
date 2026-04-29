@@ -239,9 +239,9 @@ export const MobileShell = ({
   );
 
   return (
-    <div className="min-h-screen bg-white lg:bg-slate-50 flex font-sans overflow-hidden">
+    <div className="min-h-screen bg-white lg:bg-slate-50 flex font-sans overflow-hidden h-[100dvh]">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-80 bg-white border-r border-slate-100 flex-col shadow-2xl shadow-slate-200/50 z-50 rounded-r-[40px] fixed h-screen top-0 left-0 pt-safe">
+      <aside className="hidden lg:flex w-80 bg-white border-r border-slate-100 flex-col shadow-2xl shadow-slate-200/50 z-50 rounded-r-[40px] fixed h-[100dvh] top-0 left-0 pt-[env(safe-area-inset-top,24px)]">
         <SidebarContent />
       </aside>
 
@@ -261,12 +261,12 @@ export const MobileShell = ({
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-[101] lg:hidden shadow-2xl rounded-r-[3rem] overflow-hidden pt-safe"
+              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-[101] lg:hidden shadow-2xl rounded-r-[3rem] overflow-hidden pt-[env(safe-area-inset-top,20px)]"
             >
               <SidebarContent />
               <button 
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-xl mt-safe"
+                className="absolute top-8 right-6 p-2 bg-slate-50 text-slate-400 rounded-xl"
               >
                 <X size={20} />
               </button>
@@ -276,9 +276,9 @@ export const MobileShell = ({
       </AnimatePresence>
 
       {/* Main Layout Container */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden lg:ml-80">
+      <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden lg:ml-80">
         {/* Top App Bar */}
-        <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-safe h-[calc(64px+env(safe-area-inset-top))] sm:h-[calc(80px+env(safe-area-inset-top))]">
+        <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-4 h-auto min-h-[80px]">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
@@ -290,8 +290,11 @@ export const MobileShell = ({
               <Target size={18} />
             </div>
             <div>
-              <h1 className="text-xs lg:text-sm font-black uppercase tracking-[0.2em] text-slate-900 leading-none">{title}</h1>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 hidden sm:block">Sector 7-G / Node Protocol v2.4</p>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xs lg:text-sm font-black uppercase tracking-[0.2em] text-slate-900 leading-none">{title}</h1>
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+              </div>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">Sector 7-G / Node Protocol v2.4</p>
             </div>
           </div>
           

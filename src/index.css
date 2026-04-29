@@ -16,7 +16,7 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased overflow-x-hidden selection:bg-blue-100 selection:text-blue-900;
+    @apply bg-slate-50 text-slate-900 antialiased overflow-x-hidden selection:bg-blue-100 selection:text-blue-900 overscroll-none;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
