@@ -56,6 +56,7 @@ service cloud.firestore {
         (isDeptHead(existing().department) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason'])) ||
         (isOwner(existing().creator_id) && existing().status == 'pending_dept_review' && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'budget', 'department', 'lead_name']))
       );
+      allow delete: if isAdmin();
       
       match /milestones/{milestoneId} {
         allow read: if isSignedIn();
@@ -72,6 +73,7 @@ service cloud.firestore {
         isDeptHead(existing().assignedDept) ||
         (isOwner(existing().assignedVolunteerId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt', 'relatedDocId']))
       );
+      allow delete: if isAdmin();
     }
 
     // --- Volunteers ---
@@ -90,6 +92,7 @@ service cloud.firestore {
         isDeptHead('Marketing') ||
         (isOwner(existing().uploaderId) && existing().status == 'pending')
       );
+      allow delete: if isAdmin() || (isSignedIn() && existing().uploaderId == request.auth.uid);
     }
 
     // --- Finance & Transactions ---

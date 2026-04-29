@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Settings,
   IndianRupee,
-  Bot,
   Share2,
   Clock,
   Layout,
@@ -21,7 +20,6 @@ import {
   Megaphone,
   Globe,
   Database,
-  Wind,
   X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -103,7 +101,6 @@ export const MobileShell = ({
     },
     { id: 'docs', icon: FileText, label: 'Protocols Vault' },
     { id: 'tasks', icon: Layout, label: 'Force Board' },
-    { id: 'chatbot', icon: Bot, label: 'Neural Assistant' },
   ];
 
   const handleNavClick = (id: string) => {
@@ -114,9 +111,8 @@ export const MobileShell = ({
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-white font-sans">
       <div className="p-8 flex items-center gap-4">
-        <div className="w-12 h-12 bg-white rounded-2xl flex flex-col items-center justify-center shadow-xl shadow-terracotta/10 border border-terracotta/5 p-2">
-          <Wind size={20} className="text-terracotta" />
-          <div className="w-6 h-0.5 bg-terracotta/20 rounded-full mt-0.5" />
+        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-xl shadow-terracotta/10 border border-terracotta/5 p-2">
+          <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
         </div>
         <div>
           <h1 className="text-sm font-black uppercase tracking-widest text-mahogany leading-none mb-1">Garad Foundation</h1>
@@ -288,9 +284,8 @@ export const MobileShell = ({
             >
               <Menu size={20} />
             </button>
-            <div className="hidden sm:block lg:hidden w-10 h-10 bg-white rounded-lg flex flex-col items-center justify-center shadow-md border border-terracotta/5 p-1.5">
-              <Wind size={16} className="text-terracotta" />
-              <div className="w-4 h-0.5 bg-terracotta/20 rounded-full mt-0.5" />
+            <div className="hidden sm:block lg:hidden w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md border border-terracotta/5 p-1.5">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">

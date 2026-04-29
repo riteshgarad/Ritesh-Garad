@@ -29,7 +29,6 @@ import {
   FileText, 
   Share2, 
   Star, 
-  Bot, 
   Zap, 
   Search, 
   Bell, 
@@ -55,7 +54,6 @@ import {
   ClipboardCheck,
   ShieldCheck,
   Trophy,
-  Wind,
   Send,
   MessageCircle,
   ExternalLink
@@ -103,7 +101,6 @@ import {
   ExpenseRequest
 } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
-import { askAssistant } from './services/geminiService';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where, setDoc } from 'firebase/firestore';
@@ -287,7 +284,7 @@ const NotificationPanel = ({
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'chatbot' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -1332,22 +1329,9 @@ export default function App() {
   if (!authInitialized) {
     return (
       <div className="min-h-screen bg-cream flex flex-col items-center justify-center p-4">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.1, 1],
-          }}
-          transition={{ 
-            duration: 2, 
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="w-20 h-20 bg-white rounded-[1.5rem] mb-8 shadow-2xl shadow-terracotta/10 flex items-center justify-center p-3 border border-terracotta/5"
-        >
-          <div className="flex flex-col items-center">
-            <Wind size={32} className="text-terracotta" />
-            <div className="w-8 h-1 bg-terracotta/20 rounded-full mt-1" />
+          <div className="w-20 h-20 bg-white rounded-[1.5rem] mb-8 shadow-2xl shadow-terracotta/10 flex items-center justify-center p-2 border border-terracotta/5">
+            <img src="/logo.png" alt="Garad Foundation" className="w-full h-full object-contain" />
           </div>
-        </motion.div>
         <div className="text-center">
           <h2 className="text-[10px] font-black text-mahogany uppercase tracking-[0.4em] animate-pulse mb-2">Initializing OS Kernels</h2>
           <p className="text-[8px] font-bold text-terracotta/40 uppercase tracking-[0.2em]">Mission Bharari Protocol v5.0</p>
@@ -1385,16 +1369,9 @@ export default function App() {
               initial={{ scale: 0, rotate: -10 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', delay: 0.3, damping: 12, stiffness: 200 }}
-              className="w-32 h-32 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(166,58,27,0.15)] flex items-center justify-center mb-6 border border-terracotta/10 relative p-4"
+              className="w-32 h-32 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(166,58,27,0.15)] flex items-center justify-center mb-6 border border-terracotta/10 relative p-6"
             >
-              <div className="relative flex flex-col items-center">
-                <div className="flex items-center gap-0.5">
-                  <Wind size={48} className="text-terracotta transform -rotate-12" />
-                  <Star size={24} fill="currentColor" className="text-gold animate-pulse mb-6" />
-                </div>
-                <div className="w-16 h-1.5 bg-terracotta/20 rounded-full -mt-2" />
-                <p className="absolute -bottom-8 text-[8px] font-black text-terracotta/40 uppercase tracking-[0.2em] whitespace-nowrap">Asset: logo.png (missing)</p>
-              </div>
+              <img src="/logo.png" alt="Garad Foundation" className="w-full h-full object-contain" />
             </motion.div>
 
             <motion.div
@@ -2230,8 +2207,6 @@ const PageView = ({
       return <UserManagement currentUser={user} />;
     case 'expense-approvals':
       return <ExpenseApprovalDashboard user={user} requests={expenseRequests} />;
-    case 'chatbot':
-      return <ChatbotView projects={projects} tasks={tasks} volunteers={volunteers} />;
     case 'create':
       return (
         <div className="space-y-6 pt-safe text-left">
@@ -2326,7 +2301,6 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
     { id: 'docs', label: 'Signal Vault', icon: FileText, desc: 'Document protocol' },
     { id: 'social-media', label: 'Comm Link', icon: Share2, desc: 'Outreach & visibility' },
     { id: 'public-relations', label: 'PR portal', icon: Megaphone, desc: 'Public relations' },
-    { id: 'chatbot', label: 'AI Oracle', icon: Bot, desc: 'Mission intelligence' },
   ];
 
   return (
@@ -2744,7 +2718,7 @@ const ProjectDetailView = ({
           className="p-8 bg-[#0f172a] rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
-            <Bot size={120} />
+            <Shield size={120} />
           </div>
           <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
             <div className="text-left">
@@ -3432,152 +3406,6 @@ const FinanceView = () => {
   );
 };
 
-const ChatbotView = ({ projects, tasks, volunteers }: any) => {
-  const [messages, setMessages] = useState<any[]>([
-    { role: 'assistant', content: 'Namaste! I am the Garad Hub OS Assistant. System diagnostics show optimal performance. How can I assist your mission today?' }
-  ]);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-
-  const context = useMemo(() => {
-    return `
-      PROJECTS: ${projects.map((p: any) => p.name).join(', ')}
-      TASKS: ${tasks.length} total, ${tasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length} completed
-      VOLUNTEERS: ${volunteers.length} total active members
-    `;
-  }, [projects, tasks, volunteers]);
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    const userMsg = input;
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-    setIsTyping(true);
-
-    try {
-      const reply = await askAssistant(userMsg, context);
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (e) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection failure. AI terminal unresponsive.' }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-auto lg:h-[calc(100vh-280px)] min-h-[500px]">
-      <div className="lg:col-span-3 flex flex-col bg-white border border-slate-200 rounded-3xl shadow-2xl shadow-slate-200/20 overflow-hidden order-1 lg:order-1">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
-              <Bot size={26} />
-            </div>
-            <div className="text-left">
-              <h3 className="text-xs font-black text-slate-900 tracking-[0.2em] uppercase leading-none">Garad Neural Hub</h3>
-              <div className="flex items-center gap-1.5 mt-2">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                <span className="text-[10px] text-emerald-600 font-black uppercase tracking-widest leading-none">OS Operational</span>
-              </div>
-            </div>
-          </div>
-          <button className="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest px-5 py-2.5 rounded-xl border border-slate-200 hover:border-blue-200 hover:bg-blue-50 transition-all bg-white shadow-sm">Export Audit Log</button>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 md:space-y-10 scroll-smooth custom-scrollbar">
-          {messages.map((m, i) => (
-            <div key={i} className={cn("flex items-start gap-4 md:gap-6", m.role === 'user' ? "flex-row-reverse" : "")}>
-              <div className={cn(
-                "w-10 h-10 md:w-11 md:h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-lg border-2",
-                m.role === 'user' ? "bg-white text-slate-400 border-slate-100" : "bg-blue-600 text-white border-blue-400"
-              )}>
-                {m.role === 'user' ? <Users size={18} /> : <Bot size={20} />}
-              </div>
-              <div className={cn(
-                "p-5 md:p-7 rounded-3xl max-w-[90%] md:max-w-[85%] text-[13px] md:text-sm leading-relaxed border shadow-sm",
-                m.role === 'user' 
-                  ? "bg-blue-600 text-white border-blue-500 rounded-tr-none shadow-blue-500/10 font-medium" 
-                  : "bg-slate-50 text-slate-700 border-slate-100 rounded-tl-none font-medium text-left"
-              )}>
-                <div className="markdown-body">
-                  <Markdown>{m.content}</Markdown>
-                </div>
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex items-start gap-6">
-              <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white shrink-0 border-2 border-blue-400 shadow-xl shadow-blue-500/20">
-                <Bot size={20} />
-              </div>
-              <div className="bg-slate-50 p-6 rounded-3xl rounded-tl-none border border-slate-100 flex gap-2 items-center shadow-sm">
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce delay-200"></div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="p-6 md:p-8 border-t border-slate-100 bg-slate-50/50">
-          <div className="relative flex items-center bg-white rounded-2xl border border-slate-200 focus-within:border-blue-600 focus-within:shadow-xl focus-within:shadow-blue-500/10 transition-all p-1 shadow-inner">
-            <input 
-              type="text" 
-              className="flex-1 bg-transparent border-none py-4 px-6 md:px-8 focus:outline-none text-[13px] md:text-sm placeholder-slate-300 text-slate-900 font-black uppercase tracking-widest"
-              placeholder="Direct Transmission to neural link..."
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-            />
-            <button 
-              onClick={handleSend}
-              className="p-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/30 group active:scale-95"
-            >
-              <Zap size={20} fill="currentColor" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-8">
-        <Card className="p-6 text-left">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Inquiry Protocols</h4>
-          <div className="space-y-4">
-            {Object.entries(PAGE_TITLES).slice(0, 4).map(([id, title]) => (
-              <button 
-                key={id} 
-                onClick={() => setInput(`Give me a summary of ${title}`)}
-                className="w-full text-left p-5 text-[11px] font-black text-slate-600 rounded-2xl bg-slate-50 hover:bg-blue-50 hover:text-blue-600 border border-slate-200 hover:border-blue-200 transition-all uppercase tracking-widest active:scale-[0.98] shadow-sm leading-tight"
-              >
-                {title} Audit
-              </button>
-            ))}
-          </div>
-        </Card>
-        
-        <Card className="p-8 bg-slate-900 border-none shadow-2xl shadow-slate-900/20 text-left">
-          <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-6">Metrics Terminal</h4>
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Outflow</span>
-              <span className="text-sm font-black text-white tracking-tighter">₹3.92L</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Units</span>
-              <span className="text-sm font-black text-white tracking-tighter">842</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grant Flow</span>
-              <span className="text-sm font-black text-white tracking-tighter">4 Nodes</span>
-            </div>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
-// --- Utilities ---
-
 // --- Utilities ---
 const downloadCSV = (data: any[], filename: string) => {
   if (!data || data.length === 0) return;
@@ -3611,7 +3439,6 @@ const PAGE_TITLES: Record<Page, string> = {
   'social-media': 'Social Link Pipeline',
   'public-relations': 'Media Relations',
   'fundraising': 'Capital Inflow',
-  'chatbot': 'Mission AI Oracle',
   'automation': 'Workflow Automata',
   'project-detail': 'Mission Briefing',
   'users': 'Cyber Access Control',
