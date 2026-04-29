@@ -5,6 +5,17 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
+  /* Brand: Garad Foundation */
+  --garad-terracotta: #A63A1B;
+  --garad-mahogany: #4A1412;
+  --garad-gold: #F2D8A7;
+  --garad-cream: #FAF7F2;
+
+  --color-terracotta: var(--garad-terracotta);
+  --color-mahogany: var(--garad-mahogany);
+  --color-gold: var(--garad-gold);
+  --color-cream: var(--garad-cream);
+  
   /* Custom Native-Mobile Tokens */
   --radius-3xl: 2rem;
   --radius-4xl: 2.5rem;

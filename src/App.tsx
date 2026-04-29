@@ -1331,13 +1331,27 @@ export default function App() {
 
   if (!authInitialized) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center p-4">
         <motion.div 
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="w-12 h-12 bg-blue-600 rounded-xl mb-6 shadow-2xl shadow-blue-500/50"
-        />
-        <h2 className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] animate-pulse">Initializing OS Kernels</h2>
+          animate={{ 
+            scale: [1, 1.1, 1],
+          }}
+          transition={{ 
+            duration: 2, 
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="w-20 h-20 bg-white rounded-[1.5rem] mb-8 shadow-2xl shadow-terracotta/10 flex items-center justify-center p-3 border border-terracotta/5"
+        >
+          <div className="flex flex-col items-center">
+            <Wind size={32} className="text-terracotta" />
+            <div className="w-8 h-1 bg-terracotta/20 rounded-full mt-1" />
+          </div>
+        </motion.div>
+        <div className="text-center">
+          <h2 className="text-[10px] font-black text-mahogany uppercase tracking-[0.4em] animate-pulse mb-2">Initializing OS Kernels</h2>
+          <p className="text-[8px] font-bold text-terracotta/40 uppercase tracking-[0.2em]">Mission Bharari Protocol v5.0</p>
+        </div>
       </div>
     );
   }
@@ -1353,96 +1367,169 @@ export default function App() {
     }
 
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95, rotate: 0 }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-          className="bg-white border border-slate-200 rounded-3xl p-10 w-full max-w-md shadow-2xl"
-        >
-          <div className="text-center mb-10">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-xl shadow-blue-500/20">G</div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Garad Foundation</h1>
-            <p className="text-slate-500 text-[10px] mt-2 uppercase tracking-widest font-black">NGO Operating System</p>
-          </div>
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center relative overflow-hidden font-sans">
+        {/* Aesthetic Background Accents */}
+        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-terracotta/10 to-transparent pointer-events-none" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-terracotta/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-gold/10 rounded-full blur-3xl pointer-events-none" />
 
-          <form onSubmit={handleAuth} className="space-y-6">
-            {loginError && (
-              <div className="bg-red-50 text-red-600 p-4 rounded-xl text-xs font-bold border border-red-100 uppercase tracking-wider">
-                {loginError}
-              </div>
-            )}
-            {resetSent && (
-              <div className="bg-emerald-50 text-emerald-600 p-4 rounded-xl text-xs font-bold border border-emerald-100 uppercase tracking-wider">
-                Reset link sent! Check your inbox.
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Email Terminal</label>
-              <input 
-                type="email" 
-                value={loginEmail}
-                onChange={e => setLoginEmail(e.target.value)}
-                placeholder="identity@portal.com" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-sm"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Security Key</label>
-              <input 
-                type="password" 
-                value={loginPass}
-                onChange={e => setLoginPass(e.target.value)}
-                placeholder="••••••••" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all text-sm"
-                required
-              />
-              {!isSignUp && (
-                <div className="flex justify-end mt-2 px-1">
-                  <button 
-                    type="button"
-                    onClick={handleResetPassword}
-                    className="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors cursor-pointer"
-                  >
-                    Retrieve Credentials?
-                  </button>
-                </div>
-              )}
-            </div>
-            <button 
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] uppercase tracking-[0.2em] py-4.5 rounded-xl transition-all shadow-xl shadow-blue-500/25 active:scale-[0.98] mt-2"
+        <div className="w-full max-w-sm px-6 relative z-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+            className="flex flex-col items-center text-center mb-12"
+          >
+            {/* Logo Hero */}
+            <motion.div 
+              initial={{ scale: 0, rotate: -10 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', delay: 0.3, damping: 12, stiffness: 200 }}
+              className="w-32 h-32 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(166,58,27,0.15)] flex items-center justify-center mb-6 border border-terracotta/10 relative p-4"
             >
-              {isSignUp ? 'Register Operative' : 'Authorize Access'}
-            </button>
+              <div className="relative flex flex-col items-center">
+                <div className="flex items-center gap-0.5">
+                  <Wind size={48} className="text-terracotta transform -rotate-12" />
+                  <Star size={24} fill="currentColor" className="text-gold animate-pulse mb-6" />
+                </div>
+                <div className="w-16 h-1.5 bg-terracotta/20 rounded-full -mt-2" />
+                <p className="absolute -bottom-8 text-[8px] font-black text-terracotta/40 uppercase tracking-[0.2em] whitespace-nowrap">Asset: logo.png (missing)</p>
+              </div>
+            </motion.div>
 
-            <div className="flex flex-col gap-4 text-center pt-2">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-[10px] font-bold text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-colors"
-              >
-                {isSignUp ? 'Already registered? System Login' : 'First deployment? Initialize Account'}
-              </button>
-              
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-                <div className="relative flex justify-center"><span className="bg-white px-2 text-[8px] font-black text-slate-300 uppercase tracking-widest">OR</span></div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <h1 className="text-3xl font-black text-mahogany tracking-tighter uppercase leading-none mb-2">
+                MISSION BHARARI
+              </h1>
+              <p className="text-[10px] font-black text-terracotta/60 uppercase tracking-[0.4em] mb-1">
+                Powered by Garad Foundation
+              </p>
+              <p className="text-[11px] font-medium text-mahogany/40 italic font-serif">
+                "Garv Manusakicha"
+              </p>
+            </motion.div>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.6 }}
+            className="bg-white/70 backdrop-blur-xl border border-white rounded-[2.5rem] p-8 shadow-2xl shadow-terracotta/5"
+          >
+            <form onSubmit={handleAuth} className="space-y-5">
+              <AnimatePresence mode="wait">
+                {loginError && (
+                  <motion.div 
+                    initial={{ x: -10, opacity: 0 }}
+                    animate={{ x: [0, -10, 10, -10, 10, 0], opacity: 1 }}
+                    className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold border border-red-100 uppercase tracking-wider text-center"
+                  >
+                    {loginError}
+                  </motion.div>
+                )}
+                {resetSent && (
+                  <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl text-[10px] font-bold border border-emerald-100 uppercase tracking-wider text-center"
+                  >
+                    Reset link sent! Check your inbox.
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="space-y-1.5">
+                <label className="block text-[9px] font-black text-mahogany/40 uppercase tracking-[0.2em] px-2 italic">Sector Identity</label>
+                <input 
+                  type="email" 
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  placeholder="name@foundation.org" 
+                  className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-4 text-slate-900 placeholder-slate-300 focus:outline-none focus:border-terracotta focus:ring-4 focus:ring-terracotta/5 transition-all text-sm shadow-sm"
+                  required
+                />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsApplying(true)}
-                className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center px-2">
+                  <label className="text-[9px] font-black text-mahogany/40 uppercase tracking-[0.2em] italic">Access Key</label>
+                  {!isSignUp && (
+                    <button 
+                      type="button"
+                      onClick={handleResetPassword}
+                      className="text-[9px] font-black text-terracotta hover:text-mahogany uppercase tracking-widest transition-colors cursor-pointer"
+                    >
+                      Lost Key?
+                    </button>
+                  )}
+                </div>
+                <input 
+                  type="password" 
+                  value={loginPass}
+                  onChange={e => setLoginPass(e.target.value)}
+                  placeholder="••••••••" 
+                  className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-4 text-slate-900 placeholder-slate-300 focus:outline-none focus:border-terracotta focus:ring-4 focus:ring-terracotta/5 transition-all text-sm shadow-sm"
+                  required
+                />
+              </div>
+
+              <button 
+                type="submit"
+                disabled={isUpdateLoading}
+                className="w-full bg-terracotta hover:bg-mahogany text-white font-black text-[10px] uppercase tracking-[0.2em] py-5 rounded-2xl transition-all shadow-xl shadow-terracotta/25 active:scale-[0.98] mt-4 flex items-center justify-center gap-2 group"
               >
-                <Star size={12} fill="currentColor" /> Apply to Volunteer
+                {isUpdateLoading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    {isSignUp ? 'REGISTER OPERATIVE' : 'ACCESS COMMAND HUB'}
+                    <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </button>
-            </div>
-          </form>
-          <div className="text-center mt-10 pt-8 border-t border-slate-100">
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.3em]">System Build v4.2.0-LGT</p>
-          </div>
-        </motion.div>
+
+              <div className="pt-4 flex flex-col gap-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-[9px] font-black text-mahogany/30 hover:text-terracotta uppercase tracking-[0.15em] transition-colors"
+                >
+                  {isSignUp ? 'RETURN TO BASE LOGIN' : 'NEW ASSIGNMENT? INITIALIZE ACCOUNT'}
+                </button>
+                
+                <div className="flex items-center justify-center gap-4">
+                  <div className="h-[1px] flex-1 bg-mahogany/5" />
+                  <span className="text-[8px] font-black text-mahogany/20 uppercase tracking-widest italic">Mission Access</span>
+                  <div className="h-[1px] flex-1 bg-mahogany/5" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsApplying(true)}
+                  className="w-full py-4 rounded-2xl border border-mahogany/5 text-[9px] font-black text-mahogany/60 hover:bg-gold/10 hover:text-terracotta transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                >
+                  <Star size={14} fill="currentColor" className="text-gold" /> BECOME A VOLUNTEER
+                </button>
+              </div>
+            </form>
+          </motion.div>
+
+          {/* Footer Metadata */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+            className="text-center mt-12"
+          >
+            <p className="text-[9px] text-mahogany/20 font-black uppercase tracking-[0.5em]">
+              System Build 5.0.0 // Global Foundation OS
+            </p>
+          </motion.div>
+        </div>
       </div>
     );
   }
