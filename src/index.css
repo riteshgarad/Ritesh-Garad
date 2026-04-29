@@ -54,6 +54,28 @@
   padding-bottom: env(safe-area-inset-bottom, 24px);
 }
 
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility mt-safe {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Scrollbar refinement */
 ::-webkit-scrollbar {
   width: 6px;

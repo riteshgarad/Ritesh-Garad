@@ -241,7 +241,7 @@ export const MobileShell = ({
   return (
     <div className="min-h-screen bg-white lg:bg-slate-50 flex font-sans overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-80 bg-white border-r border-slate-100 flex-col shadow-2xl shadow-slate-200/50 z-50 rounded-r-[40px] fixed h-screen top-0 left-0">
+      <aside className="hidden lg:flex w-80 bg-white border-r border-slate-100 flex-col shadow-2xl shadow-slate-200/50 z-50 rounded-r-[40px] fixed h-screen top-0 left-0 pt-safe">
         <SidebarContent />
       </aside>
 
@@ -261,12 +261,12 @@ export const MobileShell = ({
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-[101] lg:hidden shadow-2xl rounded-r-[3rem] overflow-hidden"
+              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-[101] lg:hidden shadow-2xl rounded-r-[3rem] overflow-hidden pt-safe"
             >
               <SidebarContent />
               <button 
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-xl"
+                className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-xl mt-safe"
               >
                 <X size={20} />
               </button>
@@ -278,7 +278,7 @@ export const MobileShell = ({
       {/* Main Layout Container */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden lg:ml-80">
         {/* Top App Bar */}
-        <header className="h-16 lg:h-20 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40">
+        <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-safe h-[calc(64px+env(safe-area-inset-top))] sm:h-[calc(80px+env(safe-area-inset-top))]">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
@@ -313,7 +313,7 @@ export const MobileShell = ({
         </header>
 
         {/* Main Scrolling Content Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-10 bg-slate-50/30">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-10 bg-slate-50/30 max-w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={activePath}
@@ -329,7 +329,7 @@ export const MobileShell = ({
         </main>
 
         {/* Mobile-Only Bottom Navigation (Simplified for focus) */}
-        <nav className="lg:hidden h-20 bg-white border-t border-slate-100 flex items-center justify-around px-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+        <nav className="lg:hidden h-[calc(80px+env(safe-area-inset-bottom,24px))] bg-white border-t border-slate-100 flex items-center justify-around px-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
           {[
             { id: 'dashboard', icon: Home, label: 'Hub' },
             { id: 'projects', icon: Target, label: 'Missions' },

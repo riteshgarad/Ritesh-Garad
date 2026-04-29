@@ -2147,7 +2147,7 @@ const PageView = ({
       return <ChatbotView projects={projects} tasks={tasks} volunteers={volunteers} />;
     case 'create':
       return (
-        <div className="space-y-6 pt-4 text-left">
+        <div className="space-y-6 pt-safe text-left">
           <div className="px-2">
             <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">Operational Quick Launch</h2>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Deploy new assets or initialize mission parameters</p>
@@ -2245,8 +2245,8 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
   return (
     <div className="space-y-10">
       {/* Mobile-only Sector Quick Access */}
-      <div className="lg:hidden -mx-4 px-4 overflow-x-auto no-scrollbar pb-2">
-          <div className="flex gap-3">
+      <div className="lg:hidden -mx-4 px-4 overflow-x-auto no-scrollbar pb-2 max-w-full">
+          <div className="flex gap-3 w-fit">
             {Object.keys(DEPT_COLORS).map(dept => (
               <div key={dept} className="shrink-0 flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: DEPT_COLORS[dept][1] }} />
