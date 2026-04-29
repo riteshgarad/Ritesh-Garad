@@ -919,7 +919,8 @@ export default function App() {
       return;
     }
     try {
-      const project = projects.find(p => p.id === taskData.projectId);
+      // Find project safely to avoid property access on undefined/null
+      const project = projects.find(p => p && p.id === taskData.projectId);
       await addDoc(collection(db, 'tasks'), {
         ...taskData,
         projectName: project?.name || 'Unknown Project',
@@ -931,7 +932,7 @@ export default function App() {
       
       logActivity({
         type: 'system',
-        message: `New data bridge created: "${taskData.title}" for ${project?.name}`,
+        message: `New data bridge created: "${taskData.title}" for ${project?.name || 'Unknown'}`,
         projectId: taskData.projectId,
         projectName: project?.name
       });
@@ -1332,7 +1333,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-4">
         <motion.div 
-          animate={{ scale: [1, 1.1, 1], rotate: [0, 90, 0] }}
+          animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 2, repeat: Infinity }}
           className="w-12 h-12 bg-blue-600 rounded-xl mb-6 shadow-2xl shadow-blue-500/50"
         />
@@ -1354,8 +1355,8 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, scale: 0.95, rotate: 0 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
           className="bg-white border border-slate-200 rounded-3xl p-10 w-full max-w-md shadow-2xl"
         >
           <div className="text-center mb-10">
@@ -2237,9 +2238,33 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
     { label: 'Fiscal Allocation', value: '₹12.4L', icon: IndianRupee, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
   ];
 
+  const functionalNodes = [
+    { id: 'dashboard', label: 'Command Hub', icon: LayoutDashboard, desc: 'Root system overview' },
+    { id: 'projects', label: 'Mission Data', icon: FolderKanban, desc: 'Project lifecycle mgmt' },
+    { id: 'tasks', label: 'Node Engine', icon: CheckSquare, desc: 'Operational task flow' },
+    { id: 'volunteers', label: 'Unit Directory', icon: Users, desc: 'Personnel records' },
+    { id: 'finance', label: 'Resource Cell', icon: IndianRupee, desc: 'Financial oversight' },
+    { id: 'docs', label: 'Signal Vault', icon: FileText, desc: 'Document protocol' },
+    { id: 'social-media', label: 'Comm Link', icon: Share2, desc: 'Outreach & visibility' },
+    { id: 'public-relations', label: 'PR portal', icon: Megaphone, desc: 'Public relations' },
+    { id: 'chatbot', label: 'AI Oracle', icon: Bot, desc: 'Mission intelligence' },
+  ];
+
   return (
     <div className="space-y-10">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      {/* Mobile-only Sector Quick Access */}
+      <div className="lg:hidden -mx-4 px-4 overflow-x-auto no-scrollbar pb-2">
+          <div className="flex gap-3">
+            {Object.keys(DEPT_COLORS).map(dept => (
+              <div key={dept} className="shrink-0 flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: DEPT_COLORS[dept][1] }} />
+                <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{dept}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, i) => (
           <div key={i} className="metric-card shadow-xl shadow-slate-200/50 p-5 md:p-7 group hover:translate-y-[-2px] transition-all border-slate-100 bg-white rounded-[24px] md:rounded-[32px]">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
