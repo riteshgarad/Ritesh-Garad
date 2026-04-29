@@ -2244,18 +2244,6 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
 
   return (
     <div className="space-y-10">
-      {/* Mobile-only Sector Quick Access */}
-      <div className="lg:hidden -mx-4 px-4 overflow-x-auto no-scrollbar pb-2 max-w-full">
-          <div className="flex gap-3 w-fit">
-            {Object.keys(DEPT_COLORS).map(dept => (
-              <div key={dept} className="shrink-0 flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: DEPT_COLORS[dept][1] }} />
-                <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{dept}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, i) => (
           <div key={i} className="metric-card shadow-xl shadow-slate-200/50 p-5 md:p-7 group hover:translate-y-[-2px] transition-all border-slate-100 bg-white rounded-[24px] md:rounded-[32px]">

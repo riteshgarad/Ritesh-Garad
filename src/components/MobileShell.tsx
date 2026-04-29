@@ -278,7 +278,7 @@ export const MobileShell = ({
       {/* Main Layout Container */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden lg:ml-80">
         {/* Top App Bar */}
-        <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-4 h-auto min-h-[80px]">
+        <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-[calc(env(safe-area-inset-top,24px)+24px)] pb-6 h-auto min-h-[100px]">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
