@@ -91,15 +91,23 @@ export default function AddExpenseRequestModal({ isOpen, onClose, user }: AddExp
         }).catch(err => console.error('Notification trigger failed', err));
       }
 
-      // Automated Email Notification to Finance Head
-      await sendEmail({
-        type: 'REQUEST_TO_FINANCE',
-        amount: formData.amount,
-        requesterName: user.name,
-        requesterEmail: user.email,
-        message: formData.professionalMessage,
-        subject: `[FISCAL ALERT] New Expense Request: ₹${formData.amount} - ${user.name}`
-      });
+      // 4. INDEPENDENT EMAIL AUTOMATION
+      try {
+        await sendEmail({
+          requesterEmail: user.email, // In this case, we notify the admin about this user's request
+          amount: formData.amount,
+          requesterName: user.name,
+          status: 'Pending Review',
+          message: formData.professionalMessage,
+          type: 'REQUEST_TO_FINANCE'
+        });
+      } catch (mailError) {
+        console.error("[Email Failure] Mobile Diagnostic:", mailError);
+        toast("Request saved, but notification email could not be sent.", {
+          icon: '⚠️',
+          duration: 6000
+        });
+      }
       
       setFormData({
         amount: '',

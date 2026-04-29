@@ -1,40 +1,49 @@
 import { auth } from '../App';
 
 export async function sendEmail(payload: { 
-  type?: 'REQUEST_TO_FINANCE' | 'DECISION_TO_VOLUNTEER';
-  to?: string; 
-  subject?: string; 
-  html?: string; 
-  text?: string;
-  amount?: string;
+  requesterEmail: string; 
+  amount: string;
+  status: string;
   requesterName?: string;
-  requesterEmail?: string;
   message?: string;
-  status?: string;
   reason?: string;
+  type?: string;
 }) {
+  const ABSOLUTE_URL = 'https://ritesh-garad.vercel.app/api/send-email';
+  
   try {
-    const user = auth.currentUser;
-    if (!user) throw new Error('User not authenticated');
-
-    const token = await user.getIdToken();
-    const response = await fetch('/api/automation/send-email', {
+    console.log('[Email Trigger] Dispatching to absolute endpoint:', ABSOLUTE_URL, payload);
+    
+    // Using absolute URL to bypass mobile wrapper relative-path limitations
+    const response = await fetch(ABSOLUTE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to send email');
+      const errorText = await response.text();
+      let errorMessage = 'Failed to send email';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorMessage;
+      } catch (e) {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
-    return await response.json();
-  } catch (error) {
-    console.error('[Email Service Error]:', error);
+    const result = await response.json();
+    console.log('[Email Trigger] Transmission Success:', result);
+    return result;
+  } catch (error: any) {
+    console.error('[Email Trigger] Fatal Error detected in mobile environment:', error);
+    // Log detailed error for mobile console debugging
+    if (error.message === 'Failed to fetch') {
+      console.error('[CORS/Network] Fetch failed. This usually indicates a CORS blockage or missing absolute URL.');
+    }
     throw error;
   }
 }

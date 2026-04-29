@@ -190,18 +190,11 @@ export const VolunteerDirectory = ({
       // 3. Send Notification
       try {
         await sendEmail({
-          to: volunteer.email,
-          subject: `[MISSION DRAFT] Assigned to: ${project.name}`,
-          html: `
-            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #1e3a8a; border-radius: 12px; background-color: #f0f7ff;">
-              <h2 style="color: #1e40af; text-transform: uppercase;">You Have Been Drafted</h2>
-              <p>Hello ${volunteer.name},</p>
-              <p>You have been officially assigned to the mission: <strong>${project.name}</strong>.</p>
-              <p>Please check your Task Board for your initial objectives and coordination parameters.</p>
-              <hr style="border: 0; border-top: 1px solid #bfdbfe; margin: 20px 0;" />
-              <p style="font-size: 12px; color: #64748b;">Mission Control Intelligence Hub.</p>
-            </div>
-          `
+          requesterEmail: volunteer.email,
+          amount: '0',
+          status: 'MISSION_DRAFTED',
+          requesterName: volunteer.name,
+          message: `You have been officially drafted into the mission: ${project.name}`
         });
       } catch (e) {
         console.warn("Email notification failed, but data saved.");

@@ -677,18 +677,11 @@ export default function App() {
         const projectDoc = projects.find(p => p.id === projectId);
         if (projectDoc) {
           await sendEmail({
-            to: projectDoc.creator_email || "riteshgarad4@gmail.com",
-            subject: `[MISSION UPDATE] ${projectDoc.name} Status: ${newStatus.toUpperCase()}`,
-            html: `
-              <div style="font-family: sans-serif; padding: 20px; border: 1px solid #1e3a8a; border-radius: 12px; background-color: #f8fafc;">
-                <h2 style="color: #1e40af;">Project Status Update</h2>
-                <p>Hello,</p>
-                <p>The mission <strong>${projectDoc.name}</strong> has been updated to status: <strong>${newStatus.toUpperCase()}</strong>.</p>
-                ${reason ? `<div style="background-color: white; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Note/Reason:</strong> ${reason}</p></div>` : ''}
-                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-                <p style="font-size: 12px; color: #64748b;">Mission Control Automated Signal.</p>
-              </div>
-            `
+            requesterEmail: projectDoc.creator_email || "riteshgarad4@gmail.com",
+            amount: "0", // Contextual for project status
+            status: newStatus.toUpperCase(),
+            requesterName: projectDoc.name,
+            reason: reason
           });
         }
       } catch (err) {

@@ -102,19 +102,17 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
       // PHASE 2: INDEPENDENT EMAIL AUTOMATION
       try {
         await sendEmail({
-          type: 'DECISION_TO_VOLUNTEER',
-          to: request.requesterEmail,
+          requesterEmail: request.requesterEmail,
           amount: request.amount.toString(),
           requesterName: request.requesterName,
-          requesterEmail: request.requesterEmail,
           status: 'Approved',
-          subject: `[FISCAL CLEARANCE] Expense Request Approved: ₹${request.amount}`
+          message: request.professionalMessage || request.description
         });
       } catch (mailError) {
-        console.error("Mail Error:", mailError);
-        toast("Email could not be sent, but budget is securely approved.", {
+        console.error("[Email Failure] Mobile Diagnostic:", mailError);
+        toast("Request saved, but notification email could not be sent.", {
           icon: '⚠️',
-          duration: 4000
+          duration: 6000
         });
       }
 
@@ -167,19 +165,18 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
       // PHASE 2: INDEPENDENT EMAIL AUTOMATION
       try {
         await sendEmail({
-          type: 'DECISION_TO_VOLUNTEER',
-          to: selectedRequest.requesterEmail,
+          requesterEmail: selectedRequest.requesterEmail,
           amount: selectedRequest.amount.toString(),
           requesterName: selectedRequest.requesterName,
-          requesterEmail: selectedRequest.requesterEmail,
           status: 'Rejected',
           reason: rejectionReason,
-          subject: `[FISCAL NOTICE] Expense Request Declined: ₹${selectedRequest.amount}`
+          message: selectedRequest.professionalMessage || selectedRequest.description
         });
       } catch (mailError) {
-        console.error("Mail Error:", mailError);
-        toast("Notification email could not be sent, but decision is logged.", {
-          icon: '⚠️'
+        console.error("[Email Failure] Mobile Diagnostic:", mailError);
+        toast("Request saved, but notification email could not be sent.", {
+          icon: '⚠️',
+          duration: 6000
         });
       }
 

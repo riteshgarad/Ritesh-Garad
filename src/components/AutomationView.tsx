@@ -66,18 +66,11 @@ export default function AutomationView() {
     setIsSendingTest(true);
     try {
       await sendEmail({
-        to: testEmail,
-        subject: 'NGO Mission Control - Automation Test',
-        html: `
-          <div style="font-family: sans-serif; padding: 40px; background-color: #f8fafc; border-radius: 24px;">
-            <h1 style="color: #1e293b; margin-bottom: 16px;">System Pulse Normal</h1>
-            <p style="color: #64748b; font-size: 16px;">This is an automated test signal from your NGO Command Center.</p>
-            <div style="margin-top: 32px; padding: 20px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
-              <p style="margin: 0; font-weight: bold; color: #3b82f6;">Status: TRANSMITTING</p>
-              <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">Timestamp: ${new Date().toISOString()}</p>
-            </div>
-          </div>
-        `
+        requesterEmail: testEmail,
+        amount: '1.00',
+        status: 'SYSTEM_TEST',
+        requesterName: 'Automation Core',
+        message: 'System Pulse Normal. This is an automated test signal from your NGO Command Center.'
       });
       toast.success('Test Transmission Cleared');
       setTestEmail('');
