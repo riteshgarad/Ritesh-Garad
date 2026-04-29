@@ -9,6 +9,8 @@ import FinanceDashboard from './components/FinanceDashboard';
 import SocialMediaDashboard from './components/SocialMediaDashboard';
 import PublicRelationsDashboard from './components/PublicRelationsDashboard';
 import UserManagement from './components/UserManagement';
+import AutomationView from './components/AutomationView';
+import { sendEmail } from './services/emailService';
 import { BudgetPlanner } from './components/BudgetPlanner';
 import { DocumentVault } from './components/DocumentVault';
 import { FileUploadModal } from './components/FileUploadModal';
@@ -670,6 +672,29 @@ export default function App() {
 
       await updateDoc(projectRef, updateData);
 
+      // Automated Email Notification for status change
+      try {
+        const projectDoc = projects.find(p => p.id === projectId);
+        if (projectDoc) {
+          await sendEmail({
+            to: projectDoc.creator_email || "riteshgarad4@gmail.com",
+            subject: `[MISSION UPDATE] ${projectDoc.name} Status: ${newStatus.toUpperCase()}`,
+            html: `
+              <div style="font-family: sans-serif; padding: 20px; border: 1px solid #1e3a8a; border-radius: 12px; background-color: #f8fafc;">
+                <h2 style="color: #1e40af;">Project Status Update</h2>
+                <p>Hello,</p>
+                <p>The mission <strong>${projectDoc.name}</strong> has been updated to status: <strong>${newStatus.toUpperCase()}</strong>.</p>
+                ${reason ? `<div style="background-color: white; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Note/Reason:</strong> ${reason}</p></div>` : ''}
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+                <p style="font-size: 12px; color: #64748b;">Mission Control Automated Signal.</p>
+              </div>
+            `
+          });
+        }
+      } catch (err) {
+        console.warn("Project status email notification failed:", err);
+      }
+
       // Trigger Auto-Report Generation if completed
       if (newStatus === 'completed') {
         const proj = projects.find(p => p.id === projectId);
@@ -1318,7 +1343,7 @@ export default function App() {
     }
 
     // Finance/Volunteers/Automation are generally restricted to admins or specific roles
-    if (['finance', 'volunteers', 'automation', 'users'].includes(item.id)) return false;
+    if (user.role !== 'Admin' && ['finance', 'volunteers', 'automation', 'users'].includes(item.id)) return false;
 
     // Others (General/Projects/Documentation) are generally visible
     if (['social-media', 'public-relations'].includes(item.id)) return false;
@@ -2205,6 +2230,8 @@ const PageView = ({
       return <PublicRelationsDashboard user={user} />;
     case 'users':
       return <UserManagement currentUser={user} />;
+    case 'automation':
+      return <AutomationView />;
     case 'expense-approvals':
       return <ExpenseApprovalDashboard user={user} requests={expenseRequests} />;
     case 'create':

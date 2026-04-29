@@ -286,6 +286,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role", "isActive"]
+    },
+    "automation_logs": {
+      "title": "Automation Log",
+      "description": "Record of triggered automation events and email status.",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "type": { "type": "string" },
+        "recipient": { "type": "string" },
+        "status": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "details": { "type": "string" }
+      },
+      "required": ["action", "status", "timestamp"]
     }
   },
   "firestore": {
@@ -352,6 +366,10 @@
     "/activity_logs/{logId}": {
       "schema": "ActivityLog",
       "description": "Live feed of mission orchestration events."
+    },
+    "/automation_logs/{logId}": {
+      "schema": "automation_logs",
+      "description": "Historical record of autonomous pulse transmissions."
     }
   }
 }

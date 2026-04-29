@@ -35,8 +35,6 @@ export async function sendEmail(payload: {
     return await response.json();
   } catch (error) {
     console.error('[Email Service Error]:', error);
-    // Don't throw error to prevent UI blocking, just log it. 
-    // We can show a toast from the caller if needed.
-    return { success: false, error };
+    throw error;
   }
 }

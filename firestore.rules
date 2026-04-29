@@ -145,6 +145,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
     }
+
+    match /automation_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only server via Admin SDK can write
+    }
     
     match /work_logs/{logId} {
       allow read: if isSignedIn();

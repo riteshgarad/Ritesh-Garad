@@ -210,7 +210,7 @@ export default function AddExpenseRequestModal({ isOpen, onClose, user }: AddExp
                 onChange={e => setFormData({ ...formData, professionalMessage: e.target.value })}
               />
             </div>
-            <p className="text-[9px] text-slate-400 font-bold px-4 italic">Note: This will be reviewed as a formal request by the Finance Head (Yukta).</p>
+            <p className="text-[9px] text-slate-400 font-bold px-4 italic">Note: This will be reviewed as a formal request by the Finance Head.</p>
           </div>
 
           <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 flex gap-4">

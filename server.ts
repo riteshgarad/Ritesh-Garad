@@ -124,10 +124,29 @@ async function startServer() {
       let emailOptions: any = {};
 
       if (type === 'REQUEST_TO_FINANCE') {
+        // Dynamically identify Finance Head recipients
+        let financeHeadEmails = ["riteshgarad4@gmail.com"]; // Fallback to Admin
+        try {
+          const financeHeadsSnap = await db.collection('users')
+            .where('department', '==', 'Finance')
+            .where('role', 'in', ['Department Head', 'Dept Head', 'Admin'])
+            .get();
+          
+          if (!financeHeadsSnap.empty) {
+            const foundEmails = financeHeadsSnap.docs.map(doc => doc.data().email).filter(e => !!e);
+            if (foundEmails.length > 0) {
+              financeHeadEmails = foundEmails;
+            }
+          }
+          console.log(`[Email Automation] Identified Finance Heads: ${financeHeadEmails.join(', ')}`);
+        } catch (dbErr) {
+          console.warn("[Email Automation] DB lookup for Finance Head failed, using fallback.");
+        }
+
         // Notify Finance Head
         emailOptions = {
           from: "NGO Mission Control <notifications@resend.dev>",
-          to: "yukta-finance-head@gmail.com", // Finance Head Email
+          to: financeHeadEmails,
           subject: subject || `[FISCAL ALERT] New Expense Request: ₹${amount || '0'}`,
           html: html || `<div style="font-family: sans-serif; padding: 20px;">
             <h2 style="color: #1e40af;">New Expense Authorization Required</h2>
@@ -164,9 +183,39 @@ async function startServer() {
       }
 
       const data = await resend.emails.send(emailOptions);
+      
+      // Log to automation_logs for visibility in the dashboard
+      try {
+        await db.collection('automation_logs').add({
+          action: 'Email Dispatch',
+          type: type || 'GENERIC',
+          recipient: emailOptions.to,
+          subject: emailOptions.subject,
+          status: 'success',
+          resendId: data.data?.id,
+          timestamp: FieldValue.serverTimestamp(),
+          details: `Autonomous signal transmitted to ${Array.isArray(emailOptions.to) ? emailOptions.to.join(', ') : emailOptions.to}`
+        });
+      } catch (logErr) {
+        console.error("Failed to log automation event:", logErr);
+      }
+
       res.json({ success: true, id: data.data?.id });
     } catch (error: any) {
       console.error("[Resend Error]:", error);
+      
+      // Log failure
+      try {
+        await db.collection('automation_logs').add({
+          action: 'Email Dispatch',
+          type: type || 'GENERIC',
+          status: 'error',
+          error: error.message,
+          timestamp: FieldValue.serverTimestamp(),
+          details: `Transmission failure: ${error.message}`
+        });
+      } catch (logErr) {}
+
       res.status(500).json({ error: error.message });
     }
   });
