@@ -287,7 +287,7 @@ const NotificationPanel = ({
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'chatbot' | 'automation' | 'project-detail' | 'users' | 'expense-approvals';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'chatbot' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -1457,17 +1457,11 @@ export default function App() {
         title={PAGE_TITLES[currentPage as Page] || currentPage}
         user={user}
         hasNotifications={unreadCount > 0}
+        projectsCount={projects.length}
+        pendingApprovalsCount={expenseRequests.filter(r => r.status === 'pending').length}
+        tasksCount={tasks.filter(t => t.status !== 'done' && t.status !== 'completed').length}
       >
-        {/* Content area is now managed by MobileShell, but we keep the child logic here */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, scale: 0.98, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: -10 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          >
-            <PageView 
+        <PageView 
               page={currentPage} 
               user={user} 
               projects={projects} 
@@ -1514,8 +1508,6 @@ export default function App() {
               activityLogs={activityLogs}
               setProofTaskTargetId={setProofTaskTargetId}
             />
-          </motion.div>
-        </AnimatePresence>
       </MobileShell>
 
       <AnimatePresence>
@@ -3535,18 +3527,22 @@ const downloadCSV = (data: any[], filename: string) => {
 const INITIALS = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
 
 const PAGE_TITLES: Record<Page, string> = {
-  dashboard: 'Dashboard Overview',
-  projects: 'Project Portfolio',
-  tasks: 'Task Board',
-  volunteers: 'Volunteer Network',
-  finance: 'Financial Ledger',
-  docs: 'Documentation Hub',
-  'social-media': 'Social Media Pipeline',
-  'public-relations': 'Public Relations & Branding',
-  'users': 'Identity & Permissions',
-  fundraising: 'Fundraising Campaigns',
-  chatbot: 'AI Assistant',
-  automation: 'Automation Lab',
-  'project-detail': 'Project Details',
-  'expense-approvals': 'Expense Approval Command Center'
+  'dashboard': 'Command Hub',
+  'projects': 'Active Missions',
+  'tasks': 'Operational Force Board',
+  'volunteers': 'Unit Records',
+  'finance': 'Resource Cell / Ledger',
+  'docs': 'Protocols Vault',
+  'social-media': 'Social Link Pipeline',
+  'public-relations': 'Media Relations',
+  'fundraising': 'Capital Inflow',
+  'chatbot': 'Mission AI Oracle',
+  'automation': 'Workflow Automata',
+  'project-detail': 'Mission Briefing',
+  'users': 'Cyber Access Control',
+  'expense-approvals': 'Financial Authorizations',
+  'roadmap': 'Strategic Roadmap',
+  'new-proposal': 'Mission Proposal',
+  'finance-requests': 'Resource Requisition',
+  'kyc': 'Personnel Authentication'
 };

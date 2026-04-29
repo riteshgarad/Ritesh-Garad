@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, 
@@ -9,11 +9,19 @@ import {
   Bell,
   Menu,
   ChevronLeft,
+  ChevronDown,
   Settings,
   IndianRupee,
   Bot,
   Share2,
-  Clock
+  Clock,
+  Layout,
+  Users,
+  ShieldCheck,
+  Megaphone,
+  Globe,
+  Database,
+  X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -25,6 +33,9 @@ interface MobileShellProps {
   hasNotifications?: boolean;
   onNotifClick?: () => void;
   user?: any;
+  projectsCount?: number;
+  pendingApprovalsCount?: number;
+  tasksCount?: number;
 }
 
 export const MobileShell = ({ 
@@ -34,137 +45,282 @@ export const MobileShell = ({
   title, 
   hasNotifications,
   onNotifClick,
-  user
+  user,
+  projectsCount = 0,
+  pendingApprovalsCount = 0,
+  tasksCount = 0
 }: MobileShellProps) => {
-  const navItems = [
-    { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Command Hub' },
-    { id: 'projects', icon: Target, label: 'Missions', desc: 'Project lifecycle' },
-    { id: 'tasks', icon: Clock, label: 'Task flow', desc: 'Operational nodes' },
-    { id: 'volunteers', icon: User, label: 'Unit records', desc: 'Personnel data' },
-    { id: 'finance', icon: IndianRupee, label: 'Resource Cell', desc: 'Financial oversight' },
-    { id: 'docs', icon: FileText, label: 'Signal Vault', desc: 'Document protocol' },
-    { id: 'social-media', icon: Share2, label: 'Comm Link', icon_alt: 'Social' },
-    { id: 'chatbot', icon: Bot, label: 'AI Oracle', desc: 'Mission intelligence' },
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['missions', 'finance']);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const toggleMenu = (id: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const navigation = [
+    { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Home Hub' },
+    { 
+      id: 'missions', 
+      icon: Target, 
+      label: 'Missions', 
+      subs: [
+        { id: 'projects', label: 'Active Missions' },
+        { id: 'roadmap', label: 'Strategic Roadmap' },
+        { id: 'new-proposal', label: 'Draft Proposal' }
+      ]
+    },
+    { 
+      id: 'finance', 
+      icon: IndianRupee, 
+      label: 'Finance Command',
+      subs: [
+        { id: 'expense-approvals', label: 'Authorizations', roles: ['Admin', 'Department Head'] },
+        { id: 'finance-requests', label: 'Fund Requests' },
+        { id: 'finance', label: 'Digital Ledger' }
+      ]
+    },
+    { 
+      id: 'network', 
+      icon: Users, 
+      label: 'Personnel Network',
+      subs: [
+        { id: 'volunteers', label: 'Unit Directory' },
+        { id: 'users', label: 'Access Control', roles: ['Admin'] },
+        { id: 'kyc', label: 'Verified Credentials' }
+      ]
+    },
+    { 
+      id: 'media', 
+      icon: Megaphone, 
+      label: 'Communications',
+      subs: [
+        { id: 'social-media', label: 'Social Pipeline' },
+        { id: 'public-relations', label: 'PR & Outreach' }
+      ]
+    },
+    { id: 'docs', icon: FileText, label: 'Protocols Vault' },
+    { id: 'tasks', icon: Layout, label: 'Force Board' },
+    { id: 'chatbot', icon: Bot, label: 'Neural Assistant' },
   ];
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex font-sans overflow-hidden">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-72 bg-white border-r border-slate-200 flex-col shadow-xl shadow-slate-200/20 z-50">
-        <div className="p-8 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-            <Target size={24} />
-          </div>
-          <div>
-            <h1 className="text-sm font-black uppercase tracking-widest text-slate-900 leading-none mb-1">GF OS</h1>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Internal Sector</p>
-          </div>
+  const handleNavClick = (id: string) => {
+    onNavigate(id);
+    setIsMobileMenuOpen(false);
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full bg-white font-sans">
+      <div className="p-8 flex items-center gap-4">
+        <div className="w-10 h-10 bg-purple-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-purple-200">
+          <Target size={22} className="rotate-12" />
         </div>
+        <div>
+          <h1 className="text-sm font-black uppercase tracking-widest text-slate-900 leading-none mb-1">Garad Hub</h1>
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Operation: Mission Bharari</p>
+        </div>
+      </div>
 
-        <nav className="flex-1 overflow-y-auto p-6 space-y-2">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">Operational Nodes</h3>
-          {navItems.map((item) => {
-            const isActive = activePath === item.id;
-            const Icon = item.icon;
-            
-            if (item.id === 'create') return null;
+      <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1 custom-scrollbar">
+        {navigation.map((item) => {
+          const isMenuActive = activePath === item.id || item.subs?.some(s => s.id === activePath);
+          const isExpanded = expandedMenus.includes(item.id);
+          const Icon = item.icon;
 
-            return (
+          return (
+            <div key={item.id} className="space-y-1">
               <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => item.subs ? toggleMenu(item.id) : handleNavClick(item.id)}
                 className={cn(
-                  "w-full flex items-center gap-4 p-4 rounded-2xl transition-all group border",
-                  isActive 
-                    ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-200" 
-                    : "bg-transparent border-transparent text-slate-500 hover:bg-slate-50 hover:border-slate-100"
+                  "w-full flex items-center justify-between p-3.5 rounded-2xl transition-all group",
+                  isMenuActive 
+                    ? "text-purple-600" 
+                    : "text-slate-500 hover:bg-slate-50"
                 )}
               >
-                <div className={cn(
-                  "p-2 rounded-xl transition-all",
-                  isActive ? "bg-white/10 text-white" : "bg-slate-100 text-slate-400 group-hover:bg-white group-hover:text-blue-600 group-hover:shadow-sm"
-                )}>
-                  <Icon size={18} />
+                <div className="flex items-center gap-3.5">
+                  <div className={cn(
+                    "p-2 rounded-xl transition-all",
+                    isMenuActive 
+                      ? "bg-purple-50 text-purple-600" 
+                      : "bg-transparent text-slate-400 group-hover:text-purple-600"
+                  )}>
+                    <Icon size={18} />
+                  </div>
+                  <span className={cn(
+                    "text-[11px] font-black uppercase tracking-tight",
+                    isMenuActive ? "text-purple-700" : "text-slate-600"
+                  )}>{item.label}</span>
                 </div>
-                <div className="text-left">
-                  <p className="text-[11px] font-black uppercase tracking-tight leading-none">{item.label}</p>
-                  <p className={cn(
-                    "text-[8px] font-bold uppercase tracking-widest mt-1",
-                    isActive ? "text-white/40" : "text-slate-400"
-                  )}>{item.desc}</p>
-                </div>
+                {item.subs && (
+                  <div className="flex items-center gap-2">
+                    {item.id === 'missions' && projectsCount > 0 && (
+                      <span className="w-5 h-5 bg-purple-100 text-purple-600 text-[9px] font-black flex items-center justify-center rounded-full">
+                        {projectsCount}
+                      </span>
+                    )}
+                    {item.id === 'finance' && pendingApprovalsCount > 0 && (
+                      <span className="w-5 h-5 bg-red-100 text-red-600 text-[9px] font-black flex items-center justify-center rounded-full">
+                        {pendingApprovalsCount}
+                      </span>
+                    )}
+                    <ChevronDown 
+                      size={14} 
+                      className={cn(
+                        "transition-transform text-slate-400",
+                        isExpanded ? "rotate-180" : ""
+                      )} 
+                    />
+                  </div>
+                )}
+                {!item.subs && item.id === 'tasks' && tasksCount > 0 && (
+                  <span className="w-5 h-5 bg-blue-100 text-blue-600 text-[9px] font-black flex items-center justify-center rounded-full">
+                    {tasksCount}
+                  </span>
+                )}
               </button>
-            );
-          })}
 
-          <div className="pt-8 space-y-4">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">Quick Action</h3>
-            <button 
-              onClick={() => onNavigate('create')}
-              className="w-full flex items-center justify-center gap-3 p-5 bg-blue-600 text-white rounded-[2rem] shadow-xl shadow-blue-500/20 hover:scale-[1.02] active:scale-95 transition-all text-[11px] font-black uppercase tracking-[0.2em]"
-            >
-              <Plus size={18} />
-              <span>Deploy Asset</span>
-            </button>
-          </div>
-        </nav>
+              {item.subs && isExpanded && (
+                <div className="ml-10 space-y-1 border-l-2 border-slate-50 pl-4 py-1">
+                  {item.subs.map(sub => {
+                    if (sub.roles && user && !sub.roles.includes(user.role)) return null;
+                    const isSubActive = activePath === sub.id;
+                    return (
+                      <button
+                        key={sub.id}
+                        onClick={() => handleNavClick(sub.id)}
+                        className={cn(
+                          "w-full text-left py-2.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                          isSubActive 
+                            ? "text-purple-600 bg-purple-50/50" 
+                            : "text-slate-400 hover:text-slate-900 hover:translate-x-1"
+                        )}
+                      >
+                        {sub.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
-        <div className="p-6 border-t border-slate-100">
-           <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-black text-sm">
-                {user?.name?.charAt(0) || 'U'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-black text-slate-900 uppercase truncate">{user?.name || 'Operative'}</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{user?.role || 'Guest'}</p>
-              </div>
-           </div>
+        <div className="pt-6 mt-6 border-t border-slate-50 px-2">
+          <button 
+            onClick={() => handleNavClick('create')}
+            className="w-full flex items-center justify-center gap-3 p-4 bg-slate-900 text-white rounded-[2rem] shadow-xl shadow-slate-200 hover:bg-purple-600 active:scale-95 transition-all text-[10px] font-black uppercase tracking-[0.2em]"
+          >
+            <Plus size={16} />
+            <span>Deploy Initiative</span>
+          </button>
         </div>
+      </nav>
+
+      <div className="p-6 border-t border-slate-50">
+         <div className="bg-slate-50 rounded-[2rem] p-4 flex items-center gap-3 border border-slate-100">
+            <div className="w-10 h-10 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600 font-black text-xs shadow-sm">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-black text-slate-900 uppercase truncate">{user?.name || 'Operative'}</p>
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                <ShieldCheck size={10} className="text-purple-600 shrink-0" />
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">{user?.role || 'Guest'}</p>
+              </div>
+            </div>
+            <button className="p-2 text-slate-300 hover:text-slate-900 transition-colors">
+              <Settings size={14} />
+            </button>
+         </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-white lg:bg-slate-50 flex font-sans overflow-hidden">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex w-80 bg-white border-r border-slate-100 flex-col shadow-2xl shadow-slate-200/50 z-50 rounded-r-[40px] fixed h-screen top-0 left-0">
+        <SidebarContent />
       </aside>
 
+      {/* Mobile Menu Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] lg:hidden"
+            />
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-[101] lg:hidden shadow-2xl rounded-r-[3rem] overflow-hidden"
+            >
+              <SidebarContent />
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-xl"
+              >
+                <X size={20} />
+              </button>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Main Layout Container */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Top App Bar (Always visible but styled differently for lg) */}
-        <header className="h-16 lg:h-20 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-6 lg:px-10 z-40">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden lg:ml-80">
+        {/* Top App Bar */}
+        <header className="h-16 lg:h-20 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40">
           <div className="flex items-center gap-4">
-            <div className="lg:hidden w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2 text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="hidden sm:block lg:hidden w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white">
               <Target size={18} />
             </div>
             <div>
-              <h1 className="text-sm font-black uppercase tracking-widest text-slate-900 leading-none">{title}</h1>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">Sector 7-G / Node Status: Optimal</p>
+              <h1 className="text-xs lg:text-sm font-black uppercase tracking-[0.2em] text-slate-900 leading-none">{title}</h1>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 hidden sm:block">Sector 7-G / Node Protocol v2.4</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="hidden sm:flex flex-col text-right mr-2">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Core Time</span>
-              <span className="text-[10px] font-bold text-slate-900 uppercase font-mono tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="hidden md:flex flex-col text-right mr-2">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">System Clock</span>
+              <span className="text-[10px] font-bold text-slate-900 uppercase font-mono tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
             <button 
               onClick={onNotifClick}
-              className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 relative hover:bg-slate-100 hover:scale-105 transition-all shadow-sm group"
+              className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 relative hover:text-purple-600 hover:scale-105 transition-all shadow-sm group"
             >
               <Bell size={18} className="group-hover:rotate-12 transition-transform" />
               {hasNotifications && (
-                <span className="absolute top-2.5 right-2.5 lg:top-3 lg:right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                <span className="absolute top-2.5 right-2.5 lg:top-3 lg:right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse" />
               )}
             </button>
-            <div className="lg:hidden w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-[10px] font-black text-blue-600 shadow-sm">
-              {user?.name?.charAt(0) || 'U'}
-            </div>
           </div>
         </header>
 
         {/* Main Scrolling Content Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 lg:p-10 bg-slate-50/50">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-10 bg-slate-50/30">
           <AnimatePresence mode="wait">
             <motion.div
               key={activePath}
-              initial={{ opacity: 0, y: 10, scale: 0.99 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.99 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
               className="max-w-7xl mx-auto w-full"
             >
               {children}
@@ -172,37 +328,50 @@ export const MobileShell = ({
           </AnimatePresence>
         </main>
 
-        {/* Mobile-Only Bottom Navigation */}
-        <nav className="lg:hidden h-20 bg-white/90 backdrop-blur-md border-t border-slate-100 flex items-center justify-around px-2 pb-safe">
-          {navItems.slice(0, 5).map((item) => {
+        {/* Mobile-Only Bottom Navigation (Simplified for focus) */}
+        <nav className="lg:hidden h-20 bg-white border-t border-slate-100 flex items-center justify-around px-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+          {[
+            { id: 'dashboard', icon: Home, label: 'Hub' },
+            { id: 'projects', icon: Target, label: 'Missions' },
+            { id: 'create', icon: Plus, label: 'New', isSpecial: true },
+            { id: 'tasks', icon: Layout, label: 'Tasks' },
+            { id: 'volunteers', icon: User, label: 'Unit' }
+          ].map((item) => {
             const isActive = activePath === item.id;
             const Icon = item.icon;
+
+            if (item.id === 'create') {
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleNavClick('create')}
+                  className="relative -top-6"
+                >
+                  <div className="w-14 h-14 bg-purple-600 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-purple-500/30 ring-4 ring-white transition-transform active:scale-90">
+                    <Plus size={24} />
+                  </div>
+                </button>
+              );
+            }
 
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => handleNavClick(item.id)}
                 className="flex flex-col items-center gap-1.5 px-4 py-2 relative group"
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="active-bg"
-                    className="absolute inset-x-1 inset-y-1 bg-blue-50 rounded-2xl -z-10 border border-blue-100/50"
-                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
                 <Icon 
                   size={20} 
                   className={cn(
                     "transition-all duration-300",
-                    isActive ? "text-blue-600 scale-110" : "text-slate-400 group-active:scale-90"
+                    isActive ? "text-purple-600 scale-110" : "text-slate-400 group-active:scale-95"
                   )} 
                 />
                 <span className={cn(
                   "text-[9px] font-black uppercase tracking-widest leading-none transition-colors",
-                  isActive ? "text-blue-600" : "text-slate-400"
+                  isActive ? "text-purple-600" : "text-slate-400"
                 )}>
-                  {item.label.split(' ')[0]}
+                  {item.label}
                 </span>
               </button>
             );
