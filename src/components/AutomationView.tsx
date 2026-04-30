@@ -42,23 +42,39 @@ export default function AutomationView() {
     setIsChecking(true);
     setStatus('checking');
     try {
+      // Use the service's target logic to check the correct endpoint
+      const VERCEL_URL = 'https://v0-mission-bharari-os.vercel.app/api/health';
+      const LOCAL_URL = `${window.location.origin}/api/health`;
+      const isDev = window.location.hostname.includes('asia-southeast1.run.app') || window.location.hostname === 'localhost';
+      const targetUrl = isDev ? LOCAL_URL : VERCEL_URL;
+
       const token = await auth.currentUser?.getIdToken();
-      const response = await fetch('/api/health', {
+      const response = await fetch(targetUrl, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const serverHealth = await response.json();
       
-      if (response.ok && serverHealth.resendConfigured) {
+      if (serverHealth.resendConfigured) {
         setStatus('connected');
       } else {
         setStatus('error');
-        if (!serverHealth.resendConfigured) {
-          toast.error("RESEND_API_KEY is missing in Server Environment Variables");
-        }
+        toast.error("RESEND_API_KEY is missing on remote server");
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[Automation Diagnostic]:", err);
       setStatus('error');
+      if (err.message.includes('HTTP 500')) {
+        toast.error("Vercel Function Crashed: Check RESEND_API_KEY or Dependencies.");
+      } else if (err.message.includes('Failed to fetch')) {
+        toast.error("Endpoint Unreachable: Check Deployment URL or CORS settings.");
+      } else {
+        toast.error(`Conn Error: ${err.message}`);
+      }
     } finally {
       setIsChecking(false);
     }
@@ -134,6 +150,10 @@ export default function AutomationView() {
                </h4>
                <p className="text-xs text-slate-500 font-medium mb-6">Verify manual and automated mail dispatch functionality.</p>
                <div className="space-y-4">
+                 <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 mb-4">
+                    <p className="text-[10px] font-black text-amber-900 uppercase tracking-widest mb-1">Configuration Required</p>
+                    <p className="text-[10px] text-amber-700 font-medium leading-relaxed">Ensure <code className="bg-amber-100 px-1 rounded font-bold">RESEND_API_KEY</code> is added to your Vercel Environment Variables.</p>
+                 </div>
                  <input 
                   type="email"
                   placeholder="Target Email Address..."

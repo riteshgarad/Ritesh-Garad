@@ -10,7 +10,7 @@ export async function sendEmail(payload: {
   type?: string;
 }) {
   // Use the absolute URL for the mobile app, but allow fallback to current origin for dev/preview
-  const VERCEL_URL = 'https://ritesh-garad.vercel.app/api/send-email';
+  const VERCEL_URL = 'https://v0-mission-bharari-os.vercel.app/api/send-email';
   const LOCAL_URL = `${window.location.origin}/api/send-email`;
   
   // Try the Vercel URL first (as requested for the production/mobile setup)
