@@ -7,11 +7,15 @@ export default async function handler(req: any, res: any) {
 
   try {
     const { prompt, context } = req.body;
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: 'GEMINI_API_KEY is not configured.' });
+    }
+
+    const genAI = new GoogleGenAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
+    const fullPrompt = `
         You are the AI Assistant for Garad Foundation, a youth-led NGO from Maharashtra, India. 
         Be helpful, friendly, and concise. Use Markdown for formatting.
         
@@ -19,10 +23,12 @@ export default async function handler(req: any, res: any) {
         ${context}
         
         User asks: ${prompt}
-      `,
-    });
+      `;
 
-    res.status(200).json({ text: response.text });
+    const result = await model.generateContent(fullPrompt);
+    const responseText = result.response.text();
+
+    res.status(200).json({ text: responseText });
   } catch (error: any) {
     console.error("Vercel AI Error:", error);
     res.status(500).json({ error: error.message });
