@@ -167,5 +167,20 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isAdmin() || isDeptHead('HR');
     }
+
+    match /messages/{messageId} {
+      allow list: if isSignedIn() && (
+        resource.data.recipientId == 'global' || 
+        resource.data.recipientId == request.auth.uid || 
+        resource.data.senderId == request.auth.uid
+      );
+      allow get: if isSignedIn() && (
+        resource.data.recipientId == 'global' || 
+        resource.data.recipientId == request.auth.uid || 
+        resource.data.senderId == request.auth.uid
+      );
+      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+      allow update, delete: if false;
+    }
   }
 }

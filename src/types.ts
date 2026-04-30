@@ -273,4 +273,5 @@ export interface AppUser {
   email: string;
   role: string;
   department?: string;
+  isActive?: boolean;
 }

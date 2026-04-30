@@ -65,6 +65,7 @@ import { VolunteerFinanceDashboard } from './components/VolunteerFinanceDashboar
 import { MobileShell } from './components/MobileShell';
 import { MissionDetailView } from './components/project/MissionDetailView';
 import { sendPushNotification } from './lib/push';
+import { ChatView } from './components/ChatView';
 import OneSignal from 'react-onesignal';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -289,7 +290,7 @@ const NotificationPanel = ({
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -314,6 +315,7 @@ export default function App() {
   const [budgetRequests, setBudgetRequests] = useState<BudgetRequest[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
+  const [operators, setOperators] = useState<AppUser[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   
@@ -509,6 +511,11 @@ export default function App() {
       (err) => handleFirestoreError(err, 'list', 'volunteer_certificates')
     );
 
+    const unsubProfiles = onSnapshot(collection(db, 'users'),
+      (snapshot) => setOperators(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as any))),
+      (err) => handleFirestoreError(err, 'list', 'users')
+    );
+
     return () => {
       unsubProjects();
       unsubTasks();
@@ -522,6 +529,7 @@ export default function App() {
       unsubExpenseRequests();
       unsubLogs();
       unsubCerts();
+      unsubProfiles();
     };
   }, [user]);
 
@@ -1656,6 +1664,7 @@ export default function App() {
               onAddTask={handleAddTask}
               activityLogs={activityLogs}
               setProofTaskTargetId={setProofTaskTargetId}
+              operators={operators}
             />
       </MobileShell>
 
@@ -2187,7 +2196,8 @@ const PageView = ({
   onVerifyLog, onGenerateCert, milestones, onToggleMilestone, onAddMilestone,
   financeRequests, budgetRequests, expenseRequests,
   onUploadDocument, onVerifyDocument,
-  onTaskStatusChange, onAddTask, activityLogs, setProofTaskTargetId
+  onTaskStatusChange, onAddTask, activityLogs, setProofTaskTargetId,
+  operators
 }: any) => {
   // Determine if current user has a volunteer record
   const currentVolunteer = volunteers.find((v: any) => v.email === user?.email);
@@ -2195,6 +2205,13 @@ const PageView = ({
   switch (page) {
     case 'dashboard':
       return <DashboardView projects={projects} tasks={tasks} volunteers={volunteers} onOpenProject={onOpenProject} setCurrentPage={setCurrentPage} onDeleteProject={onDeleteProject} user={user} />;
+    case 'messages':
+      return (
+        <ChatView 
+          user={user} 
+          operators={operators} 
+        />
+      );
     case 'projects':
       return <ProjectsView projects={projects} onOpenProject={onOpenProject} onAdd={onAddProject} onDelete={onDeleteProject} user={user} />;
     case 'project-detail':
@@ -3067,6 +3084,7 @@ const PAGE_TITLES: Record<Page, string> = {
   'dashboard': 'Command Hub',
   'projects': 'Active Missions',
   'tasks': 'Operational Force Board',
+  'messages': 'Mission Comms',
   'volunteers': 'Unit Records',
   'finance': 'Resource Cell / Ledger',
   'docs': 'Protocols Vault',

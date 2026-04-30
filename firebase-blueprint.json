@@ -300,9 +300,27 @@
         "details": { "type": "string" }
       },
       "required": ["action", "status", "timestamp"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Real-time communication logs between personnel.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "recipientId": { "type": "string", "description": "User ID or 'global' for group chat" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["text", "senderId", "timestamp"]
     }
   },
   "firestore": {
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Cross-departmental communication logs."
+    },
     "/users/{userId}": {
       "schema": "AppUser",
       "description": "User profiles and RBAC metadata."
