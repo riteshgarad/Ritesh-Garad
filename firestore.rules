@@ -9,7 +9,7 @@ service cloud.firestore {
 
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email == 'riteshgarad4@gmail.com'); }
+    function isVerified() { return isSignedIn(); } // Simplified for prototype to avoid email verification blocks
     function isAdmin() { 
       return isSignedIn() && (
              request.auth.token.email == 'riteshgarad4@gmail.com' ||
