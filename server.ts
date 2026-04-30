@@ -121,7 +121,11 @@ async function startServer() {
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ 
+      status: "ok",
+      resendConfigured: !!process.env.RESEND_API_KEY,
+      environment: process.env.NODE_ENV || 'development'
+    });
   });
 
   // Email Automation Route

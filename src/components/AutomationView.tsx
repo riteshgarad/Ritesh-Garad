@@ -47,12 +47,15 @@ export default function AutomationView() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      // In a real app, we'd have a specific endpoint to check Resend health
-      // For now, we'll assume if API is up and key is present (server side check)
-      if (response.ok) {
+      const serverHealth = await response.json();
+      
+      if (response.ok && serverHealth.resendConfigured) {
         setStatus('connected');
       } else {
         setStatus('error');
+        if (!serverHealth.resendConfigured) {
+          toast.error("RESEND_API_KEY is missing in Server Environment Variables");
+        }
       }
     } catch (err) {
       setStatus('error');

@@ -9,13 +9,19 @@ export async function sendEmail(payload: {
   reason?: string;
   type?: string;
 }) {
-  const ABSOLUTE_URL = 'https://ritesh-garad.vercel.app/api/send-email';
+  // Use the absolute URL for the mobile app, but allow fallback to current origin for dev/preview
+  const VERCEL_URL = 'https://ritesh-garad.vercel.app/api/send-email';
+  const LOCAL_URL = `${window.location.origin}/api/send-email`;
+  
+  // Try the Vercel URL first (as requested for the production/mobile setup)
+  // but if we are in the preview environment, we should probably use the local server
+  const isDevelopment = window.location.hostname.includes('asia-southeast1.run.app') || window.location.hostname === 'localhost';
+  const targetUrl = isDevelopment ? LOCAL_URL : VERCEL_URL;
   
   try {
-    console.log('[Email Trigger] Dispatching to absolute endpoint:', ABSOLUTE_URL, payload);
+    console.log('[Email Trigger] Dispatching to endpoint:', targetUrl, payload);
     
-    // Using absolute URL to bypass mobile wrapper relative-path limitations
-    const response = await fetch(ABSOLUTE_URL, {
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
