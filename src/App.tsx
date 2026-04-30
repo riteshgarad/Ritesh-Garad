@@ -414,7 +414,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      if ((OneSignal as any).initialized) {
+        OneSignal.logout();
+      }
+      return;
+    }
+
+    if ((OneSignal as any).initialized) {
+      OneSignal.login(user.uid);
+    }
 
     const unsubProjects = onSnapshot(collection(db, 'projects'), 
       (snapshot) => setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project))),
@@ -1323,6 +1332,13 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    try {
+      if ((OneSignal as any).initialized) {
+        await OneSignal.logout();
+      }
+    } catch (err) {
+      console.warn("OneSignal logout failed:", err);
+    }
     await signOut(auth);
     setUser(null);
     setLoginEmail('');
