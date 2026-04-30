@@ -103,3 +103,26 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-300;
 }
+
+/* WhatsApp style bubble tails */
+.chat-bubble-right::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: -8px;
+  width: 15px;
+  height: 15px;
+  background: inherit;
+  clip-path: polygon(0 0, 0% 100%, 100% 100%);
+}
+
+.chat-bubble-left::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: -8px;
+  width: 15px;
+  height: 15px;
+  background: inherit;
+  clip-path: polygon(100% 0, 0% 100%, 100% 100%);
+}

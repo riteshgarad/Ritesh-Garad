@@ -267,6 +267,16 @@ export interface Milestone {
   completedAt?: any;
 }
 
+export interface ChatMessage {
+  id: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  recipientId: string;
+  timestamp: any;
+  read: boolean;
+}
+
 export interface AppUser {
   uid: string;
   name: string;
