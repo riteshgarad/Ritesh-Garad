@@ -1597,6 +1597,7 @@ export default function App() {
       <MobileShell 
         activePath={currentPage} 
         onNavigate={(id) => setCurrentPage(id as Page)}
+        onLogout={handleLogout}
         title={PAGE_TITLES[currentPage as Page] || currentPage}
         user={user}
         hasNotifications={unreadCount > 0}

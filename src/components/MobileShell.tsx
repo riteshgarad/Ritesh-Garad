@@ -15,6 +15,7 @@ import {
   Share2,
   Clock,
   Layout,
+  LogOut,
   Users,
   Shield,
   ShieldCheck,
@@ -34,6 +35,7 @@ interface MobileShellProps {
   title: string;
   hasNotifications?: boolean;
   onNotifClick?: () => void;
+  onLogout?: () => void;
   user?: any;
   projectsCount?: number;
   pendingApprovalsCount?: number;
@@ -47,6 +49,7 @@ export const MobileShell = ({
   title, 
   hasNotifications,
   onNotifClick,
+  onLogout,
   user,
   projectsCount = 0,
   pendingApprovalsCount = 0,
@@ -234,9 +237,20 @@ export const MobileShell = ({
                 <p className="text-[8px] font-black text-terracotta/60 uppercase tracking-widest truncate">{user?.role || 'Guest'}</p>
               </div>
             </div>
-            <button className="p-2 text-slate-300 hover:text-slate-900 transition-colors">
-              <Settings size={14} />
-            </button>
+            <div className="flex gap-1">
+              <button className="p-2 text-slate-300 hover:text-slate-900 transition-colors">
+                <Settings size={14} />
+              </button>
+              {onLogout && (
+                <button 
+                  onClick={onLogout}
+                  className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                  title="Secure Logout"
+                >
+                  <LogOut size={14} />
+                </button>
+              )}
+            </div>
          </div>
       </div>
     </div>
