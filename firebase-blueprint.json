@@ -313,7 +313,7 @@
         "timestamp": { "type": "string", "format": "date-time" },
         "read": { "type": "boolean" }
       },
-      "required": ["text", "senderId", "timestamp"]
+      "required": ["text", "senderId", "senderName", "recipientId", "timestamp", "read"]
     }
   },
   "firestore": {

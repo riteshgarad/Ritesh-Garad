@@ -9,6 +9,7 @@ service cloud.firestore {
 
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email == 'riteshgarad4@gmail.com'); }
     function isAdmin() { 
       return isSignedIn() && (
              request.auth.token.email == 'riteshgarad4@gmail.com' ||
@@ -28,14 +29,24 @@ service cloud.firestore {
     function existing() { return resource.data; }
     
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
-    function isValidString(val, max) { return val is string && val.size() <= max; }
+    
+    function isValidMessage(data) {
+      return data.keys().hasAll(['text', 'senderId', 'senderName', 'recipientId', 'timestamp', 'read']) &&
+             data.keys().size() == 6 &&
+             data.text is string && data.text.size() <= 3000 &&
+             data.senderId == request.auth.uid &&
+             data.senderName is string &&
+             data.recipientId is string &&
+             data.timestamp == request.time &&
+             data.read == false;
+    }
 
     // --- User Profiles ---
     match /users/{userId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn(); 
       allow create: if isAdmin() || (
-        isSignedIn() && isOwner(userId) && 
+        isVerified() && isOwner(userId) && 
         incoming().keys().hasAll(['uid', 'email', 'name', 'role', 'department', 'isActive', 'createdAt']) &&
         (incoming().role == 'Volunteer' || incoming().role == 'Staff Operative' || request.auth.token.email == 'riteshgarad4@gmail.com')
       );
@@ -51,7 +62,7 @@ service cloud.firestore {
     // --- Projects ---
     match /projects/{projectId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn(); // Simplified for now as many roles can propose
+      allow create: if isVerified(); 
       allow update: if (
         isAdmin() || 
         (isDeptHead(existing().department) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'budget_status', 'rejection_reason'])) ||
@@ -68,8 +79,8 @@ service cloud.firestore {
     // --- Tasks ---
     match /tasks/{taskId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
+      allow create: if isVerified();
+      allow update: if isVerified() && (
         isAdmin() || 
         isDeptHead(existing().assignedDept) ||
         (isOwner(existing().assignedVolunteerId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAt', 'relatedDocId']))
@@ -86,7 +97,7 @@ service cloud.firestore {
     // --- Documentation ---
     match /documents/{docId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isVerified();
       allow update: if (
         isAdmin() || 
         isDeptHead('Operations') || 
@@ -116,7 +127,7 @@ service cloud.firestore {
       allow list: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && resource.data.requesterId == request.auth.uid);
       allow get: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && resource.data.requesterId == request.auth.uid);
       allow update, delete: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && existing().requesterId == request.auth.uid);
-      allow create: if isSignedIn();
+      allow create: if isVerified();
     }
 
     match /budget_requests/{rId} {
@@ -138,7 +149,7 @@ service cloud.firestore {
 
     match /donations/{dId} {
       allow read: if isAdmin() || isDeptHead('Finance');
-      allow create: if isSignedIn();
+      allow create: if isVerified();
     }
 
     // --- Misc ---
@@ -154,7 +165,7 @@ service cloud.firestore {
     
     match /work_logs/{logId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isVerified();
       allow update: if isAdmin() || isDeptHead(existing().department);
     }
 
@@ -171,16 +182,18 @@ service cloud.firestore {
 
     match /messages/{messageId} {
       allow list: if isSignedIn() && (
+        isAdmin() ||
         resource.data.recipientId == 'global' || 
         resource.data.recipientId == request.auth.uid || 
         resource.data.senderId == request.auth.uid
       );
       allow get: if isSignedIn() && (
+        isAdmin() ||
         resource.data.recipientId == 'global' || 
         resource.data.recipientId == request.auth.uid || 
         resource.data.senderId == request.auth.uid
       );
-      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+      allow create: if isVerified() && isValidMessage(incoming());
       allow update, delete: if false;
     }
   }
