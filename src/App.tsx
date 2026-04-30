@@ -37,6 +37,7 @@ import {
   Megaphone,
   Camera,
   Shield,
+  Database,
   LogOut, 
   Menu, 
   X,
@@ -52,7 +53,6 @@ import {
   AlertCircle,
   Download,
   Trash2,
-  Database,
   ClipboardCheck,
   ShieldCheck,
   Trophy,
@@ -1347,8 +1347,21 @@ export default function App() {
   if (!authInitialized) {
     return (
       <div className="min-h-screen bg-cream flex flex-col items-center justify-center p-4">
-          <div className="w-20 h-20 bg-white rounded-[1.5rem] mb-8 shadow-2xl shadow-terracotta/10 flex items-center justify-center p-2 border border-terracotta/5">
-            <img src="/logo.png" alt="Garad Foundation" className="w-full h-full object-contain" />
+          <div className="w-20 h-20 bg-white rounded-[1.5rem] mb-8 shadow-2xl shadow-terracotta/10 flex items-center justify-center border border-terracotta/5 overflow-hidden">
+            <div className="relative w-12 h-12">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 border-2 border-dashed border-terracotta/20 rounded-full"
+              />
+              <motion.div 
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 flex items-center justify-center text-terracotta"
+              >
+                <Database size={28} />
+              </motion.div>
+            </div>
           </div>
         <div className="text-center">
           <h2 className="text-[10px] font-black text-mahogany uppercase tracking-[0.4em] animate-pulse mb-2">Initializing OS Kernels</h2>
@@ -1387,9 +1400,18 @@ export default function App() {
               initial={{ scale: 0, rotate: -10 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', delay: 0.3, damping: 12, stiffness: 200 }}
-              className="w-32 h-32 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(166,58,27,0.15)] flex items-center justify-center mb-6 border border-terracotta/10 relative p-6"
+              className="w-32 h-32 bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(166,58,27,0.15)] flex items-center justify-center mb-6 border border-terracotta/10 relative"
             >
-              <img src="/logo.png" alt="Garad Foundation" className="w-full h-full object-contain" />
+              <div className="relative w-16 h-16">
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 border-2 border-dashed border-mahogany/10 rounded-[1.5rem]"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-mahogany">
+                  <Shield size={40} strokeWidth={2.5} />
+                </div>
+              </div>
             </motion.div>
 
             <motion.div

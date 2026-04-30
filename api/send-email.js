@@ -1,9 +1,9 @@
-const { Resend } = require('resend');
+import { Resend } from 'resend';
 
-// Vercel Serverless Function Implementation
-module.exports = async (req, res) => {
+// Vercel Serverless Function Implementation (ESM)
+export default async function handler(req, res) {
   // 1. Full CORS Support
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
@@ -13,8 +13,7 @@ module.exports = async (req, res) => {
 
   // 2. Preflight Handing (Magic Fix for Mobile)
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
@@ -28,6 +27,10 @@ module.exports = async (req, res) => {
     return res.status(400).json({ 
       error: 'Missing required fields: requesterEmail, amount, and status are mandatory for automation.' 
     });
+  }
+
+  if (!process.env.RESEND_API_KEY) {
+    return res.status(503).json({ error: 'RESEND_API_KEY is not configured on Vercel.' });
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -54,16 +57,21 @@ module.exports = async (req, res) => {
       </div>
     `;
 
-    const data = await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: requesterEmail,
       subject: `[MISSION HUB] Request Updated: ${status}`,
       html: htmlContent,
     });
 
-    res.status(200).json({ success: true, id: data.id });
+    if (error) {
+      console.error('RESEND_ERROR:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.status(200).json({ success: true, id: data.id });
   } catch (error) {
     console.error('SERVERLESS_API_ERROR:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
-};
+}

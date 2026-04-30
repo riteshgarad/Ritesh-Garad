@@ -16,6 +16,7 @@ import {
   Clock,
   Layout,
   Users,
+  Shield,
   ShieldCheck,
   Megaphone,
   Globe,
@@ -113,8 +114,8 @@ export const MobileShell = ({
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-white font-sans">
       <div className="p-8 flex items-center gap-4">
-        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-xl shadow-terracotta/10 border border-terracotta/5 p-2">
-          <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+        <div className="w-12 h-12 bg-mahogany rounded-2xl flex items-center justify-center shadow-xl shadow-mahogany/20 border border-white/10 text-white">
+          <Shield size={24} strokeWidth={2.5} />
         </div>
         <div>
           <h1 className="text-sm font-black uppercase tracking-widest text-mahogany leading-none mb-1">Garad Foundation</h1>
@@ -287,8 +288,8 @@ export const MobileShell = ({
             >
               <Menu size={20} />
             </button>
-            <div className="hidden sm:block lg:hidden w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md border border-terracotta/5 p-1.5">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+            <div className="hidden sm:block lg:hidden w-10 h-10 bg-mahogany rounded-xl flex items-center justify-center shadow-md border border-white/10 text-white">
+              <Shield size={20} strokeWidth={2.5} />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
