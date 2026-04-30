@@ -64,6 +64,7 @@ import ExpenseApprovalDashboard from './components/ExpenseApprovalDashboard';
 import { VolunteerFinanceDashboard } from './components/VolunteerFinanceDashboard';
 import { MobileShell } from './components/MobileShell';
 import { MissionDetailView } from './components/project/MissionDetailView';
+import { sendPushNotification } from './lib/push';
 import OneSignal from 'react-onesignal';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -1181,6 +1182,16 @@ export default function App() {
         progress,
         status: status || projectDoc?.status
       });
+
+      if (newStatus === 'completed') {
+        const pDoc = projects.find(p => p.id === projectId);
+        const mDoc = allM.find((m: any) => m.id === milestoneId) || { title: 'A Protocol' };
+        sendPushNotification({
+          title: 'Protocol Secured 🛡️',
+          message: `${user?.name || 'A volunteer'} finalized "${mDoc.title}" for mission ${pDoc?.name || 'Assigned'}`,
+          segment: 'Subscribed Users'
+        });
+      }
     } catch (err) {
       handleFirestoreError(err, 'update', `projects/${projectId}/milestones/${milestoneId}`);
     }
@@ -1203,6 +1214,13 @@ export default function App() {
 
       await updateDoc(doc(db, 'projects', projectId), { progress });
       toast.success("New milestone established.");
+
+      const pDoc = projects.find(p => p.id === projectId);
+      sendPushNotification({
+        title: 'New Mission Protocol 🛰️',
+        message: `${user?.name || 'Command'} updated protocol for ${pDoc?.name || 'Active Mission'}`,
+        segment: 'Subscribed Users'
+      });
     } catch (err) {
       handleFirestoreError(err, 'create', `projects/${projectId}/milestones`);
     }

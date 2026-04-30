@@ -21,6 +21,7 @@ import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/fi
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { sendEmail } from '../services/emailService';
+import { sendPushNotification } from '../lib/push';
 
 interface ExpenseApprovalDashboardProps {
   user: AppUser;
@@ -99,6 +100,16 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
         </div>
       );
 
+      // Trigger Push Notification
+      const targetUid = request.requesterId || request.requesterUid;
+      if (targetUid) {
+        sendPushNotification({
+          title: 'Finance Authorized 💰',
+          message: `Your request for ₹${request.amount} has been approved. Funds are transitioning.`,
+          externalIds: [targetUid]
+        });
+      }
+
       // PHASE 2: INDEPENDENT EMAIL AUTOMATION
       try {
         await sendEmail({
@@ -161,6 +172,16 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
           <span className="font-bold">Rejection Logged & Finalized</span>
         </div>
       );
+
+      // Trigger Push Notification
+      const targetUid = selectedRequest.requesterId || selectedRequest.requesterUid;
+      if (targetUid) {
+        sendPushNotification({
+          title: 'Finance Warning ⚠️',
+          message: `Your budget request for ₹${selectedRequest.amount} was declined. See feedback.`,
+          externalIds: [targetUid]
+        });
+      }
 
       // PHASE 2: INDEPENDENT EMAIL AUTOMATION
       try {

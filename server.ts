@@ -284,6 +284,58 @@ async function startServer() {
     }
   });
 
+  // OneSignal Push Notification Endpoint
+  app.post("/api/notify/push", verifyAuth, async (req, res) => {
+    const { title, message, segment, externalIds, url } = req.body;
+
+    const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID;
+    const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
+
+    if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
+      console.warn("[OneSignal] configuration missing");
+      return res.status(503).json({ error: "OneSignal not configured" });
+    }
+
+    try {
+      const response = await fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
+        },
+        body: JSON.stringify({
+          app_id: ONESIGNAL_APP_ID,
+          headings: { en: title },
+          contents: { en: message },
+          included_segments: segment ? [segment] : undefined,
+          include_external_user_ids: externalIds,
+          url: url || undefined
+        })
+      });
+
+      const data = await response.json();
+      
+      // Log to automation_logs
+      try {
+        await db.collection('automation_logs').add({
+          action: 'Push Notification',
+          title,
+          message,
+          recipient: segment || (externalIds ? `External IDs: ${externalIds.length}` : 'Unknown'),
+          status: response.ok ? 'success' : 'error',
+          onesignalData: data,
+          timestamp: FieldValue.serverTimestamp(),
+          details: `OneSignal signal transmitted: ${message}`
+        });
+      } catch (logErr) {}
+
+      res.status(response.status).json(data);
+    } catch (error: any) {
+      console.error("[OneSignal Error]:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin: Create User
   app.post("/api/admin/create-user", verifyAdmin, async (req, res) => {
     const { email, password, name, role, department } = req.body;
