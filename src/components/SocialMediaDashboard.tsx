@@ -25,6 +25,7 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { db } from '../App';
 import { NGODocument, Project, Campaign, AppUser } from '../types';
 import { Card } from './ui/card';
@@ -51,21 +52,24 @@ const SocialMediaDashboard: React.FC<SocialMediaDashboardProps> = ({ user }) => 
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NGODocument));
         // Filter for images/videos in code ideally, or use categories
         setPendingDocs(docs.filter(d => d.category === 'Mission_Report' || d.category === 'Marketing'));
-      }
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'documents')
     );
 
     const subCampaigns = onSnapshot(
       query(collection(db, 'campaigns'), where('status', '==', 'active')),
       (snapshot) => {
         setActiveCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign)));
-      }
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'campaigns')
     );
 
     const subProjects = onSnapshot(
       collection(db, 'projects'),
       (snapshot) => {
         setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
-      }
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'projects')
     );
 
     return () => {

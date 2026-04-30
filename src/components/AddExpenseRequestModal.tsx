@@ -12,6 +12,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { AppUser } from '../types';
 import { toast } from 'react-hot-toast';
 import { sendEmail } from '../services/emailService';
@@ -117,8 +118,7 @@ export default function AddExpenseRequestModal({ isOpen, onClose, user }: AddExp
       });
       onClose();
     } catch (error) {
-      console.error(error);
-      toast.error('Signal Error: Transmission failed');
+      handleFirestoreError(error, OperationType.CREATE, 'expense_requests');
     } finally {
       setIsSubmitting(false);
     }

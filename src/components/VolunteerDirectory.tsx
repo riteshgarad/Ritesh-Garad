@@ -23,6 +23,7 @@ import {
   arrayUnion, 
   deleteDoc
 } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { db, auth } from '../App';
 import { Volunteer, VolunteerApplication, AppUser } from '../types';
 import { format } from 'date-fns';
@@ -145,8 +146,7 @@ export const VolunteerDirectory = ({
         </div>
       );
     } catch (error: any) {
-      console.error(error);
-      toast.error(`Purge Failed: ${error.message}`);
+      handleFirestoreError(error, OperationType.DELETE, `volunteers/${volunteer.id}`);
     } finally {
       setIsDeleting(null);
     }
@@ -202,8 +202,7 @@ export const VolunteerDirectory = ({
 
       toast.success(`Deployment Successful: ${volunteer.name} assigned to ${project.name}`);
     } catch (error: any) {
-      console.error(error);
-      toast.error('Deployment Protocol Failed');
+      handleFirestoreError(error, OperationType.UPDATE, 'assignment protocol');
     }
   };
 

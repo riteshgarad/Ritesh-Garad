@@ -3,6 +3,7 @@ import { X, Upload, DollarSign, Tag, Calendar, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -57,8 +58,7 @@ const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen, onClo
         receiptURL: ''
       });
     } catch (error) {
-      console.error("Error logging transaction:", error);
-      alert("Failed to log transaction. Check permissions.");
+      handleFirestoreError(error, OperationType.CREATE, 'transactions');
     } finally {
       setIsSubmitting(false);
     }

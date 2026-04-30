@@ -42,6 +42,7 @@ import {
   serverTimestamp,
   where
 } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 
 interface UserManagementProps {
   currentUser: AppUser | null;
@@ -74,8 +75,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
       setUsers(userData);
       setIsLoading(false);
     }, (error) => {
-      console.error("Firestore Error:", error);
-      toast.error("Security Logic: Permissions Denied");
+      handleFirestoreError(error, OperationType.LIST, 'users');
       setIsLoading(false);
     });
 
@@ -118,11 +118,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
       setIsAddModalOpen(false);
       setFormData({ email: '', password: '', name: '', role: 'Volunteer', department: 'General' });
     } catch (error: any) {
-      console.error(error);
       if (error.code === 'auth/email-already-in-use') {
         toast.error('Identity Conflict: This email is already registered in the mission network.');
-      } else {
+      } else if (error.code?.startsWith('auth/')) {
         toast.error(error.message || 'Mission identity creation failed');
+      } else {
+        handleFirestoreError(error, OperationType.WRITE, 'users');
       }
       // Ensure secondary auth is signed out even on failure
       try { await secondarySignOut(secondaryAuth); } catch(e) {}
@@ -138,7 +139,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
       });
       toast.success('Permissions state updated');
     } catch (error: any) {
-      toast.error('Identity update failed');
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
     }
   };
 

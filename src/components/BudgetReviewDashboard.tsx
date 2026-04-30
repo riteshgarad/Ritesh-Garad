@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../App';
 import { collection, query, onSnapshot, orderBy, updateDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { BudgetRequest, AppUser } from '../types';
 
 interface BudgetReviewDashboardProps {
@@ -34,6 +35,8 @@ export const BudgetReviewDashboard: React.FC<BudgetReviewDashboardProps> = ({ us
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BudgetRequest));
       setRequests(data);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'budget_requests');
     });
     return () => unsubscribe();
   }, []);
@@ -69,7 +72,7 @@ export const BudgetReviewDashboard: React.FC<BudgetReviewDashboardProps> = ({ us
       setRejectionReason('');
       setSelectedRequestId(null);
     } catch (error) {
-      console.error("Budget Action Failed:", error);
+      handleFirestoreError(error, OperationType.UPDATE, `budget_requests/${requestId}`);
     }
   };
 

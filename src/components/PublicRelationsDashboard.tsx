@@ -23,6 +23,7 @@ import {
   serverTimestamp,
   addDoc
 } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { db } from '../App';
 import { AppUser, Project, Donor } from '../types';
 import { Card } from './ui/card';
@@ -43,13 +44,16 @@ const PublicRelationsDashboard: React.FC<PRDashboardProps> = ({ user }) => {
 
     const subProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'projects');
     });
 
     const subDonors = onSnapshot(
       query(collection(db, 'donors'), orderBy('total_donated', 'desc')), 
       (snapshot) => {
         setDonors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Donor)));
-      }
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, 'donors')
     );
 
     return () => {

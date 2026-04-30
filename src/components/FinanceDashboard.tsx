@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
 import { collection, query, onSnapshot, orderBy, updateDoc, doc, where, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { Transaction, Project, AppUser } from '../types';
 import TransactionTable from './TransactionTable';
 import AddTransactionModal from './AddTransactionModal';
@@ -59,6 +60,8 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
       setTransactions(data);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'transactions');
     });
 
     return () => unsubscribe();
@@ -76,7 +79,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
 
       await updateDoc(doc(db, 'transactions', id), data);
     } catch (error) {
-      console.error("Error updating transaction status:", error);
+      handleFirestoreError(error, OperationType.UPDATE, `transactions/${id}`);
     }
   };
 

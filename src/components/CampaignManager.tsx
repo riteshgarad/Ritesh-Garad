@@ -23,6 +23,7 @@ import {
   doc, 
   serverTimestamp 
 } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { Campaign, AppUser, CampaignStatus } from '../types';
 import { cn } from '../lib/utils';
 
@@ -52,7 +53,7 @@ const CampaignManager: React.FC<CampaignManagerProps> = ({ campaigns, user }) =>
       
       await updateDoc(doc(db, 'campaigns', campaignId), data);
     } catch (e) {
-      console.error(e);
+      handleFirestoreError(e, OperationType.UPDATE, `campaigns/${campaignId}`);
     }
   };
 
@@ -248,7 +249,7 @@ const CampaignForm = ({ isOpen, onClose, user }: any) => {
       });
       onClose();
     } catch (e) {
-      console.error(e);
+      handleFirestoreError(e, OperationType.CREATE, 'campaigns');
     }
   };
 

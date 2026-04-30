@@ -7,6 +7,7 @@ import {
   onSnapshot, 
   orderBy 
 } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { db } from '../App';
 import { ExpenseRequest } from '../types';
 import { 
@@ -52,6 +53,9 @@ export const VolunteerFinanceDashboard = ({ user }: VolunteerFinanceDashboardPro
         ...doc.data()
       })) as ExpenseRequest[];
       setRequests(data);
+      setLoading(false);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'expense_requests');
       setLoading(false);
     });
 

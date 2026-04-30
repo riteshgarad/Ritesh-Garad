@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
 import { collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { toast } from 'react-hot-toast';
 import { sendEmail } from '../services/emailService';
 import { cn } from '../lib/utils';
@@ -33,6 +34,8 @@ export default function AutomationView() {
     const q = query(collection(db, 'automation_logs'), orderBy('timestamp', 'desc'), limit(15));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'automation_logs');
     });
 
     return () => unsubscribe();

@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { ExpenseRequest, AppUser } from '../types';
 import { db } from '../App';
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { sendEmail } from '../services/emailService';
@@ -129,8 +130,7 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
 
       setSelectedRequestId(null);
     } catch (error: any) {
-      console.error("Database Error:", error);
-      toast.error('Approval Protocol Failed: Database update error.');
+      handleFirestoreError(error, OperationType.UPDATE, `expense_requests/${request.id}`);
     } finally {
       setIsProcessing(false);
     }
@@ -205,8 +205,7 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
       setRejectionReason('');
       setSelectedRequestId(null);
     } catch (error: any) {
-      console.error("Database Error:", error);
-      toast.error('Rejection Protocol Failed: Database update error.');
+      handleFirestoreError(error, OperationType.UPDATE, `expense_requests/${selectedRequest.id}`);
     } finally {
       setIsProcessing(false);
     }

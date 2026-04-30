@@ -20,13 +20,16 @@ import {
   limit, 
   onSnapshot,
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  or,
+  and
 } from 'firebase/firestore';
 import { db } from '../App';
 import { AppUser } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { sendPushNotification } from '../lib/push';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 
 interface Message {
   id: string;
@@ -54,12 +57,30 @@ export function ChatView({ user, operators }: ChatViewProps) {
   const contacts = operators.filter(o => o.uid !== user.uid && o.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'messages'),
-      where('recipientId', 'in', [selectedRecipientId, user.uid]),
-      orderBy('timestamp', 'asc'),
-      limit(50)
-    );
+    // Construct query that explicitly follows security rules:
+    // 1. Recipient is 'global'
+    // 2. Sender is ME and Recipient is THEM
+    // 3. Sender is THEM and Recipient is ME
+    
+    let q;
+    if (selectedRecipientId === 'global') {
+      q = query(
+        collection(db, 'messages'),
+        where('recipientId', '==', 'global'),
+        orderBy('timestamp', 'asc'),
+        limit(50)
+      );
+    } else {
+      q = query(
+        collection(db, 'messages'),
+        or(
+          and(where('senderId', '==', user.uid), where('recipientId', '==', selectedRecipientId)),
+          and(where('senderId', '==', selectedRecipientId), where('recipientId', '==', user.uid))
+        ),
+        orderBy('timestamp', 'asc'),
+        limit(50)
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({
@@ -67,15 +88,9 @@ export function ChatView({ user, operators }: ChatViewProps) {
         ...doc.data()
       })) as Message[];
       
-      // Filter for specific conversation if not global
-      const filtered = selectedRecipientId === 'global' 
-        ? msgs.filter(m => m.recipientId === 'global')
-        : msgs.filter(m => 
-            (m.senderId === user.uid && m.recipientId === selectedRecipientId) || 
-            (m.senderId === selectedRecipientId && m.recipientId === user.uid)
-          );
-
-      setMessages(filtered);
+      setMessages(msgs);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, `messages [recipient: ${selectedRecipientId}]`);
     });
 
     return () => unsubscribe();
@@ -114,7 +129,6 @@ export function ChatView({ user, operators }: ChatViewProps) {
           externalIds: [selectedRecipientId]
         });
       } else {
-        // Broadcas to everyone? Maybe too much, but for demo let's say "Subscribed Users"
         sendPushNotification({
           title: 'General Ops Message 📡',
           message: `${user.name}: ${inputText.slice(0, 50)}`,
@@ -122,7 +136,7 @@ export function ChatView({ user, operators }: ChatViewProps) {
         });
       }
     } catch (err) {
-      console.error("Failed to send message:", err);
+      handleFirestoreError(err, OperationType.CREATE, 'messages');
     }
   };
 

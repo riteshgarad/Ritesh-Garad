@@ -44,6 +44,7 @@ import {
   increment,
   where
 } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { Campaign, Donor, Donation, Transaction, Project, AppUser, NGODocument } from '../types';
 import DonorCRM from './DonorCRM';
 import CampaignManager from './CampaignManager';
@@ -70,14 +71,15 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
       (snapshot) => {
         setCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign)));
       },
-      (error) => console.error("Campaign listener error:", error)
+      (error) => handleFirestoreError(error, OperationType.LIST, 'campaigns')
     );
 
     const subMarketingMedia = onSnapshot(
       query(collection(db, 'documents'), where('category', '==', 'Marketing'), where('status', '==', 'verified')),
       (snapshot) => {
         setMarketingMedia(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NGODocument)));
-      }
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'marketing_documents')
     );
 
     // Only Admin or Marketing Heads can see donor/donation details
@@ -92,7 +94,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
         (snapshot) => {
           setDonors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Donor)));
         },
-        (error) => console.error("Donor listener error:", error)
+        (error) => handleFirestoreError(error, OperationType.LIST, 'donors')
       );
 
       subDonations = onSnapshot(
@@ -100,7 +102,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
         (snapshot) => {
           setDonations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Donation)));
         },
-        (error) => console.error("Donation listener error:", error)
+        (error) => handleFirestoreError(error, OperationType.LIST, 'donations')
       );
     }
 
@@ -109,7 +111,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
       (snapshot) => {
         setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
       },
-      (error) => console.error("Project listener error:", error)
+      (error) => handleFirestoreError(error, OperationType.LIST, 'projects')
     );
 
     return () => {

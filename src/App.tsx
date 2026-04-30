@@ -66,6 +66,7 @@ import { MobileShell } from './components/MobileShell';
 import { MissionDetailView } from './components/project/MissionDetailView';
 import { sendPushNotification } from './lib/push';
 import { ChatView } from './components/ChatView';
+import { handleFirestoreError, OperationType } from './lib/firestore_errors';
 import OneSignal from 'react-onesignal';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -126,36 +127,7 @@ const secondaryApp = getApps().find(a => a.name === "Secondary")
                      || initializeApp(firebaseConfig, "Secondary");
 export const secondaryAuth = getAuth(secondaryApp);
 
-const handleFirestoreError = (error: any, operationType: string, path: string | null = null) => {
-  const authInfo = auth.currentUser ? {
-    userId: auth.currentUser.uid,
-    email: auth.currentUser.email || '',
-    emailVerified: auth.currentUser.emailVerified,
-    isAnonymous: auth.currentUser.isAnonymous,
-    providerInfo: auth.currentUser.providerData.map(p => ({
-      providerId: p.providerId,
-      displayName: p.displayName || '',
-      email: p.email || ''
-    }))
-  } : {
-    userId: 'anonymous',
-    email: '',
-    emailVerified: false,
-    isAnonymous: true,
-    providerInfo: []
-  };
 
-  const errorInfo = {
-    error: error.message || 'Unknown Firestore error',
-    operationType,
-    path,
-    authInfo
-  };
-  
-  console.error("Firestore Failure:", JSON.stringify(errorInfo, null, 2));
-  toast.error(`Security Clearance Error: ${operationType} on ${path}`);
-  // Do NOT throw, to keep the app alive
-};
 
 async function testConnection() {
   try {
@@ -374,7 +346,7 @@ export default function App() {
               setUser(initialProfile as any);
               setAuthInitialized(true);
             } catch (err) {
-              console.error("Profile bootstrap failed:", err);
+              handleFirestoreError(err, OperationType.WRITE, `users/${firebaseUser.uid}`);
               setUser({
                 uid: firebaseUser.uid,
                 name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
@@ -386,8 +358,7 @@ export default function App() {
             }
           }
         }, (err) => {
-          console.error("Profile Snapshot Error:", err);
-          handleFirestoreError(err, 'get' as any, `users/${firebaseUser.uid}`);
+          handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
           setAuthInitialized(true);
         });
       } else {
@@ -408,6 +379,14 @@ export default function App() {
       const appId = (import.meta as any).env.VITE_ONESIGNAL_APP_ID;
       if (appId) {
         try {
+          // Check if already initialized to prevent error
+          if ((OneSignal as any).initialized) {
+            console.log("OneSignal already initialized");
+            return;
+          }
+
+          const isDev = window.location.hostname.includes('run.app') || window.location.hostname === 'localhost';
+
           await OneSignal.init({
             appId: appId,
             allowLocalhostAsSecureOrigin: true,
@@ -421,8 +400,13 @@ export default function App() {
             } as any,
           });
           console.log("OneSignal Status: Active");
-        } catch (err) {
-          console.error("OneSignal Initialization Error:", err);
+        } catch (err: any) {
+          // Squelch domain mismatch errors in development/preview environments
+          if (err.message?.includes('Can only be used on') || err.message?.includes('initialized')) {
+            console.warn("OneSignal Initialization skipped/failed (expected in dev):", err.message);
+          } else {
+            console.error("OneSignal Initialization Error:", err);
+          }
         }
       }
     };
@@ -434,12 +418,12 @@ export default function App() {
 
     const unsubProjects = onSnapshot(collection(db, 'projects'), 
       (snapshot) => setProjects(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Project))),
-      (err) => handleFirestoreError(err, 'list', 'projects')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'projects')
     );
 
     const unsubTasks = onSnapshot(collection(db, 'tasks'), 
       (snapshot) => setTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Task))),
-      (err) => handleFirestoreError(err, 'list', 'tasks')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'tasks')
     );
 
     const unsubVolunteers = onSnapshot(collection(db, 'volunteers'), 
@@ -451,69 +435,69 @@ export default function App() {
           skills: Array.isArray(data.skills) ? data.skills : (typeof data.skills === 'string' ? data.skills.split(',').map((s: string) => s.trim()) : [])
         } as Volunteer;
       })),
-      (err) => handleFirestoreError(err, 'list', 'volunteers')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'volunteers')
     );
 
     const unsubDocuments = onSnapshot(collection(db, 'documents'),
       (snapshot) => setDocuments(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as NGODocument))),
-      (err) => handleFirestoreError(err, 'list', 'documents')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'documents')
     );
 
     const unsubFinance = (user.role === 'Admin' || (user.role === 'Dept Head' && user.department === 'Finance')) 
       ? onSnapshot(collection(db, 'finance_requests'),
           (snapshot) => setFinanceRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as FinanceRequest))),
-          (err) => handleFirestoreError(err, 'list', 'finance_requests')
+          (err) => handleFirestoreError(err, OperationType.LIST, 'finance_requests')
         )
       : () => {};
 
     const unsubBudgets = (user.role === 'Admin' || user.role === 'Dept Head')
       ? onSnapshot(collection(db, 'budget_requests'),
           (snapshot) => setBudgetRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BudgetRequest))),
-          (err) => handleFirestoreError(err, 'list', 'budget_requests')
+          (err) => handleFirestoreError(err, OperationType.LIST, 'budget_requests')
         )
       : () => {};
 
     const unsubActivityLogs = (user.role === 'Admin')
       ? onSnapshot(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)),
           (snapshot) => setActivityLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ActivityLog))),
-          (err) => handleFirestoreError(err, 'list', 'activity_logs')
+          (err) => handleFirestoreError(err, OperationType.LIST, 'activity_logs')
         )
       : () => {};
 
     const unsubApps = (user.role === 'Admin' || (user.role === 'Dept Head' && user.department === 'HR'))
       ? onSnapshot(collection(db, 'volunteer_applications'),
           (snapshot) => setApplications(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerApplication))),
-          (err) => handleFirestoreError(err, 'list', 'volunteer_applications')
+          (err) => handleFirestoreError(err, OperationType.LIST, 'volunteer_applications')
         )
       : () => {};
 
     const unsubTransactions = (user.role === 'Admin' || (user.role === 'Dept Head' && user.department === 'Finance'))
       ? onSnapshot(collection(db, 'transactions'),
           (snapshot) => setTransactions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction))),
-          (err) => handleFirestoreError(err, 'list', 'transactions')
+          (err) => handleFirestoreError(err, OperationType.LIST, 'transactions')
         )
       : () => {};
 
     const unsubExpenseRequests = (user.role === 'Admin' || (user.role === 'Department Head' && user.department === 'Finance'))
       ? onSnapshot(collection(db, 'expense_requests'),
           (snapshot) => setExpenseRequests(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ExpenseRequest))),
-          (err) => handleFirestoreError(err, 'list', 'expense_requests')
+          (err) => handleFirestoreError(err, OperationType.LIST, 'expense_requests')
         )
       : () => {};
 
     const unsubLogs = onSnapshot(collection(db, 'work_logs'),
       (snapshot) => setWorkLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))),
-      (err) => handleFirestoreError(err, 'list', 'work_logs')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'work_logs')
     );
 
     const unsubCerts = onSnapshot(collection(db, 'volunteer_certificates'),
       (snapshot) => setCertificates(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerCertificate))),
-      (err) => handleFirestoreError(err, 'list', 'volunteer_certificates')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'volunteer_certificates')
     );
 
     const unsubProfiles = onSnapshot(collection(db, 'users'),
       (snapshot) => setOperators(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as any))),
-      (err) => handleFirestoreError(err, 'list', 'users')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'users')
     );
 
     return () => {
@@ -540,7 +524,7 @@ export default function App() {
     }
     const unsub = onSnapshot(collection(db, 'projects', selectedProjectId, 'milestones'), 
       (snapshot) => setMilestones(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Milestone))),
-      (err) => handleFirestoreError(err, 'list', `projects/${selectedProjectId}/milestones`)
+      (err) => handleFirestoreError(err, OperationType.LIST, `projects/${selectedProjectId}/milestones`)
     );
     return () => unsub();
   }, [selectedProjectId, user]);
@@ -550,25 +534,29 @@ export default function App() {
     if (!user) return;
     
     const seedIfEmpty = async () => {
-      const vSnap = await getDocs(collection(db, 'volunteers'));
-      if (vSnap.empty) {
-        console.log("Seeding INITIAL_VOLUNTEERS...");
-        for (const v of INITIAL_VOLUNTEERS) {
-          await addDoc(collection(db, 'volunteers'), { ...v });
+      try {
+        const vSnap = await getDocs(collection(db, 'volunteers'));
+        if (vSnap.empty) {
+          console.log("Seeding INITIAL_VOLUNTEERS...");
+          for (const v of INITIAL_VOLUNTEERS) {
+            await addDoc(collection(db, 'volunteers'), { ...v });
+          }
         }
-      }
 
-      const pSnap = await getDocs(collection(db, 'projects'));
-      if (pSnap.empty) {
-        console.log("Seeding INITIAL_PROJECTS...");
-        for (const p of INITIAL_PROJECTS) {
-          const { id, ...data } = p;
-          await addDoc(collection(db, 'projects'), { 
-            ...data, 
-            creator_id: auth.currentUser?.uid,
-            created_at: serverTimestamp() 
-          });
+        const pSnap = await getDocs(collection(db, 'projects'));
+        if (pSnap.empty) {
+          console.log("Seeding INITIAL_PROJECTS...");
+          for (const p of INITIAL_PROJECTS) {
+            const { id, ...data } = p;
+            await addDoc(collection(db, 'projects'), { 
+              ...data, 
+              creator_id: auth.currentUser?.uid,
+              created_at: serverTimestamp() 
+            });
+          }
         }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, 'seeding');
       }
     };
 
@@ -684,7 +672,7 @@ export default function App() {
 
       setIsProjectModalOpen(false);
     } catch (err) {
-      handleFirestoreError(err, 'create', 'projects');
+      handleFirestoreError(err, OperationType.CREATE, 'projects');
     }
   };
 
@@ -774,7 +762,7 @@ export default function App() {
         }
       }
     } catch (err) {
-      handleFirestoreError(err, 'update', `projects/${projectId}`);
+      handleFirestoreError(err, OperationType.UPDATE, `projects/${projectId}`);
     }
   };
 
@@ -790,7 +778,7 @@ export default function App() {
       });
       setIsVolunteerModalOpen(false);
     } catch (err) {
-      handleFirestoreError(err, 'create', 'volunteers');
+      handleFirestoreError(err, OperationType.CREATE, 'volunteers');
     }
   };
 
@@ -814,7 +802,7 @@ export default function App() {
         setCurrentPage('projects');
       }
     } catch (err) {
-      handleFirestoreError(err, 'delete', `projects/${id}`);
+      handleFirestoreError(err, OperationType.DELETE, `projects/${id}`);
     }
   };
 
@@ -858,7 +846,7 @@ export default function App() {
 
       toast.success("Document Sealed in Vault.");
     } catch (err) {
-      handleFirestoreError(err, 'create', 'documents');
+      handleFirestoreError(err, OperationType.CREATE, 'documents');
     }
   };
 
@@ -874,7 +862,7 @@ export default function App() {
       });
       toast.success(`Protocol executed: Document node marked as ${status}.`);
     } catch (err) {
-      handleFirestoreError(err, 'update', `documents/${id}`);
+      handleFirestoreError(err, OperationType.UPDATE, `documents/${id}`);
     }
   };
 
@@ -884,7 +872,7 @@ export default function App() {
       await deleteDoc(doc(db, 'documents', id));
       toast.success("Record expunged from repository.");
     } catch (err) {
-      handleFirestoreError(err, 'delete', `documents/${id}`);
+      handleFirestoreError(err, OperationType.DELETE, `documents/${id}`);
     }
   };
 
@@ -899,7 +887,7 @@ export default function App() {
       });
       toast.success("Application submitted successfully.");
     } catch (err) {
-      handleFirestoreError(err, 'create', 'volunteer_applications');
+      handleFirestoreError(err, OperationType.CREATE, 'volunteer_applications');
     } finally {
       setIsUpdateLoading(false);
     }
@@ -946,7 +934,7 @@ export default function App() {
       await batch.commit();
       toast.success(`Protocol executed. ${app.name} has been onboarded.`);
     } catch (err) {
-      handleFirestoreError(err, 'update', `volunteer_applications/${app.id}`);
+      handleFirestoreError(err, OperationType.UPDATE, `volunteer_applications/${app.id}`);
     }
   };
 
@@ -991,7 +979,7 @@ export default function App() {
       setIsAddTaskModalOpen(false);
       toast.success("Protocol Injected. Data bridge established.");
     } catch (err) {
-      handleFirestoreError(err, 'create', 'tasks');
+      handleFirestoreError(err, OperationType.CREATE, 'tasks');
     }
   };
 
@@ -1079,7 +1067,7 @@ export default function App() {
       await batch.commit();
       toast.success(`Protocol status: ${newStatus.toUpperCase()}`);
     } catch (err) {
-      handleFirestoreError(err, 'update', `tasks/${id}`);
+      handleFirestoreError(err, OperationType.UPDATE, `tasks/${id}`);
     }
   };
 
@@ -1092,7 +1080,7 @@ export default function App() {
       });
       toast.success("Hours logged. Pending verification by Sector Lead.");
     } catch (err) {
-      handleFirestoreError(err, 'create', 'work_logs');
+      handleFirestoreError(err, OperationType.CREATE, 'work_logs');
     }
   };
 
@@ -1126,7 +1114,7 @@ export default function App() {
       await batch.commit();
       toast.success(`Contribution ${status}. Records synchronized.`);
     } catch (err) {
-      handleFirestoreError(err, 'update', `work_logs/${logId}`);
+      handleFirestoreError(err, OperationType.UPDATE, `work_logs/${logId}`);
     }
   };
 
@@ -1156,7 +1144,7 @@ export default function App() {
 
       toast.success("Recognition Diploma generated and archived.");
     } catch (err) {
-      handleFirestoreError(err, 'create', 'volunteer_certificates');
+      handleFirestoreError(err, OperationType.CREATE, 'volunteer_certificates');
     }
   };
 
@@ -1201,7 +1189,7 @@ export default function App() {
         });
       }
     } catch (err) {
-      handleFirestoreError(err, 'update', `projects/${projectId}/milestones/${milestoneId}`);
+      handleFirestoreError(err, OperationType.UPDATE, `projects/${projectId}/milestones/${milestoneId}`);
     }
   };
 
@@ -1230,7 +1218,7 @@ export default function App() {
         segment: 'Subscribed Users'
       });
     } catch (err) {
-      handleFirestoreError(err, 'create', `projects/${projectId}/milestones`);
+      handleFirestoreError(err, OperationType.CREATE, `projects/${projectId}/milestones`);
     }
   };
 
@@ -1328,9 +1316,7 @@ export default function App() {
       setIsEditBudgetModalOpen(false);
       setEditingProject(null);
     } catch (err) {
-      console.error(err);
-      toast.error("Resubmission failed. Please check connectivity.");
-      handleFirestoreError(err, 'update', `projects/${projectId}/budget`);
+      handleFirestoreError(err, OperationType.UPDATE, `projects/${projectId}/budget`);
     } finally {
       setIsUpdateLoading(false);
     }
@@ -1646,7 +1632,11 @@ export default function App() {
               applications={applications}
               onApprove={handleApproveApplication}
               onReject={async (id: string) => {
-                await updateDoc(doc(db, 'volunteer_applications', id), { status: 'rejected' });
+                try {
+                  await updateDoc(doc(db, 'volunteer_applications', id), { status: 'rejected' });
+                } catch (err) {
+                  handleFirestoreError(err, OperationType.UPDATE, `volunteer_applications/${id}`);
+                }
               }}
               onLogHours={handleLogHours}
               workLogs={workLogs}
@@ -2848,7 +2838,7 @@ const FinanceView = () => {
     return onSnapshot(q, (snapshot) => {
       setFinanceRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinanceRequest)));
       setLoading(false);
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'finance_requests'));
   }, []);
 
   return (
