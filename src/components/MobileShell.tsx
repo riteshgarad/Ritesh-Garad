@@ -20,6 +20,7 @@ import {
   Megaphone,
   Globe,
   Database,
+  Zap,
   X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -101,6 +102,7 @@ export const MobileShell = ({
     },
     { id: 'docs', icon: FileText, label: 'Protocols Vault' },
     { id: 'tasks', icon: Layout, label: 'Force Board' },
+    { id: 'automation', icon: Zap, label: 'Automation Hub', roles: ['Admin'] },
   ];
 
   const handleNavClick = (id: string) => {
@@ -122,6 +124,7 @@ export const MobileShell = ({
 
       <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1 custom-scrollbar">
         {navigation.map((item) => {
+          if (item.roles && user && !item.roles.includes(user.role)) return null;
           const isMenuActive = activePath === item.id || item.subs?.some(s => s.id === activePath);
           const isExpanded = expandedMenus.includes(item.id);
           const Icon = item.icon;

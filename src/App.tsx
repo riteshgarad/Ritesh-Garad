@@ -2482,6 +2482,7 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
                 { label: 'Log Pulse', icon: CheckSquare, color: 'bg-emerald-50 text-emerald-600 border-emerald-100', page: 'tasks' },
                 { label: 'Credit flow', icon: IndianRupee, color: 'bg-amber-50 text-amber-600 border-amber-100', page: 'finance' },
                 { label: 'Deployment', icon: Users, color: 'bg-indigo-50 text-indigo-600 border-indigo-100', page: 'volunteers' },
+                ...(user.role === 'Admin' ? [{ label: 'Automata', icon: Zap, color: 'bg-rose-50 text-rose-600 border-rose-100', page: 'automation' }] : [])
               ].map((action, i) => (
                 <button 
                   key={i} 
