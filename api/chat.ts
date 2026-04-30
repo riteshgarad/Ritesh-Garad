@@ -12,8 +12,7 @@ export default async function handler(req: any, res: any) {
       return res.status(503).json({ error: 'GEMINI_API_KEY is not configured.' });
     }
 
-    const genAI = new GoogleGenAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const ai = new GoogleGenAI({ apiKey });
     
     const fullPrompt = `
         You are the AI Assistant for Garad Foundation, a youth-led NGO from Maharashtra, India. 
@@ -25,10 +24,12 @@ export default async function handler(req: any, res: any) {
         User asks: ${prompt}
       `;
 
-    const result = await model.generateContent(fullPrompt);
-    const responseText = result.response.text();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: fullPrompt,
+    });
 
-    res.status(200).json({ text: responseText });
+    res.status(200).json({ text: response.text });
   } catch (error: any) {
     console.error("Vercel AI Error:", error);
     res.status(500).json({ error: error.message });
