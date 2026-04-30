@@ -27,6 +27,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { NotificationPanel } from './NotificationPanel';
 
 interface MobileShellProps {
   children: React.ReactNode;
@@ -36,6 +37,10 @@ interface MobileShellProps {
   hasNotifications?: boolean;
   onNotifClick?: () => void;
   onLogout?: () => void;
+  notifications?: any[];
+  isNotifOpen?: boolean;
+  onMarkAsRead?: (id: string) => void;
+  onClearNotifications?: () => void;
   user?: any;
   projectsCount?: number;
   pendingApprovalsCount?: number;
@@ -50,6 +55,10 @@ export const MobileShell = ({
   hasNotifications,
   onNotifClick,
   onLogout,
+  notifications = [],
+  isNotifOpen = false,
+  onMarkAsRead,
+  onClearNotifications,
   user,
   projectsCount = 0,
   pendingApprovalsCount = 0,
@@ -316,20 +325,39 @@ export const MobileShell = ({
             </div>
           </div>
           
-          <div className="flex items-center gap-2 md:gap-4">
-            <div className="hidden md:flex flex-col text-right mr-2">
+          <div className="flex items-center gap-2 md:gap-4 h-full py-2">
+            <div className="hidden md:flex flex-col text-right mr-2 justify-center">
               <span className="text-[9px] font-black text-terracotta/30 uppercase tracking-widest mb-0.5">System Clock</span>
               <span className="text-[10px] font-bold text-mahogany uppercase font-mono tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
-            <button 
-              onClick={onNotifClick}
-              className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 relative hover:text-terracotta hover:scale-105 transition-all shadow-sm group"
-            >
-              <Bell size={18} className="group-hover:rotate-12 transition-transform" />
-              {hasNotifications && (
-                <span className="absolute top-2.5 right-2.5 lg:top-3 lg:right-3 w-2 h-2 bg-terracotta rounded-full border-2 border-white animate-pulse" />
-              )}
-            </button>
+            {onNotifClick && (
+              <div className="relative">
+                <button 
+                  onClick={onNotifClick}
+                  className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 relative hover:text-terracotta hover:border-terracotta/50 transition-all shadow-sm active:scale-95 group"
+                  title="Notifications"
+                  id="notification-bell"
+                >
+                  <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+                  {hasNotifications && (
+                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-terracotta rounded-full border-2 border-white animate-pulse" />
+                  )}
+                </button>
+                
+                <AnimatePresence>
+                  {isNotifOpen && (
+                    <div className="absolute right-0 top-full mt-2 z-[100]">
+                      <NotificationPanel 
+                        notifications={notifications}
+                        onClose={onNotifClick}
+                        onMarkAsRead={(id) => onMarkAsRead?.(id)}
+                        onClearAll={() => onClearNotifications?.()}
+                      />
+                    </div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
         </header>
 
