@@ -65,7 +65,7 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
     }, err => handleFirestoreError(err, OperationType.LIST, 'transactions'));
 
-    const qRequests = query(collection(db, 'expense_requests'), orderBy('timestamp', 'desc'));
+    const qRequests = query(collection(db, 'expense_requests'), orderBy('submittedAt', 'desc'));
     const unsubReq = onSnapshot(qRequests, (snapshot) => {
       setExpenseRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRequest)));
     }, err => handleFirestoreError(err, OperationType.LIST, 'expense_requests'));
