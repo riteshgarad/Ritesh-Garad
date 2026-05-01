@@ -131,6 +131,27 @@ export const ChatWindow = ({
                       : "bg-white text-mahogany chat-bubble-left border border-white",
                     isMe ? (isFirstInThread ? "rounded-tr-none" : "") : (isFirstInThread ? "rounded-tl-none" : "")
                   )}>
+                    {message.attachment && (
+                      <div className="mb-2 max-w-[240px] rounded-lg overflow-hidden border border-white/10">
+                        {message.attachment.isImage ? (
+                          <img 
+                            src={message.attachment.url} 
+                            alt="attachment" 
+                            className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          />
+                        ) : (
+                          <div className={cn(
+                            "flex items-center gap-3 p-3 text-[12px] font-bold uppercase tracking-tight",
+                            isMe ? "bg-white/10" : "bg-slate-50"
+                          )}>
+                            <div className="w-8 h-8 rounded bg-white/20 flex items-center justify-center shrink-0">
+                               <Shield size={16} />
+                            </div>
+                            <span className="truncate">{message.attachment.name}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <p className="leading-[1.5] tracking-tight whitespace-pre-wrap break-words">
                       {message.text}
                     </p>

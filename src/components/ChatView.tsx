@@ -144,8 +144,8 @@ export function ChatView({ user, operators }: ChatViewProps) {
     return () => unsubscribe();
   }, [selectedRecipientId, user.uid]);
 
-  const handleSendMessage = async (text: string) => {
-    if (!text.trim()) return;
+  const handleSendMessage = async (text: string, attachment?: { url: string; name: string; type: string; isImage: boolean }) => {
+    if (!text.trim() && !attachment) return;
 
     const messageData = {
       text: text,
@@ -153,7 +153,8 @@ export function ChatView({ user, operators }: ChatViewProps) {
       senderName: user.name,
       recipientId: selectedRecipientId,
       timestamp: serverTimestamp(),
-      read: false
+      read: false,
+      attachment: attachment || null
     };
 
     try {

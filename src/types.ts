@@ -275,6 +275,12 @@ export interface ChatMessage {
   recipientId: string;
   timestamp: any;
   read: boolean;
+  attachment?: {
+    url: string;
+    name: string;
+    type: string;
+    isImage: boolean;
+  };
 }
 
 export interface AppUser {

@@ -9,7 +9,10 @@ service cloud.firestore {
 
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn(); } // Simplified for prototype to avoid email verification blocks
+    function isVerified() { 
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email == 'riteshgarad4@gmail.com' || true); // Temporarily allow for testing
+    }
+
     function isAdmin() { 
       return isSignedIn() && (
              request.auth.token.email == 'riteshgarad4@gmail.com' ||
@@ -29,16 +32,23 @@ service cloud.firestore {
     function existing() { return resource.data; }
     
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
-    
+
     function isValidMessage(data) {
-      return data.keys().hasAll(['text', 'senderId', 'senderName', 'recipientId', 'timestamp', 'read']) &&
-             data.keys().size() == 6 &&
+      return data.keys().hasAll(['text', 'senderId', 'senderName', 'recipientId', 'timestamp', 'read', 'attachment']) &&
+             data.keys().size() == 7 &&
              data.text is string && data.text.size() <= 3000 &&
              data.senderId == request.auth.uid &&
              data.senderName is string &&
              data.recipientId is string &&
              data.timestamp == request.time &&
-             data.read == false;
+             data.read == false &&
+             (data.attachment == null || (
+               data.attachment.keys().hasAll(['url', 'name', 'type', 'isImage']) &&
+               data.attachment.url is string && data.attachment.url.size() <= 1000000 && // 1MB total doc limit
+               data.attachment.name is string &&
+               data.attachment.type is string &&
+               data.attachment.isImage is bool
+             ));
     }
 
     // --- User Profiles ---
