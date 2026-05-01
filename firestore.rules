@@ -131,30 +131,29 @@ service cloud.firestore {
 
     // --- Finance & Transactions ---
     match /finance/{fId} {
-      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow list: if isAdmin() || (isSignedIn() && resource.data.department == 'Finance');
       allow get: if isAdmin() || isDeptHead('Finance');
       allow create: if isAdmin() || isDeptHead('Finance');
     }
 
     match /transactions/{tId} {
-      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow list: if isAdmin() || (isSignedIn() && resource.data.department == 'Finance');
       allow get: if isAdmin() || isDeptHead('Finance');
       allow create: if isAdmin() || isDeptHead('Finance') || isDeptHead('Operations');
       allow update: if isAdmin() || isDeptHead('Finance');
     }
 
     match /finance_requests/{rId} {
-      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow list: if isAdmin() || (isSignedIn() && resource.data.department == 'Finance');
       allow get: if isAdmin() || isDeptHead('Finance');
       allow write: if isAdmin() || isDeptHead('Finance');
     }
 
     match /expense_requests/{rId} {
-      allow list: if isSignedIn() && (
-        request.auth.token.email == 'riteshgarad4@gmail.com' || 
+      allow list: if isAdmin() || (isSignedIn() && (
         resource.data.requesterId == request.auth.uid ||
         resource.data.department == 'Finance'
-      );
+      ));
       allow get: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && resource.data.requesterId == request.auth.uid);
       allow update, delete: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && existing().requesterId == request.auth.uid);
       allow create: if isVerified();
@@ -175,13 +174,13 @@ service cloud.firestore {
 
     // --- Donors & Donations ---
     match /donors/{dId} {
-      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department in ['Finance', 'Public Relations']);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.department in ['Finance', 'Public Relations']);
       allow get: if isAdmin() || isDeptHead('Finance') || isDeptHead('Public Relations');
       allow write: if isAdmin() || isDeptHead('Finance');
     }
 
     match /donations/{dId} {
-      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow list: if isAdmin() || (isSignedIn() && resource.data.department == 'Finance');
       allow get: if isAdmin() || isDeptHead('Finance');
       allow create: if isVerified();
     }

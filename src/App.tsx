@@ -2135,7 +2135,7 @@ const PageView = ({
   
   useEffect(() => {
     if (isFinanceHead) {
-      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals'];
+      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
       if (!allowedPages.includes(page)) {
         // Redirect to dashboard if trying to access unauthorized page
         setCurrentPage('dashboard');
@@ -2145,7 +2145,7 @@ const PageView = ({
 
   // If Finance Head and on unauthorized page, don't render content for that frame
   if (isFinanceHead) {
-    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals'];
+    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
     if (!allowedPages.includes(page)) {
       return null;
     }

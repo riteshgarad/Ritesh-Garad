@@ -133,9 +133,9 @@ export const MobileShell = ({
     
     const isYukta = user.email === 'yuktagarad@gmail.com' || user.name === 'Yukta';
     
-    // Strict filtering for Yukta as requested: Only Comms, Finance, and Calendar
+    // Strict filtering for Yukta as requested: Only Comms, Finance, and Calendar + Dashboard & Missions
     if (isYukta) {
-      const allowedForYukta = ['messages', 'finance', 'schedule'];
+      const allowedForYukta = ['dashboard', 'messages', 'finance', 'schedule', 'missions', 'projects'];
       return allowedForYukta.includes(item.id);
     }
 
