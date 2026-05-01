@@ -305,64 +305,69 @@ export const MobileShell = ({
       {/* Main Layout Container */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden lg:ml-80">
         {/* Top App Bar */}
-        <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-[calc(env(safe-area-inset-top,24px)+24px)] pb-6 h-auto min-h-[100px]">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
-            >
-              <Menu size={20} />
-            </button>
-            <div className="hidden sm:block lg:hidden w-10 h-10 bg-mahogany rounded-xl flex items-center justify-center shadow-md border border-white/10 text-white">
-              <Shield size={20} strokeWidth={2.5} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-xs lg:text-sm font-black uppercase tracking-[0.2em] text-mahogany leading-none">{title}</h1>
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+        {activePath !== 'messages' && (
+          <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-[calc(env(safe-area-inset-top,24px)+24px)] pb-6 h-auto min-h-[100px]">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2 text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="hidden sm:block lg:hidden w-10 h-10 bg-mahogany rounded-xl flex items-center justify-center shadow-md border border-white/10 text-white">
+                <Shield size={20} strokeWidth={2.5} />
               </div>
-              <p className="text-[9px] font-bold text-terracotta/40 uppercase tracking-widest hidden sm:block">Sector 7-G / Node Protocol v5.0</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 md:gap-4 h-full py-2">
-            <div className="hidden md:flex flex-col text-right mr-2 justify-center">
-              <span className="text-[9px] font-black text-terracotta/30 uppercase tracking-widest mb-0.5">System Clock</span>
-              <span className="text-[10px] font-bold text-mahogany uppercase font-mono tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-            {onNotifClick && (
-              <div className="relative">
-                <button 
-                  onClick={onNotifClick}
-                  className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 relative hover:text-terracotta hover:border-terracotta/50 transition-all shadow-sm active:scale-95 group"
-                  title="Notifications"
-                  id="notification-bell"
-                >
-                  <Bell size={20} className="group-hover:rotate-12 transition-transform" />
-                  {hasNotifications && (
-                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-terracotta rounded-full border-2 border-white animate-pulse" />
-                  )}
-                </button>
-                
-                <AnimatePresence>
-                  {isNotifOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-[100]">
-                      <NotificationPanel 
-                        notifications={notifications}
-                        onClose={onNotifClick}
-                        onMarkAsRead={(id) => onMarkAsRead?.(id)}
-                        onClearAll={() => onClearNotifications?.()}
-                      />
-                    </div>
-                  )}
-                </AnimatePresence>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-xs lg:text-sm font-black uppercase tracking-[0.2em] text-mahogany leading-none">{title}</h1>
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                </div>
+                <p className="text-[9px] font-bold text-terracotta/40 uppercase tracking-widest hidden sm:block">Sector 7-G / Node Protocol v5.0</p>
               </div>
-            )}
-          </div>
-        </header>
+            </div>
+            
+            <div className="flex items-center gap-2 md:gap-4 h-full py-2">
+              <div className="hidden md:flex flex-col text-right mr-2 justify-center">
+                <span className="text-[9px] font-black text-terracotta/30 uppercase tracking-widest mb-0.5">System Clock</span>
+                <span className="text-[10px] font-bold text-mahogany uppercase font-mono tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              {onNotifClick && (
+                <div className="relative">
+                  <button 
+                    onClick={onNotifClick}
+                    className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 relative hover:text-terracotta hover:border-terracotta/50 transition-all shadow-sm active:scale-95 group"
+                    title="Notifications"
+                    id="notification-bell"
+                  >
+                    <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+                    {hasNotifications && (
+                      <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-terracotta rounded-full border-2 border-white animate-pulse" />
+                    )}
+                  </button>
+                  
+                  <AnimatePresence>
+                    {isNotifOpen && (
+                      <div className="absolute right-0 top-full mt-2 z-[100]">
+                        <NotificationPanel 
+                          notifications={notifications}
+                          onClose={onNotifClick}
+                          onMarkAsRead={(id) => onMarkAsRead?.(id)}
+                          onClearAll={() => onClearNotifications?.()}
+                        />
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+          </header>
+        )}
 
         {/* Main Scrolling Content Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-10 bg-slate-50/30 max-w-full">
+        <main className={cn(
+          "flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/30 max-w-full",
+          activePath === 'messages' ? "p-0" : "p-4 lg:p-10"
+        )}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activePath}

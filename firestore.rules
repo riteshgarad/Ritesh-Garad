@@ -194,7 +194,15 @@ service cloud.firestore {
         resource.data.senderId == request.auth.uid
       );
       allow create: if isVerified() && isValidMessage(incoming());
-      allow update, delete: if false;
+      allow update: if isVerified() && (
+        isAdmin() ||
+        (
+          (existing().recipientId == request.auth.uid || (existing().recipientId == 'global' && existing().senderId != request.auth.uid)) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['read']) &&
+          incoming().read == true
+        )
+      );
+      allow delete: if isAdmin();
     }
   }
 }

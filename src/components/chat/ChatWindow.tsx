@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Shield, ArrowLeft, MoreVertical, CheckCheck } from 'lucide-react';
+import { Shield, ArrowLeft, MoreVertical, CheckCheck, Users } from 'lucide-react';
 import { AppUser, ChatMessage } from '../../types';
 import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,101 +25,128 @@ export const ChatWindow = ({
     }
   }, [messages]);
 
+  const formatDateLabel = (date: Date) => {
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#FAF7F2] relative overflow-hidden">
       {/* WhatsApp Wallpaper Pattern Overlay */}
       <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#A63A1B 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-mahogany/5 px-4 pt-safe pb-4 flex items-center justify-between shrink-0 z-20 shadow-sm sticky top-0">
-        <div className="flex items-center gap-3">
+      <header className="bg-white/95 backdrop-blur-md border-b border-mahogany/5 px-4 pt-safe pb-3 flex items-center justify-between shrink-0 z-20 shadow-sm sticky top-0">
+        <div className="flex items-center gap-1.5 overflow-hidden">
           <button 
             onClick={onBack}
-            className="md:hidden p-2 -ml-2 text-slate-400 hover:text-mahogany transition-colors active:scale-95"
+            className="p-2 -ml-2 text-mahogany hover:bg-slate-50 rounded-full transition-all active:scale-95 shrink-0"
           >
-            <ArrowLeft size={22} />
+            <ArrowLeft size={22} strokeWidth={2.5} />
           </button>
-          <div className="relative group cursor-pointer">
-            <div className="w-11 h-11 rounded-full bg-mahogany/5 flex items-center justify-center text-mahogany text-base font-black shadow-inner border border-mahogany/10 group-hover:scale-105 transition-transform">
-              {recipient.uid === 'global' ? 'G' : recipient.name.charAt(0)}
+          <div className="relative shrink-0">
+            <div className="w-10 h-10 rounded-full bg-mahogany/5 flex items-center justify-center text-mahogany text-base font-black shadow-inner border border-mahogany/10">
+              {recipient.uid === 'global' ? <Users size={18} /> : recipient.name.charAt(0)}
             </div>
             {recipient.uid !== 'global' && (
-               <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
+               <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
             )}
           </div>
-          <div className="flex flex-col truncate max-w-[160px] sm:max-w-xs">
-            <h3 className="text-[14px] font-black text-mahogany uppercase tracking-tight leading-none truncate">
+          <div className="flex flex-col truncate ml-1.5">
+            <h3 className="text-[15px] font-black text-mahogany tracking-tight leading-tight truncate">
               {recipient.uid === 'global' ? 'General Operations' : recipient.name}
             </h3>
-            <div className="flex items-center gap-1.5 mt-1.5">
-               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-               <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">
-                 {recipient.uid === 'global' ? 'System Bridge' : 'Active Secure'}
+            <div className="flex items-center gap-1.5">
+               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+               <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none">
+                 {recipient.uid === 'global' ? 'Mission Bridge' : 'Active Now'}
                </p>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1 text-slate-400">
-           <button className="p-2 hover:bg-slate-50 rounded-full transition-colors"><Shield size={18} className="text-terracotta/50" /></button>
-           <button className="p-2 hover:bg-slate-50 rounded-full transition-colors"><MoreVertical size={20} /></button>
+        <div className="flex items-center gap-0.5 text-slate-400 shrink-0">
+           <button className="p-2.5 hover:bg-slate-50 rounded-full transition-colors"><Shield size={20} className="text-terracotta/60" /></button>
+           <button className="p-2.5 hover:bg-slate-50 rounded-full transition-colors"><MoreVertical size={20} /></button>
         </div>
       </header>
 
       {/* Messages Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-3 z-10 no-scrollbar"
+        className="flex-1 overflow-y-auto px-3 py-4 space-y-2 z-10 no-scrollbar pb-10"
       >
-        <div className="flex flex-col items-center mb-10 mt-2">
-          <div className="px-5 py-2 bg-white/60 backdrop-blur-sm rounded-2xl border border-mahogany/5 shadow-sm">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Signal Bridge Established | E2E Secure</p>
+        <div className="flex flex-col items-center mb-8 mt-2">
+          <div className="px-5 py-2 bg-white/80 backdrop-blur-sm rounded-xl border border-mahogany/5 shadow-sm">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.22em] text-center">
+              Signals are secured with missionary-grade encryption
+            </p>
           </div>
         </div>
 
         <AnimatePresence initial={false}>
           {messages.map((message, i) => {
             const isMe = message.senderId === user.uid;
+            const msgDate = message.timestamp ? (message.timestamp.toDate ? message.timestamp.toDate() : new Date(message.timestamp)) : new Date();
             const prevMsg = i > 0 ? messages[i-1] : null;
-            const isFirstInThread = !prevMsg || prevMsg.senderId !== message.senderId;
+            const prevDate = prevMsg?.timestamp ? (prevMsg.timestamp.toDate ? prevMsg.timestamp.toDate() : new Date(prevMsg.timestamp)) : null;
+            
+            const showDateLabel = !prevDate || prevDate.toDateString() !== msgDate.toDateString();
+            const isFirstInThread = !prevMsg || prevMsg.senderId !== message.senderId || showDateLabel;
 
             return (
-              <motion.div 
-                key={message.id || i}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                layout
-                className={cn(
-                  "flex flex-col group max-w-[82%]",
-                  isMe ? "ml-auto items-end" : "mr-auto items-start",
-                  isFirstInThread ? "mt-4" : "mt-0.5"
-                )}
-              >
-                {recipient.uid === 'global' && !isMe && isFirstInThread && (
-                  <p className="text-[9px] font-black text-slate-400 uppercase ml-3 mb-1 tracking-widest">{message.senderName}</p>
+              <React.Fragment key={message.id || i}>
+                {showDateLabel && (
+                  <div className="flex justify-center my-6">
+                    <div className="px-4 py-1.5 bg-[#E1E8EB]/80 backdrop-blur-sm rounded-lg shadow-sm border border-white/20">
+                      <p className="text-[10px] font-black text-[#54656F] uppercase tracking-widest">
+                        {formatDateLabel(msgDate)}
+                      </p>
+                    </div>
+                  </div>
                 )}
                 
-                <div className={cn(
-                  "relative px-4 py-2.5 rounded-2xl text-[13px] font-medium transition-all shadow-sm",
-                  isMe 
-                    ? "bg-terracotta text-white chat-bubble-right" 
-                    : "bg-white text-mahogany chat-bubble-left border border-mahogany/5",
-                  isMe ? (isFirstInThread ? "rounded-tr-none" : "") : (isFirstInThread ? "rounded-tl-none" : "")
-                )}>
-                  <p className="leading-relaxed tracking-tight whitespace-pre-wrap break-words">
-                    {message.text}
-                  </p>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  layout
+                  className={cn(
+                    "flex flex-col group max-w-[85%]",
+                    isMe ? "ml-auto items-end" : "mr-auto items-start",
+                    isFirstInThread ? "mt-3" : "mt-0.5"
+                  )}
+                >
+                  {recipient.uid === 'global' && !isMe && isFirstInThread && (
+                    <p className="text-[10px] font-black text-mahogany/40 uppercase ml-2 mb-1 tracking-widest">{message.senderName}</p>
+                  )}
                   
-                  <div className="flex items-center justify-end gap-1 mt-1 -mr-1">
-                    <p className={cn(
-                      "text-[9px] font-bold uppercase tracking-tighter opacity-70",
-                      isMe ? "text-white/80" : "text-slate-400"
-                    )}>
-                      {message.timestamp ? (message.timestamp.toDate ? message.timestamp.toDate() : new Date(message.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                  <div className={cn(
+                    "relative px-3 py-2 rounded-xl text-[14px] font-medium transition-all shadow-sm",
+                    isMe 
+                      ? "bg-terracotta text-white chat-bubble-right" 
+                      : "bg-white text-mahogany chat-bubble-left border border-white",
+                    isMe ? (isFirstInThread ? "rounded-tr-none" : "") : (isFirstInThread ? "rounded-tl-none" : "")
+                  )}>
+                    <p className="leading-[1.5] tracking-tight whitespace-pre-wrap break-words">
+                      {message.text}
                     </p>
-                    {isMe && <CheckCheck size={12} className={cn(message.read ? "text-[#34B7F1]" : "text-white/40")} />}
+                    
+                    <div className="flex items-center justify-end gap-1 mt-1 -mb-1 ml-4 h-4">
+                      <p className={cn(
+                        "text-[9px] font-bold uppercase tracking-tighter",
+                        isMe ? "text-white/70" : "text-slate-400"
+                      )}>
+                        {message.timestamp ? msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </p>
+                      {isMe && <CheckCheck size={14} className={cn(message.read ? "text-[#34B7F1]" : "text-white/40")} />}
+                    </div>
                   </div>
-                </div>
-              </motion.div>
+                </motion.div>
+              </React.Fragment>
             );
           })}
         </AnimatePresence>

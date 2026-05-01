@@ -184,10 +184,10 @@ export function ChatView({ user, operators }: ChatViewProps) {
     : operators.find(o => o.uid === selectedRecipientId);
 
   return (
-    <div className="flex h-full bg-cream overflow-hidden">
+    <div className="flex h-[100dvh] bg-white overflow-hidden safe-bottom">
       {/* Sidebar Interface */}
       <div className={cn(
-        "transition-all duration-500 ease-in-out shrink-0",
+        "transition-all duration-300 ease-in-out shrink-0 h-full",
         selectedRecipientId ? "hidden md:block w-80" : "w-full"
       )}>
         <ChatList 
@@ -203,7 +203,7 @@ export function ChatView({ user, operators }: ChatViewProps) {
 
       {/* Thread Interface */}
       <div className={cn(
-        "flex-1 flex flex-col transition-all duration-500",
+        "flex-1 flex flex-col h-full bg-[#FAF7F2] transition-all duration-300",
         !selectedRecipientId ? "hidden md:flex" : "flex"
       )}>
         {selectedRecipientId && selectedRecipient ? (
