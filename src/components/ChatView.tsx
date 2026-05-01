@@ -185,7 +185,7 @@ export function ChatView({ user, operators }: ChatViewProps) {
     : operators.find(o => o.uid === selectedRecipientId);
 
   return (
-    <div className="flex h-[100dvh] bg-white overflow-hidden safe-bottom">
+    <div className="flex h-full bg-white overflow-hidden">
       {/* Sidebar Interface */}
       <div className={cn(
         "transition-all duration-300 ease-in-out shrink-0 h-full",

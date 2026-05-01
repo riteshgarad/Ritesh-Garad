@@ -138,7 +138,7 @@ export const MissionDetailView = ({
         </div>
       </header>
 
-      <main className="p-4 space-y-6 max-w-md mx-auto">
+      <main className="p-4 md:p-8 lg:p-12 space-y-8 w-full">
         {/* Mission Identity Section */}
         <motion.section 
           initial={{ opacity: 0, y: 10 }}
@@ -179,7 +179,7 @@ export const MissionDetailView = ({
           <VelocityGauge progress={velocity} />
 
           {/* Mission Protocol (Signal Nodes) Section */}
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-soft border border-mahogany/5">
+          <div className="bg-transparent p-0 overflow-hidden">
              <div className="flex items-center justify-between mb-8">
                <div className="flex items-center gap-2">
                  <div className="p-1.5 bg-mahogany/5 rounded-lg">
@@ -247,8 +247,8 @@ export const MissionDetailView = ({
                       onKeyDown={e => e.key === 'Enter' && handleAddProtocol()}
                     />
                     <div className="flex gap-2">
-                      <button onClick={handleAddProtocol} className="flex-1 py-3 bg-mahogany text-white rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform shadow-lg shadow-mahogany/10">Establish Node</button>
-                      <button onClick={() => setShowAddProtocol(false)} className="px-4 py-3 bg-slate-100 text-slate-500 rounded-xl text-[9px] font-black uppercase tracking-widest">Abort</button>
+                       <button onClick={handleAddProtocol} className="flex-1 py-3 bg-mahogany text-white rounded-xl text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform shadow-lg shadow-mahogany/10">Establish Node</button>
+                       <button onClick={() => setShowAddProtocol(false)} className="px-4 py-3 bg-slate-100 text-slate-500 rounded-xl text-[9px] font-black uppercase tracking-widest">Abort</button>
                     </div>
                   </motion.div>
                 ) : (
@@ -266,7 +266,7 @@ export const MissionDetailView = ({
           </div>
 
           {/* Finance Deployment Status */}
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-soft border border-mahogany/5">
+          <div className="bg-transparent p-0 overflow-hidden">
              <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-2">
                    <div className="p-1.5 bg-emerald-50 rounded-lg">
@@ -313,7 +313,7 @@ export const MissionDetailView = ({
           <PersonnelScroll personnel={projectTeam} />
 
           {/* Recent Activity Mini-List */}
-          <div className="bg-white rounded-[2.5rem] p-6 shadow-soft border border-mahogany/5">
+          <div className="bg-transparent p-0 overflow-hidden">
              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Signal Logs</h3>
              <div className="space-y-4">
                {recentTasks.length > 0 ? recentTasks.map((task, i) => (

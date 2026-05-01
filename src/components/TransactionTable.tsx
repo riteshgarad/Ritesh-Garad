@@ -52,7 +52,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onAct
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden bg-white/50 backdrop-blur-md rounded-3xl border border-slate-200/60 shadow-sm">
+      <div className="overflow-hidden bg-transparent">
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">

@@ -262,59 +262,71 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative pb-24">
+    <div className="flex flex-col h-full bg-transparent relative pb-24">
       {/* Inbox View */}
       <div className={cn(
         "flex-1 flex flex-col h-full",
         selectedRequestId && "hidden"
       )}>
-        <div className="p-6 sticky top-0 bg-slate-50/80 backdrop-blur-md z-10">
-          <h2 className="text-xl font-black text-slate-900 tracking-tighter uppercase mb-1">Authorization Desk</h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Security Clearance Level 4 Required</p>
+        <div className="py-8 sticky top-0 bg-transparent z-10 flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase mb-1">Authorization Desk</h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Security Clearance Level 4 Required</p>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 space-y-4">
+        <div className="flex-1 overflow-y-auto pb-12">
           {pendingRequests.length === 0 ? (
-            <div className="py-20 text-center flex flex-col items-center gap-4 bg-white rounded-[3rem] shadow-soft">
-              <ShieldCheck className="text-blue-100" size={60} />
-              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No pending authorizations</p>
+            <div className="py-32 text-center flex flex-col items-center gap-4 bg-white/40 rounded-[3rem] border border-slate-200/50 backdrop-blur-sm">
+              <ShieldCheck className="text-blue-200" size={80} />
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">No pending authorizations</p>
             </div>
           ) : (
-            pendingRequests.map(request => (
-              <motion.div
-                key={request.id}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => setSelectedRequestId(request.id)}
-                className="bg-white p-6 rounded-[2.5rem] shadow-soft border border-blue-50/50 relative overflow-hidden group border-l-4 border-l-blue-500"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex gap-2">
-                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black">
-                      <Mail size={20} />
-                    </div>
-                    {(request as any).type === 'budget' && (
-                      <div className="px-2 py-1 bg-[#A63A1B]/10 text-[#A63A1B] text-[8px] font-black uppercase rounded mt-1 h-fit">
-                        Project Budget
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {pendingRequests.map(request => (
+                <motion.div
+                  key={request.id}
+                  whileHover={{ y: -5, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedRequestId(request.id)}
+                  className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden group cursor-pointer transition-all hover:border-blue-500/30"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/30 rounded-full -mr-8 -mt-8 group-hover:scale-150 transition-transform duration-700" />
+                  
+                  <div className="flex justify-between items-start mb-10 relative z-10">
+                    <div className="flex flex-col gap-2">
+                      <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-extrabold shadow-sm">
+                        <Mail size={24} />
                       </div>
-                    )}
+                      {(request as any).type === 'budget' && (
+                        <div className="px-3 py-1 bg-[#A63A1B] text-white text-[8px] font-black uppercase rounded-lg w-fit shadow-lg shadow-[#A63A1B]/20">
+                          Project Budget
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 font-mono">VERIFICATION REQ</p>
+                      <p className="text-3xl font-black text-slate-900 tracking-tighter">₹{request.amount.toLocaleString()}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Verification Req</p>
-                    <p className="text-lg font-black text-slate-900">₹{request.amount.toLocaleString()}</p>
+                  
+                  <div className="relative z-10">
+                    <h4 className="text-lg font-black text-slate-900 leading-tight mb-2 tracking-tight group-hover:text-blue-600 transition-colors">{request.description}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                       Operative: {request.requesterName}
+                    </p>
                   </div>
-                </div>
-                
-                <h4 className="text-sm font-bold text-slate-800 mb-1">{request.description}</h4>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Operative: {request.requesterName}
-                </p>
-                
-                <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
-                  <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Awaiting Signature</span>
-                  <ChevronRight size={14} className="text-slate-300" />
-                </div>
-              </motion.div>
-            ))
+                  
+                  <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between relative z-10">
+                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest font-mono">Awaiting Signature</span>
+                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <ChevronRight size={14} />
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           )}
         </div>
       </div>

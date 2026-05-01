@@ -154,7 +154,7 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
         <div className="absolute top-0 right-0 p-12 opacity-5 text-white transform rotate-12">
             <ShieldCheck size={200} />
         </div>
-        <div className="max-w-7xl mx-auto relative z-10">
+        <div className="w-full px-4 md:px-8 relative z-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -177,7 +177,7 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
       </div>
 
       {/* Sub-Navigation */}
-      <div className="max-w-7xl mx-auto px-8 -mt-12 mb-12">
+      <div className="w-full px-4 md:px-8 -mt-12 mb-12">
         <div className="bg-white p-2 rounded-[2rem] shadow-xl shadow-[#4A1412]/5 flex flex-wrap gap-1 border border-slate-100">
           {tabs.map(tab => {
             const isActive = activeTab === tab.id;
@@ -206,7 +206,7 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
       </div>
 
       {/* Main Command Workspace */}
-      <div className="max-w-7xl mx-auto px-8">
+      <div className="w-full px-4 md:px-8">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -216,7 +216,7 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           >
             {activeTab === 'inbox' && (
-              <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden min-h-[600px]">
+              <div className="overflow-hidden min-h-[600px]">
                 <ExpenseApprovalDashboard user={user} requests={normalizedRequests} />
               </div>
             )}
@@ -236,36 +236,38 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
                     New Request
                   </button>
                 </div>
-                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden min-h-[600px]">
+                <div className="overflow-hidden min-h-[600px]">
                   <ExpenseApprovalDashboard user={user} requests={expenseRequests.map(er => ({ ...er, type: 'expense' }))} />
                 </div>
               </div>
             )}
 
             {activeTab === 'ledger' && (
-              <LedgerList 
-                transactions={transactions} 
-                projects={projects} 
-                isAdmin={true} 
-                onUpdateStatus={() => {}} 
-              />
+              <div className="min-h-[600px]">
+                <LedgerList 
+                  transactions={transactions} 
+                  projects={projects} 
+                  isAdmin={true} 
+                  onUpdateStatus={() => {}} 
+                />
+              </div>
             )}
 
             {activeTab === 'budgets' && (
-              <div className="space-y-12">
+              <div className="space-y-12 pb-12">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-left">
+                  <div className="bg-white/60 backdrop-blur-sm p-10 rounded-[3rem] border border-white shadow-xl shadow-slate-200/20 text-left">
                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">Asset Allocation Matrix</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-8">
-                      <div className="h-64 w-full relative">
+                    <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-12">
+                      <div className="h-72 w-full relative">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
                               data={ALLOCATION_DATA}
                               cx="50%"
                               cy="50%"
-                              innerRadius={60}
-                              outerRadius={80}
+                              innerRadius={70}
+                              outerRadius={95}
                               paddingAngle={8}
                               dataKey="value"
                             >
@@ -278,24 +280,24 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Ops</span>
-                          <span className="text-xl font-black text-slate-900 leading-none">100%</span>
+                          <span className="text-3xl font-black text-slate-900 leading-none tracking-tighter">100%</span>
                         </div>
                       </div>
                       <div className="space-y-4">
                         {ALLOCATION_DATA.map((item) => (
-                          <div key={item.name} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl">
+                          <div key={item.name} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                             <div className="flex items-center gap-3">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
-                              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{item.name}</span>
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                              <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest">{item.name}</span>
                             </div>
-                            <span className="text-[11px] font-black text-slate-900">{(item.value / 10).toFixed(0)}%</span>
+                            <span className="text-sm font-black text-slate-900">{(item.value / 10).toFixed(0)}%</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-left">
+                  <div className="bg-white/60 backdrop-blur-sm p-10 rounded-[3rem] border border-white shadow-xl shadow-slate-200/20 text-left">
                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">System Diagnostics</h3>
                     <div className="space-y-4">
                       {[
@@ -303,24 +305,26 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
                         { label: 'Asset Utilization', value: '78.5%', icon: Target, color: 'text-blue-500' },
                         { label: 'Fund Health Index', value: 'Gold', icon: Star, color: 'text-amber-500' },
                       ].map((hub, i) => (
-                        <div key={i} className="flex items-center justify-between p-5 bg-slate-50 border border-slate-100 rounded-2xl">
+                        <div key={i} className="flex items-center justify-between p-6 bg-white border border-slate-100 rounded-3xl shadow-sm">
                           <div className="flex items-center gap-4">
-                            <div className={cn("p-2 rounded-lg bg-white shadow-sm", hub.color)}>
-                              <hub.icon size={16} />
+                            <div className={cn("p-3 rounded-xl bg-slate-50 shadow-inner", hub.color)}>
+                              <hub.icon size={20} />
                             </div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{hub.label}</span>
+                            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{hub.label}</span>
                           </div>
-                          <span className="text-sm font-black text-slate-900">{hub.value}</span>
+                          <span className="text-lg font-black text-slate-900">{hub.value}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xl font-black text-[#4A1412] uppercase tracking-tighter italic">Mission Expenditure Velocity</h2>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Real-time Project Linking</p>
+                <div className="space-y-8">
+                  <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-black text-[#4A1412] uppercase tracking-tighter italic">Mission Expenditure Velocity</h2>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Real-time Project Linking</p>
+                    </div>
                   </div>
                   <BudgetGauge projects={projects} transactions={transactions} />
                 </div>
@@ -328,14 +332,14 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
             )}
 
             {activeTab === 'income' && (
-              <div className="space-y-12">
+              <div className="space-y-12 pb-12">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="md:col-span-2 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-left">
+                  <div className="md:col-span-2 bg-white/60 backdrop-blur-sm p-10 rounded-[3rem] border border-white shadow-xl shadow-slate-200/20 text-left">
                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                       Donation Inflow Pulse
                     </h3>
-                    <div className="h-64 w-full">
+                    <div className="h-72 w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={DONATION_DATA}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -370,14 +374,16 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
                     </div>
                   </div>
 
-                  <div className="bg-emerald-600 p-8 rounded-[3rem] text-white shadow-xl shadow-emerald-900/10 flex flex-col justify-between">
+                  <div className="bg-emerald-600 p-10 rounded-[3rem] text-white shadow-2xl shadow-emerald-900/40 flex flex-col justify-between">
                     <div>
-                      <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-4">Total Realized Inflow</p>
-                      <h3 className="text-5xl font-black tracking-tighter text-white">₹{totalInflow.toLocaleString()}</h3>
+                      <p className="text-[11px] font-black text-white/50 uppercase tracking-[0.2em] mb-6">Total Realized Inflow</p>
+                      <h3 className="text-6xl font-black tracking-tighter text-white">₹{totalInflow.toLocaleString()}</h3>
                     </div>
-                    <div className="mt-6 flex items-center gap-2">
-                      <TrendingUp size={16} />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">Steady Growth Sector</span>
+                    <div className="mt-8 flex items-center gap-3">
+                      <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                        <TrendingUp size={24} />
+                      </div>
+                      <span className="text-[12px] font-black uppercase tracking-widest">Steady Growth Sector</span>
                     </div>
                   </div>
                 </div>
@@ -399,7 +405,6 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
           isOpen={showAddExpenseModal} 
           onClose={() => setShowAddExpenseModal(false)} 
           user={user} 
-          projects={projects} 
         />
       )}
     </div>

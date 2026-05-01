@@ -217,13 +217,13 @@ export const VolunteerDirectory = ({
           <input 
             type="text" 
             placeholder="Search agents..."
-            className="w-full pl-16 pr-6 py-5 bg-white border-none rounded-[2rem] text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:ring-4 focus:ring-blue-100 transition-all outline-none shadow-soft"
+            className="w-full pl-16 pr-6 py-5 bg-transparent border-b border-slate-200 rounded-none text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:border-blue-500 transition-all outline-none"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         
-        <div className="flex bg-white/50 p-1.5 rounded-2xl backdrop-blur-sm self-start">
+        <div className="flex bg-transparent p-1.5 rounded-2xl self-start">
           {['directory', 'applications'].map(tab => (
             <button 
               key={tab}

@@ -76,14 +76,14 @@ export const MessageInput = ({ onSend, disabled }: MessageInputProps) => {
   };
 
   return (
-    <div className="p-2 pb-safe shrink-0 bg-cream/80 backdrop-blur-md z-20 border-t border-mahogany/5 relative">
+    <div className="p-1 md:p-2 pb-safe shrink-0 bg-cream/80 backdrop-blur-md z-20 border-t border-mahogany/5 relative">
       <AnimatePresence>
         {attachment && (
           <motion.div 
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute bottom-full left-4 mb-4 p-2 bg-white rounded-2xl shadow-2xl border border-mahogany/10 flex items-center gap-3 min-w-[200px] z-50"
+            className="absolute bottom-full left-2 right-2 md:left-4 md:right-auto md:min-w-[300px] mb-2 p-2 bg-white rounded-2xl shadow-2xl border border-mahogany/10 flex items-center gap-3 z-50"
           >
             <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden border border-slate-100">
                {attachment.isImage ? (
@@ -108,19 +108,19 @@ export const MessageInput = ({ onSend, disabled }: MessageInputProps) => {
 
       <AnimatePresence>
         {showEmojiPicker && (
-          <motion.div 
-            ref={pickerRef}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="absolute bottom-full left-4 mb-4 z-50 shadow-2xl rounded-2xl overflow-hidden border border-mahogany/10"
-          >
+            <motion.div 
+              ref={pickerRef}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-full left-0 right-0 md:left-4 md:right-auto mb-2 md:mb-4 z-50 shadow-2xl rounded-t-2xl md:rounded-2xl overflow-hidden border border-mahogany/10"
+            >
             <EmojiPicker
               onEmojiClick={onEmojiClick}
               autoFocusSearch={false}
               theme={Theme.LIGHT}
-              width={320}
-              height={400}
+              width="100%"
+              height={350}
               skinTonesDisabled
               searchPlaceHolder="Search emojis..."
               previewConfig={{ showPreview: false }}
@@ -147,7 +147,7 @@ export const MessageInput = ({ onSend, disabled }: MessageInputProps) => {
           
           <textarea
             rows={1}
-            className="flex-1 bg-transparent border-none px-1 py-2.5 text-[15px] font-medium text-mahogany outline-none resize-none no-scrollbar placeholder:text-slate-300 min-h-[44px] max-h-32"
+            className="flex-1 bg-transparent border-none px-1 py-2.5 text-[14px] md:text-[15px] font-medium text-mahogany outline-none resize-none no-scrollbar placeholder:text-slate-300 min-h-[44px] max-h-32"
             placeholder="Type a message..."
             value={text}
             onChange={(e) => {

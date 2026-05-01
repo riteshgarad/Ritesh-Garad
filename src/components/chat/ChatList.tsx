@@ -99,23 +99,23 @@ export const ChatList = ({
           <button 
             onClick={() => onSelect('global')}
             className={cn(
-              "w-full flex items-center gap-4 px-5 py-3 transition-all relative",
+              "w-full flex items-center gap-3.5 px-4 md:px-5 py-3 transition-all relative",
               selectedId === 'global' ? "bg-terracotta/5" : "hover:bg-slate-50"
             )}
           >
             {selectedId === 'global' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-terracotta" />}
-            <div className="w-14 h-14 rounded-full bg-mahogany/5 flex items-center justify-center text-mahogany shrink-0 border border-mahogany/10 shadow-sm">
-              <Users size={26} strokeWidth={2.2} />
+            <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-mahogany/5 flex items-center justify-center text-mahogany shrink-0 border border-mahogany/10 shadow-sm">
+              <Users size={22} strokeWidth={2.2} className="md:w-[26px] md:h-[26px]" />
             </div>
             <div className="flex-1 border-b border-slate-50 pb-3 h-full overflow-hidden">
               <div className="flex justify-between items-baseline pt-1">
-                <h4 className="text-[16px] font-black text-mahogany tracking-tight truncate">General Operations</h4>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter shrink-0 ml-2">12:45 PM</span>
+                <h4 className="text-[15px] md:text-[16px] font-black text-mahogany tracking-tight truncate">General Operations</h4>
+                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-tighter shrink-0 ml-2">12:45 PM</span>
               </div>
               <div className="flex justify-between items-center mt-1">
-                <p className="text-[13px] text-slate-500 truncate font-medium">Official mission-wide bridge active</p>
+                <p className="text-[12px] md:text-[13px] text-slate-500 truncate font-medium">Official mission-wide bridge active</p>
                 {unreadCounts['global'] > 0 && (
-                  <div className="bg-terracotta text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] h-5 flex items-center justify-center shadow-sm shadow-terracotta/20">
+                  <div className="bg-terracotta text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] h-4.5 flex items-center justify-center shadow-sm shadow-terracotta/20">
                     {unreadCounts['global']}
                   </div>
                 )}
@@ -140,37 +140,37 @@ export const ChatList = ({
               key={contact.uid}
               onClick={() => onSelect(contact.uid)}
               className={cn(
-                "w-full flex items-center gap-4 px-5 py-3 transition-all relative group",
+                "w-full flex items-center gap-3.5 px-4 md:px-5 py-3 transition-all relative group",
                 selectedId === contact.uid ? "bg-terracotta/5" : "hover:bg-slate-50"
               )}
             >
               {selectedId === contact.uid && <div className="absolute left-0 top-0 bottom-0 w-1 bg-terracotta" />}
               <div className="relative shrink-0">
-                <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 text-lg md:text-xl border border-slate-200 overflow-hidden shadow-sm">
                    {contact.name.charAt(0)}
                 </div>
                 {contact.isActive && (
-                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-md" />
+                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full shadow-md" />
                 )}
               </div>
               <div className="flex-1 border-b border-slate-50 pb-3 h-full overflow-hidden">
                 <div className="flex justify-between items-baseline pt-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <h4 className="text-[16px] font-black text-mahogany tracking-tight truncate leading-tight">{contact.name}</h4>
+                    <h4 className="text-[15px] md:text-[16px] font-black text-mahogany tracking-tight truncate leading-tight">{contact.name}</h4>
                     {contact.department && (
-                      <span className="text-[9px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/50 uppercase tracking-widest shrink-0">
+                      <span className="hidden md:inline-block text-[9px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/50 uppercase tracking-widest shrink-0">
                         {contact.department}
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter shrink-0 ml-2">10:30 AM</span>
+                  <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-tighter shrink-0 ml-2">10:30 AM</span>
                 </div>
                 <div className="flex justify-between items-center mt-1">
-                  <p className="text-[13px] text-slate-500 truncate font-medium max-w-[200px]">
-                    {contact.role} — Mission active...
+                  <p className="text-[12px] md:text-[13px] text-slate-500 truncate font-medium max-w-[200px]">
+                    {contact.department || contact.role} — Mission active...
                   </p>
                   {unreadCounts[contact.uid] > 0 && (
-                    <div className="bg-terracotta text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] h-5 flex items-center justify-center shadow-sm shadow-terracotta/20">
+                    <div className="bg-terracotta text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] h-4.5 flex items-center justify-center shadow-sm shadow-terracotta/20">
                       {unreadCounts[contact.uid]}
                     </div>
                   )}

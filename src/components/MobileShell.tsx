@@ -404,7 +404,10 @@ export const MobileShell = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="max-w-7xl mx-auto w-full"
+              className={cn(
+                "w-full",
+                activePath === 'messages' ? "px-0" : "px-4 md:px-8 xl:px-12"
+              )}
             >
               {children}
             </motion.div>

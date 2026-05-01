@@ -2695,7 +2695,7 @@ const ProjectsView = ({ projects, onOpenProject, onAdd, onDelete, user }: any) =
 
   return (
     <div className="space-y-6 md:space-y-10">
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 md:gap-6 bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/20">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 md:gap-6 bg-transparent p-0 mb-8">
         <div className="flex overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide gap-2">
           {['All Initiatives', 'Active', 'Strategic Planning', 'Archived'].map(f => (
             <button 

@@ -121,7 +121,7 @@ export const LedgerList: React.FC<LedgerListProps> = ({
       </div>
 
       {/* Results */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
+      <div className="bg-transparent overflow-hidden">
         <TransactionTable 
           transactions={filteredTransactions}
           isAdmin={isAdmin}

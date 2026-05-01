@@ -78,7 +78,7 @@ const PublicRelationsDashboard: React.FC<PRDashboardProps> = ({ user }) => {
           </p>
         </div>
         
-        <div className="flex p-1 bg-white border border-slate-200 rounded-3xl shadow-sm">
+        <div className="flex p-1 bg-transparent border-none rounded-3xl">
           {['releases', 'outreach', 'metrics'].map((tab) => (
             <button
               key={tab}
@@ -105,7 +105,7 @@ const PublicRelationsDashboard: React.FC<PRDashboardProps> = ({ user }) => {
         >
           {activeTab === 'releases' && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center bg-white p-6 rounded-[24px] border border-slate-200 shadow-sm">
+              <div className="flex justify-between items-center bg-transparent p-0 mb-8 overflow-hidden">
                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Media Kits: 12</p>
                  <button className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-purple-200 transition-all hover:scale-105 active:scale-95">
                    <Plus size={14} /> Draft New Release
@@ -138,7 +138,7 @@ const PublicRelationsDashboard: React.FC<PRDashboardProps> = ({ user }) => {
           {activeTab === 'outreach' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                <div className="lg:col-span-2 space-y-6">
-                  <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm text-left">
+                   <div className="bg-transparent p-0 overflow-hidden text-left">
                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">Strategic Partnerships & CSR Leads</h3>
                     <div className="space-y-4">
                        {donors.filter(d => d.tier === 'Platinum' || d.tier === 'Gold').map((donor) => (
@@ -180,21 +180,21 @@ const PublicRelationsDashboard: React.FC<PRDashboardProps> = ({ user }) => {
 
           {activeTab === 'metrics' && (
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-8 rounded-[32px] border border-slate-200 text-left">
+                <div className="bg-transparent p-0 overflow-hidden text-left">
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Impressions</p>
                    <h3 className="text-3xl font-black text-slate-900 italic">450k+</h3>
                    <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
                       <TrendingUp size={14} /> +15% Branding lift
                    </div>
                 </div>
-                <div className="bg-white p-8 rounded-[32px] border border-slate-200 text-left">
+                <div className="bg-transparent p-0 overflow-hidden text-left">
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Mentions</p>
                    <h3 className="text-3xl font-black text-slate-900 italic">120</h3>
                    <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
                       <TrendingUp size={14} /> +8% Sentimental gain
                    </div>
                 </div>
-                <div className="bg-white p-8 rounded-[32px] border border-slate-200 text-left">
+                <div className="bg-transparent p-0 overflow-hidden text-left">
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Trust Quotient</p>
                    <h3 className="text-3xl font-black text-slate-900 italic">9.4</h3>
                    <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">

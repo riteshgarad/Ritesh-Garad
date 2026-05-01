@@ -92,7 +92,7 @@ export const DocumentVault = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/20 overflow-hidden text-left relative">
+    <div className="flex flex-col h-full bg-transparent overflow-hidden text-left relative">
       {/* Header Area */}
       <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-white z-10">
         <div className="flex items-center gap-4 w-full md:w-auto">

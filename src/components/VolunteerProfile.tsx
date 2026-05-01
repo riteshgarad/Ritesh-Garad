@@ -180,7 +180,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
             {activeTab === 'overview' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Active Assignments */}
-                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm">
+                <div className="bg-transparent p-0 overflow-hidden">
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-2">
                     <ShieldCheck size={18} className="text-indigo-500" /> Active Assignments
                   </h3>
@@ -209,7 +209,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
                     { label: 'Life Impact', val: `${volunteer.impactPoints}+`, icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50' },
                     { label: 'Days Active', val: Math.floor((Date.now() - volunteer.joinDate.toDate()) / (1000 * 60 * 60 * 24)), icon: Calendar, color: 'text-indigo-500', bg: 'bg-indigo-50' }
                   ].map((stat, i) => (
-                    <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                    <div key={i} className="bg-transparent p-0 overflow-hidden flex flex-col items-center text-center">
                       <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-4`}>
                         <stat.icon size={24} />
                       </div>
@@ -222,7 +222,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
             )}
 
             {activeTab === 'logs' && (
-              <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-transparent overflow-hidden">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-slate-50 bg-slate-50/50">

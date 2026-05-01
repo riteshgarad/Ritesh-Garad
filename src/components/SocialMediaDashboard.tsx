@@ -95,7 +95,7 @@ const SocialMediaDashboard: React.FC<SocialMediaDashboardProps> = ({ user }) => 
           </p>
         </div>
         
-        <div className="flex p-1 bg-white border border-slate-200 rounded-3xl shadow-sm">
+        <div className="flex p-1 bg-transparent border-none rounded-3xl">
           {['queue', 'campaigns', 'missions'].map((tab) => (
             <button
               key={tab}
@@ -198,7 +198,7 @@ const SocialMediaDashboard: React.FC<SocialMediaDashboardProps> = ({ user }) => 
 
           {activeTab === 'missions' && (
             <div className="space-y-6">
-               <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm text-left">
+               <div className="bg-transparent p-0 overflow-hidden text-left">
                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">Ongoing Mission Coverage Req</h3>
                  <div className="space-y-4">
                     {projects.map((project) => (
