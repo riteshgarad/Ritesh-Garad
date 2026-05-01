@@ -12,7 +12,8 @@ import {
   Zap,
   Target,
   Star,
-  ChevronLeft
+  ChevronLeft,
+  Plus
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -36,6 +37,7 @@ import { cn } from '../lib/utils';
 import ExpenseApprovalDashboard from './ExpenseApprovalDashboard';
 import { LedgerList } from './LedgerList';
 import { BudgetGauge } from './BudgetGauge';
+import AddExpenseRequestModal from './AddExpenseRequestModal';
 
 interface FinanceCommandHomeProps {
   user: AppUser;
@@ -44,16 +46,17 @@ interface FinanceCommandHomeProps {
 }
 
 const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects, initialTab = 'inbox' }) => {
-  const [activeTab, setActiveTab] = useState<'inbox' | 'ledger' | 'budgets' | 'income'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'inbox' | 'ledger' | 'budgets' | 'income' | 'expenses'>('inbox');
 
   // Sync activeTab if initialTab changes
   useEffect(() => {
-    setActiveTab(initialTab);
+    setActiveTab(initialTab as any);
   }, [initialTab]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
   const [budgetRequests, setBudgetRequests] = useState<BudgetRequest[]>([]);
   const [financeRequests, setFinanceRequests] = useState<FinanceRequest[]>([]);
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
 
   // Real-time Data Listeners
   useEffect(() => {
@@ -102,8 +105,11 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
     return expPending + budPending;
   }, [expenseRequests, budgetRequests]);
 
+  const expensePendingCount = useMemo(() => expenseRequests.filter(r => r.status === 'pending').length, [expenseRequests]);
+
   const tabs = [
     { id: 'inbox', label: 'Fund Requests', icon: Inbox, count: totalPending },
+    { id: 'expenses', label: 'Expense Inbox', icon: IndianRupee, count: expensePendingCount },
     { id: 'ledger', label: 'Digital Ledger', icon: BookOpen },
     { id: 'budgets', label: 'Mission Budgets', icon: ChartIcon },
     { id: 'income', label: 'Income Hub', icon: TrendingUp },
@@ -212,6 +218,27 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
             {activeTab === 'inbox' && (
               <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden min-h-[600px]">
                 <ExpenseApprovalDashboard user={user} requests={normalizedRequests} />
+              </div>
+            )}
+
+            {activeTab === 'expenses' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h2 className="text-xl font-black text-[#4A1412] uppercase tracking-tighter italic">Tactical Expense Queue</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Individual Reimbursements & Payments</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowAddExpenseModal(true)}
+                    className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-transform"
+                  >
+                    <Plus size={14} />
+                    New Request
+                  </button>
+                </div>
+                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden min-h-[600px]">
+                  <ExpenseApprovalDashboard user={user} requests={expenseRequests.map(er => ({ ...er, type: 'expense' }))} />
+                </div>
               </div>
             )}
 
@@ -366,6 +393,15 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects,
           </motion.div>
         </AnimatePresence>
       </div>
+      {/* Modals */}
+      {showAddExpenseModal && (
+        <AddExpenseRequestModal 
+          isOpen={showAddExpenseModal} 
+          onClose={() => setShowAddExpenseModal(false)} 
+          user={user} 
+          projects={projects} 
+        />
+      )}
     </div>
   );
 };

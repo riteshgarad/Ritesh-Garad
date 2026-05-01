@@ -97,6 +97,7 @@ export const MobileShell = ({
       roles: ['Admin', 'Finance Head', 'Department Head'],
       subs: [
         { id: 'finance-requests', label: 'Fund Requests', roles: ['Admin', 'Department Head', 'Finance Head'] },
+        { id: 'finance-expenses', label: 'Expense Requests', roles: ['Admin', 'Department Head', 'Finance Head'] },
         { id: 'finance-ledger', label: 'Digital Ledger', roles: ['Admin', 'Finance Head'] },
         { id: 'finance-budgets', label: 'Mission Budgets', roles: ['Admin', 'Finance Head'] },
         { id: 'finance-income', label: 'Income Hub', roles: ['Admin', 'Finance Head'] }

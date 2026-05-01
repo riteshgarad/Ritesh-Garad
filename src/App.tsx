@@ -2135,7 +2135,7 @@ const PageView = ({
   
   useEffect(() => {
     if (isFinanceHead) {
-      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
+      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-expenses', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
       if (!allowedPages.includes(page)) {
         // Redirect to dashboard if trying to access unauthorized page
         setCurrentPage('dashboard');
@@ -2145,7 +2145,7 @@ const PageView = ({
 
   // If Finance Head and on unauthorized page, don't render content for that frame
   if (isFinanceHead) {
-    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
+    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-expenses', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
     if (!allowedPages.includes(page)) {
       return null;
     }
@@ -2241,6 +2241,7 @@ const PageView = ({
       return <VolunteerDirectory volunteers={volunteers} applications={applications} projects={projects} onAddVolunteer={onAddVolunteer} user={user} onApprove={onApprove} onReject={onReject} onUpdateStatus={async () => {}} />;
     case 'finance':
     case 'finance-requests':
+    case 'finance-expenses':
     case 'finance-ledger':
     case 'finance-budgets':
     case 'finance-income':
@@ -2253,6 +2254,7 @@ const PageView = ({
           projects={projects} 
           initialTab={
             page === 'finance-requests' ? 'inbox' :
+            page === 'finance-expenses' ? 'expenses' :
             page === 'finance-ledger' ? 'ledger' :
             page === 'finance-budgets' ? 'budgets' :
             page === 'finance-income' ? 'income' : 'inbox'
