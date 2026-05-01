@@ -66,6 +66,7 @@ import { MobileShell } from './components/MobileShell';
 import { MissionDetailView } from './components/project/MissionDetailView';
 import { sendPushNotification } from './lib/push';
 import { ChatView } from './components/ChatView';
+import { CalendarView } from './components/schedule/CalendarView';
 import { handleFirestoreError, OperationType } from './lib/firestore_errors';
 import OneSignal from 'react-onesignal';
 import { motion, AnimatePresence } from 'motion/react';
@@ -108,24 +109,12 @@ import {
   ExpenseRequest
 } from './types';
 import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS, PHASES } from './constants';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where, setDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage, secondaryAuth } from './lib/firebase';
+export { db, auth, storage, secondaryAuth };
 import firebaseConfig from '../firebase-applet-config.json';
-
-// --- Firebase Initialization ---
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = firebaseConfig.firestoreDatabaseId 
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
-
-// Secondary App (Used only for creating users to avoid logout)
-const secondaryApp = getApps().find(a => a.name === "Secondary") 
-                     || initializeApp(firebaseConfig, "Secondary");
-export const secondaryAuth = getAuth(secondaryApp);
 
 
 
@@ -180,7 +169,7 @@ const Button = ({ children, variant = 'primary', className, ...props }: React.Bu
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -2151,6 +2140,8 @@ const PageView = ({
           operators={operators} 
         />
       );
+    case 'schedule':
+      return <CalendarView user={user} />;
     case 'projects':
       return <ProjectsView projects={projects} onOpenProject={onOpenProject} onAdd={onAddProject} onDelete={onDeleteProject} user={user} />;
     case 'project-detail':
@@ -3037,5 +3028,6 @@ const PAGE_TITLES: Record<Page, string> = {
   'roadmap': 'Strategic Roadmap',
   'new-proposal': 'Mission Proposal',
   'finance-requests': 'Resource Requisition',
-  'kyc': 'Personnel Authentication'
+  'kyc': 'Personnel Authentication',
+  'schedule': 'Mission Schedule / Calendar'
 };

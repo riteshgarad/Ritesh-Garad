@@ -24,7 +24,8 @@ import {
   Database,
   Zap,
   X,
-  MessageCircle
+  MessageCircle,
+  Calendar
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { NotificationPanel } from './NotificationPanel';
@@ -76,6 +77,7 @@ export const MobileShell = ({
   const navigation = [
     { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Home Hub' },
     { id: 'messages', icon: MessageCircle, label: 'Mission Comms' },
+    { id: 'schedule', icon: Calendar, label: 'Mission Schedule' },
     { 
       id: 'missions', 
       icon: Target, 
@@ -386,10 +388,10 @@ export const MobileShell = ({
         <nav className="lg:hidden h-[calc(80px+env(safe-area-inset-bottom,24px))] bg-white border-t border-slate-100 flex items-center justify-around px-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
           {[
             { id: 'dashboard', icon: Home, label: 'Hub' },
-            { id: 'messages', icon: MessageCircle, label: 'Comms' },
+            { id: 'schedule', icon: Calendar, label: 'Cal' },
             { id: 'create', icon: Plus, label: 'New', isSpecial: true },
-            { id: 'tasks', icon: Layout, label: 'Tasks' },
-            { id: 'volunteers', icon: User, label: 'Unit' }
+            { id: 'messages', icon: MessageCircle, label: 'Comms' },
+            { id: 'tasks', icon: Layout, label: 'Tasks' }
           ].map((item) => {
             const isActive = activePath === item.id;
             const Icon = item.icon;

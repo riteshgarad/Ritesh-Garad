@@ -190,6 +190,24 @@ service cloud.firestore {
       allow create: if isAdmin() || isDeptHead('HR');
     }
 
+    // --- Schedule & Meetings ---
+    match /schedule/{eventId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.type == 'global' ||
+        resource.data.type == 'mission' || // Visibility filtered by project link in UI
+        (resource.data.type == 'departmental' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == resource.data.dept)
+      );
+      allow create: if isAdmin() || (isVerified() && (isDeptHead(incoming().dept) || incoming().type == 'mission'));
+      allow update: if isVerified() && (
+        isAdmin() || 
+        (isDeptHead(existing().dept) && incoming().dept == existing().dept) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['attendees']) && 
+         incoming().attendees.diff(existing().attendees).affectedKeys().hasOnly([request.auth.uid]))
+      );
+      allow delete: if isAdmin();
+    }
+
     match /messages/{messageId} {
       allow list: if isSignedIn() && (
         isAdmin() ||

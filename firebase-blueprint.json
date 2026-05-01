@@ -314,9 +314,38 @@
         "read": { "type": "boolean" }
       },
       "required": ["text", "senderId", "senderName", "recipientId", "timestamp", "read"]
+    },
+    "ScheduleEvent": {
+      "title": "Schedule Event",
+      "description": "NGO meetings, mission events, and departmental reviews.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "start": { "type": "string", "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["global", "mission", "departmental"] },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "dept": { "type": "string" },
+        "meetingLink": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "attendees": {
+          "type": "object",
+          "description": "Map of userId to rsvp status",
+          "additionalProperties": { "type": "string", "enum": ["going", "pending", "maybe", "declined"] }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "start", "end", "type", "createdBy", "createdAt"]
     }
   },
   "firestore": {
+    "/schedule/{eventId}": {
+      "schema": "ScheduleEvent",
+      "description": "NGO-wide synchronized schedule."
+    },
     "/messages/{messageId}": {
       "schema": "Message",
       "description": "Cross-departmental communication logs."
