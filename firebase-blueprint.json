@@ -1,422 +1,46 @@
 {
   "entities": {
-    "Project": {
-      "title": "Project",
-      "description": "Represents an NGO project or initiative.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "tag": { "type": "string", "enum": ["Health", "Education", "Environment", "Community", "Technology"] },
-        "status": { "type": "string", "enum": ["pending_dept_review", "pending_admin_review", "approved", "rejected", "active", "completed", "on_hold"] },
-        "phase": { "type": "number" },
-        "progress": { "type": "number" },
-        "rejection_reason": { "type": "string" },
-        "timeline": { "type": "string" },
-        "department": { "type": "string" },
-        "lead_name": { "type": "string" },
-        "budget": { "type": "string" },
-        "budget_status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "created_at": { "type": "string", "format": "date-time" },
-        "creator_id": { "type": "string" }
-      },
-      "required": ["name", "status", "creator_id", "department"]
-    },
-    "FinanceRequest": {
-      "title": "Finance Request",
-      "description": "Automatically generated budget request for approved projects.",
-      "type": "object",
-      "properties": {
-        "project_id": { "type": "string" },
-        "project_name": { "type": "string" },
-        "amount": { "type": "string" },
-        "requested_at": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["pending", "disbursed", "rejected"] }
-      },
-      "required": ["project_id", "amount", "status"]
-    },
-    "Task": {
-      "title": "Interlinked Task",
-      "description": "A cross-departmental data bridge for mission orchestration.",
-      "type": "object",
-      "properties": {
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
-        "assignedDept": { "type": "string", "enum": ["Finance", "Operations", "Marketing", "HR", "Legal", "General"] },
-        "assignedVolunteerId": { "type": "string" },
-        "assignedVolunteerName": { "type": "string" },
-        "relatedDocId": { "type": "string" },
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "status": { "type": "string", "enum": ["locked", "todo", "in_progress", "done"] },
-        "dependencyId": { "type": "string" },
-        "impactValue": { "type": "integer" },
-        "proofRequired": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" },
-        "completedAt": { "type": "string", "format": "date-time" },
-        "createdBy": { "type": "string" },
-        "creatorName": { "type": "string" },
-        "budget": { "type": "number" }
-      },
-      "required": ["projectId", "assignedDept", "title", "status", "impactValue", "proofRequired", "createdAt", "updatedAt"]
-    },
-    "ActivityLog": {
-      "title": "System Activity Log",
-      "description": "Logs cross-departmental events and system triggers.",
-      "type": "object",
-      "properties": {
-        "type": { "type": "string" },
-        "message": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" }
-      },
-      "required": ["type", "message", "timestamp"]
-    },
-    "Volunteer": {
-      "title": "Volunteer",
-      "description": "An NGO operative or member.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "role": { "type": "string" },
-        "department": { "type": "string" },
-        "skills": { "type": "array", "items": { "type": "string" } },
-        "hours": { "type": "number" },
-        "status": { "type": "string", "enum": ["Active", "Inactive"] },
-        "impactPoints": { "type": "number" },
-        "badges": { "type": "array", "items": { "type": "string" } },
-        "profileImage": { "type": "string" },
-        "joinDate": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "email", "status"]
-    },
-    "WorkLog": {
-      "title": "Work Log",
-      "description": "Record of volunteer hours spent on a project.",
-      "type": "object",
-      "properties": {
-        "volunteerId": { "type": "string" },
-        "volunteerName": { "type": "string" },
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
-        "hours": { "type": "number" },
-        "description": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
-        "verifiedBy": { "type": "string" }
-      },
-      "required": ["volunteerId", "projectId", "hours", "status", "date"]
-    },
-    "VolunteerApplication": {
-      "title": "Volunteer Application",
-      "description": "Information provided by prospective volunteers during onboarding.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "skills": { "type": "array", "items": { "type": "string" } },
-        "availability": { "type": "string" },
-        "interests": { "type": "string" },
-        "idProofURL": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending_verification", "approved", "rejected"] },
-        "appliedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "email", "status", "appliedAt"]
-    },
-    "VolunteerCertificate": {
-      "title": "Volunteer Certificate",
-      "description": "Metadata for issued certificates.",
-      "type": "object",
-      "properties": {
-        "volunteerId": { "type": "string" },
-        "volunteerName": { "type": "string" },
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
-        "issuedAt": { "type": "string", "format": "date-time" },
-        "certificateURL": { "type": "string" }
-      },
-      "required": ["volunteerId", "projectId", "issuedAt", "certificateURL"]
-    },
-    "Notification": {
-      "title": "Notification",
-      "description": "In-app notification for the user.",
-      "type": "object",
-      "properties": {
-        "user_id": { "type": "string" },
-        "type": { "type": "string", "enum": ["deadline", "milestone", "system", "approval"] },
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "isRead": { "type": "boolean" },
-        "relatedId": { "type": "string" }
-      },
-      "required": ["user_id", "title", "message", "isRead"]
-    },
-    "Transaction": {
-      "title": "Transaction",
-      "description": "Financial record (income or expense) for the NGO.",
-      "type": "object",
-      "properties": {
-        "type": { "type": "string", "enum": ["income", "expense"] },
-        "amount": { "type": "number" },
-        "category": { "type": "string" },
-        "projectID": { "type": "string" },
-        "donationType": { "type": "string", "enum": ["One-time", "Monthly", "Corporate", "In-kind", "N/A"] },
-        "expenditureType": { "type": "string", "enum": ["Procurement", "Travel", "Event Setup", "Marketing", "N/A"] },
-        "paymentMethod": { "type": "string", "enum": ["Bank Transfer", "Cash", "UPI", "Online Gateway"] },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "cleared"] },
-        "receiptURL": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "createdBy": { "type": "string" }
-      },
-      "required": ["type", "amount", "category", "status", "date", "createdBy"]
-    },
-    "Campaign": {
-      "title": "Campaign",
-      "description": "A fundraising campaign for the NGO.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "goal_amount": { "type": "number" },
-        "current_raised": { "type": "number" },
-        "status": { "type": "string", "enum": ["draft", "pending_head", "pending_admin", "active", "completed"] },
-        "media_urls": { "type": "array", "items": { "type": "string" } },
-        "impact_story_id": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "created_by": { "type": "string" },
-        "category": { "type": "string" }
-      },
-      "required": ["title", "goal_amount", "status", "created_by"]
-    },
-    "Donor": {
-      "title": "Donor",
-      "description": "A supporter who provides financial contributions.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "total_donated": { "type": "number" },
-        "tier": { "type": "string", "enum": ["Bronze", "Silver", "Gold", "Platinum"] },
-        "last_donation_date": { "type": "string", "format": "date-time" },
-        "frequency": { "type": "string", "enum": ["one-time", "monthly", "yearly"] },
-        "join_date": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "email", "tier"]
-    },
-    "Donation": {
-      "title": "Donation",
-      "description": "An individual financial contribution record.",
-      "type": "object",
-      "properties": {
-        "donor_id": { "type": "string" },
-        "amount": { "type": "number" },
-        "campaign_id": { "type": "string" },
-        "is_recurring": { "type": "boolean" },
-        "status": { "type": "string", "enum": ["captured", "failed"] },
-        "donor_visibility": { "type": "string", "enum": ["public", "anonymous"] },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "payment_method": { "type": "string" }
-      },
-      "required": ["donor_id", "amount", "status", "timestamp"]
-    },
-    "NGODocument": {
-      "title": "NGO Document",
-      "description": "Evidence documents linked to projects, finances, or volunteers.",
-      "type": "object",
-      "properties": {
-        "fileName": { "type": "string" },
-        "fileURL": { "type": "string" },
-        "category": { "type": "string", "enum": ["Invoice", "Project_Report", "KYC", "Legal", "Marketing"] },
-        "uploadedBy": { "type": "string" },
-        "uploaderId": { "type": "string" },
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
-        "uploadDate": { "type": "string", "format": "date-time" },
-        "description": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
-        "rejectionReason": { "type": "string" },
-        "metadata": {
-          "type": "object",
-          "properties": {
-            "size": { "type": "string" },
-            "type": { "type": "string" },
-            "uploadedAt": { "type": "string", "format": "date-time" }
-          }
-        },
-        "location": { "type": "string" },
-        "expiryDate": { "type": "string", "format": "date-time" }
-      },
-      "required": ["fileName", "fileURL", "category", "uploadedBy", "uploaderId", "status"]
-    },
-    "expense_requests": {
-      "title": "Expense Request",
-      "description": "Manual expense requests from operatives requiring high-level authorization.",
-      "type": "object",
-      "properties": {
-        "requesterId": { "type": "string" },
-        "requesterName": { "type": "string" },
-        "requesterEmail": { "type": "string" },
-        "department": { "type": "string" },
-        "amount": { "type": "number" },
-        "description": { "type": "string" },
-        "professionalMessage": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "submittedAt": { "type": "string", "format": "date-time" },
-        "reviewedBy": { "type": "string" }
-      },
-      "required": ["requesterId", "amount", "status", "submittedAt"]
-    },
-    "AppUser": {
-      "title": "Application User",
-      "description": "System user with role-based access control metadata.",
+    "User": {
+      "title": "User Profile",
+      "description": "System user with role and department assignment",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
-        "name": { "type": "string" },
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["Admin", "Department Head", "Volunteer", "Staff Operative"] },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Department Head", "Volunteer", "Staff Operative", "Finance Head", "HR Head", "Project Head", "Marketing Head"] },
         "department": { "type": "string" },
         "isActive": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "email", "role", "isActive"]
+      "required": ["uid", "email", "name", "role", "department", "isActive", "createdAt"]
     },
-    "automation_logs": {
-      "title": "Automation Log",
-      "description": "Record of triggered automation events and email status.",
-      "type": "object",
-      "properties": {
-        "action": { "type": "string" },
-        "type": { "type": "string" },
-        "recipient": { "type": "string" },
-        "status": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "details": { "type": "string" }
-      },
-      "required": ["action", "status", "timestamp"]
-    },
-    "Message": {
-      "title": "Message",
-      "description": "Real-time communication logs between personnel.",
-      "type": "object",
-      "properties": {
-        "text": { "type": "string" },
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "recipientId": { "type": "string", "description": "User ID or 'global' for group chat" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "read": { "type": "boolean" }
-      },
-      "required": ["text", "senderId", "senderName", "recipientId", "timestamp", "read"]
-    },
-    "ScheduleEvent": {
-      "title": "Schedule Event",
-      "description": "NGO meetings, mission events, and departmental reviews.",
+    "Meeting": {
+      "title": "Mission Pulse",
+      "description": "Scheduled meeting or mission event",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
-        "start": { "type": "string", "format": "date-time" },
-        "end": { "type": "string", "format": "date-time" },
+        "start": { "type": "object" },
+        "end": { "type": "object" },
         "type": { "type": "string", "enum": ["global", "mission", "departmental"] },
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
         "dept": { "type": "string" },
-        "meetingLink": { "type": "string" },
-        "createdBy": { "type": "string" },
+        "creatorId": { "type": "string" },
         "creatorName": { "type": "string" },
-        "attendees": {
-          "type": "object",
-          "description": "Map of userId to rsvp status",
-          "additionalProperties": { "type": "string", "enum": ["going", "pending", "maybe", "declined"] }
-        },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "attendees": { "type": "object" }
       },
-      "required": ["title", "start", "end", "type", "createdBy", "createdAt"]
+      "required": ["title", "start", "end", "type", "creatorId"]
     }
   },
   "firestore": {
-    "/schedule/{eventId}": {
-      "schema": "ScheduleEvent",
-      "description": "NGO-wide synchronized schedule."
-    },
-    "/messages/{messageId}": {
-      "schema": "Message",
-      "description": "Cross-departmental communication logs."
-    },
     "/users/{userId}": {
-      "schema": "AppUser",
-      "description": "User profiles and RBAC metadata."
+      "schema": "User",
+      "description": "User profiles"
     },
-    "/projects/{projectId}": {
-      "schema": "Project",
-      "description": "Collection of NGO projects."
-    },
-    "/tasks/{taskId}": {
-      "schema": "Task",
-      "description": "Flat collection of tasks, linked by project_id."
-    },
-    "/volunteers/{volunteerId}": {
-      "schema": "Volunteer",
-      "description": "Collection of NGO members."
-    },
-    "/volunteer_applications/{applicationId}": {
-      "schema": "VolunteerApplication",
-      "description": "Onboarding applications for new volunteers."
-    },
-    "/work_logs/{logId}": {
-      "schema": "WorkLog",
-      "description": "Validated hours of contribution."
-    },
-    "/volunteer_certificates/{certId}": {
-      "schema": "VolunteerCertificate",
-      "description": "Issued recognition credentials."
-    },
-    "/finance_requests/{requestId}": {
-      "schema": "FinanceRequest",
-      "description": "Automated budget allocation requests."
-    },
-    "/users/{userId}/notifications/{notificationId}": {
-      "schema": "Notification",
-      "description": "Per-user notifications."
-    },
-    "/transactions/{transactionId}": {
-      "schema": "Transaction",
-      "description": "Financial ledger for the NGO."
-    },
-    "/campaigns/{campaignId}": {
-      "schema": "Campaign",
-      "description": "Marketing fundraising campaigns."
-    },
-    "/donors/{donorId}": {
-      "schema": "Donor",
-      "description": "CRM for NGO supporters."
-    },
-    "/donations/{donationId}": {
-      "schema": "Donation",
-      "description": "Individual donation transaction records."
-    },
-    "/documents/{documentId}": {
-      "schema": "NGODocument",
-      "description": "Centralized NGO document repository."
-    },
-    "/expense_requests/{requestId}": {
-      "schema": "expense_requests",
-      "description": "Mission-critical fiscal authorization requests."
-    },
-    "/activity_logs/{logId}": {
-      "schema": "ActivityLog",
-      "description": "Live feed of mission orchestration events."
-    },
-    "/automation_logs/{logId}": {
-      "schema": "automation_logs",
-      "description": "Historical record of autonomous pulse transmissions."
+    "/schedule/{eventId}": {
+      "schema": "Meeting",
+      "description": "Scheduled mission pulses and meetings"
     }
   }
 }

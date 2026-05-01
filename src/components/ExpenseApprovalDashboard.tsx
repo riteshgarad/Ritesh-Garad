@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { ExpenseRequest, AppUser } from '../types';
 import { db } from '../App';
-import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
@@ -58,13 +58,33 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
         amount: request.amount,
         category: 'Approved Expense',
         description: `Approved request from ${request.requesterName}: ${request.description}`,
-        status: 'cleared',
+        status: 'approved',
         date: serverTimestamp(),
         createdBy: user.uid,
         paymentMethod: 'Bank Transfer',
-        expenditureType: 'General',
+        expenditureType: 'Mission Operations',
+        projectID: request.projectId || '', // Link to mission
         requesterId: request.requesterId || request.requesterUid
       });
+
+      // Update Mission Milestone (Requested Automation)
+      if (request.projectId) {
+         try {
+           const milestonesRef = collection(db, 'milestones');
+           const q = query(milestonesRef, where('projectId', '==', request.projectId), where('label', '==', 'Funds Procurement'));
+           const milestoneSnap = await getDocs(q);
+           if (!milestoneSnap.empty) {
+             const mDoc = milestoneSnap.docs[0];
+             await updateDoc(doc(db, 'milestones', mDoc.id), {
+               isCompleted: true,
+               completedAt: serverTimestamp(),
+               completedBy: user.name
+             });
+           }
+         } catch (e) {
+           console.warn('Milestone update automation failed', e);
+         }
+      }
 
       // Create ledger entry in finance (As suggested by user)
       await addDoc(collection(db, 'finance'), {

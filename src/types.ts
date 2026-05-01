@@ -229,6 +229,7 @@ export interface Donation {
 
 export interface ExpenseRequest {
   id: string;
+  projectId?: string; // Link to project/mission
   requesterId: string;
   requesterUid?: string;
   requesterName: string;

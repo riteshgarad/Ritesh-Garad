@@ -20,9 +20,10 @@ interface MeetingCardProps {
   };
   currentUserUid: string;
   onRSVP: (meetingId: string, status: 'going' | 'maybe' | 'declined') => void | Promise<void>;
+  onClick: (meeting: any) => void;
 }
 
-export const MeetingCard = ({ meeting, currentUserUid, onRSVP }: MeetingCardProps) => {
+export const MeetingCard = ({ meeting, currentUserUid, onRSVP, onClick }: MeetingCardProps) => {
   const startTime = meeting.start?.toDate ? meeting.start.toDate() : new Date(meeting.start);
   const endTime = meeting.end?.toDate ? meeting.end.toDate() : new Date(meeting.end);
   const myStatus = meeting.attendees?.[currentUserUid] || 'pending';
@@ -53,8 +54,10 @@ export const MeetingCard = ({ meeting, currentUserUid, onRSVP }: MeetingCardProp
 
       {/* Card Content Column */}
       <div className="flex-1 pb-8">
-        <div className={cn(
-          "bg-white rounded-3xl p-5 border-l-4 shadow-soft hover:shadow-md transition-all relative",
+        <div 
+          onClick={() => onClick(meeting)}
+          className={cn(
+          "bg-white rounded-3xl p-5 border-l-4 shadow-soft hover:shadow-md transition-all relative cursor-pointer active:scale-[0.98]",
           meeting.type === 'mission' ? "border-terracotta" : 
           meeting.type === 'global' ? "border-blue-500" : "border-emerald-500"
         )}>

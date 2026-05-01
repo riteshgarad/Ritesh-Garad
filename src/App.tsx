@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import FinanceDashboard from './components/FinanceDashboard';
+import FinanceCommandHome from './components/FinanceCommandHome';
 import SocialMediaDashboard from './components/SocialMediaDashboard';
 import PublicRelationsDashboard from './components/PublicRelationsDashboard';
 import UserManagement from './components/UserManagement';
@@ -2127,6 +2127,27 @@ const PageView = ({
   onTaskStatusChange, onAddTask, activityLogs, setProofTaskTargetId,
   operators
 }: any) => {
+  // --- Protection Logic ---
+  const isFinanceHead = (user?.department === 'Finance' && (user?.role === 'Department Head' || user?.role === 'DH')) || user?.email === 'yuktagarad@gmail.com' || user?.name === 'Yukta';
+  
+  useEffect(() => {
+    if (isFinanceHead) {
+      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'expense-approvals'];
+      if (!allowedPages.includes(page)) {
+        // Redirect to dashboard if trying to access unauthorized page
+        setCurrentPage('dashboard');
+      }
+    }
+  }, [isFinanceHead, page, setCurrentPage]);
+
+  // If Finance Head and on unauthorized page, don't render content for that frame
+  if (isFinanceHead) {
+    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'expense-approvals'];
+    if (!allowedPages.includes(page)) {
+      return null;
+    }
+  }
+
   // Determine if current user has a volunteer record
   const currentVolunteer = volunteers.find((v: any) => v.email === user?.email);
 
@@ -2219,7 +2240,7 @@ const PageView = ({
       if (user?.role === 'Volunteer') {
         return <VolunteerFinanceDashboard user={user} />;
       }
-      return <FinanceDashboard user={user} projects={projects} />;
+      return <FinanceCommandHome user={user} projects={projects} />;
     case 'docs':
       return (
         <DocumentVault 
@@ -2329,7 +2350,6 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
   const functionalNodes = [
     { id: 'dashboard', label: 'Command Hub', icon: LayoutDashboard, desc: 'Root system overview' },
     { id: 'projects', label: 'Mission Data', icon: FolderKanban, desc: 'Project lifecycle mgmt' },
-    { id: 'tasks', label: 'Node Engine', icon: CheckSquare, desc: 'Operational task flow' },
     { id: 'volunteers', label: 'Unit Directory', icon: Users, desc: 'Personnel records' },
     { id: 'finance', label: 'Resource Cell', icon: IndianRupee, desc: 'Financial oversight' },
     { id: 'docs', label: 'Signal Vault', icon: FileText, desc: 'Document protocol' },
@@ -2391,20 +2411,22 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
 
         <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">High Response Nodes</h3>
-            <Badge className="bg-red-50 text-red-600 border border-red-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">Critical: {tasks.filter((t: any) => t.priority === 'High' && t.status !== 'done' && t.status !== 'completed').length}</Badge>
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Personnel Network Pulse</h3>
+            <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">{volunteers.length} Active Units</Badge>
           </div>
           <div className="space-y-4">
-            {tasks.filter((t: any) => t && t.priority === 'High' && t.status !== 'done' && t.status !== 'completed').slice(0, 4).map((t: any) => (
-              <div key={t.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+            {volunteers.slice(0, 4).map((v: any) => (
+              <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-blue-500/20 transition-all cursor-pointer" onClick={() => setCurrentPage('volunteers')}>
                 <div className="flex items-center gap-4">
-                   <div className="w-1.5 h-6 bg-red-500 rounded-full"></div>
+                   <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 font-black text-xs shadow-sm shadow-slate-200/50">
+                      {INITIALS(v.name)}
+                   </div>
                    <div className="text-left">
-                      <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{t.title}</p>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.assignedVolunteerName || t.assigned_to}</p>
+                      <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{v.name}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{v.role}</p>
                    </div>
                 </div>
-                <button className="p-2 text-slate-300 hover:text-blue-600 transition-colors">
+                <button className="p-2 text-slate-300 group-hover:text-blue-600 transition-colors">
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -2493,7 +2515,7 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
             <div className="grid grid-cols-2 gap-5">
               {[
                 { label: 'New Mission', icon: FolderKanban, color: 'bg-blue-50 text-blue-600 border-blue-100', page: 'projects' },
-                { label: 'Log Pulse', icon: CheckSquare, color: 'bg-emerald-50 text-emerald-600 border-emerald-100', page: 'tasks' },
+                { label: 'Protocols', icon: FileText, color: 'bg-emerald-50 text-emerald-600 border-emerald-100', page: 'docs' },
                 { label: 'Credit flow', icon: IndianRupee, color: 'bg-amber-50 text-amber-600 border-amber-100', page: 'finance' },
                 { label: 'Deployment', icon: Users, color: 'bg-indigo-50 text-indigo-600 border-indigo-100', page: 'volunteers' },
                 ...(user.role === 'Admin' ? [{ label: 'Automata', icon: Zap, color: 'bg-rose-50 text-rose-600 border-rose-100', page: 'automation' }] : [])
@@ -2951,7 +2973,7 @@ const FinanceView = () => {
           </div>
           <div className="flex gap-3">
             <Button variant="secondary" className="text-[10px] px-6 py-3 font-black rounded-xl uppercase tracking-widest">Export Dataset</Button>
-            <Button variant="primary" className="text-[10px] px-6 py-3 font-black rounded-xl uppercase tracking-widest shadow-xl shadow-blue-500/20">+ Log Pulse</Button>
+            <Button variant="primary" className="text-[10px] px-6 py-3 font-black rounded-xl uppercase tracking-widest shadow-xl shadow-blue-500/20">Command Center</Button>
           </div>
         </div>
         <div className="space-y-4">

@@ -77,11 +77,13 @@ export const MobileShell = ({
   const navigation = [
     { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Home Hub' },
     { id: 'messages', icon: MessageCircle, label: 'Mission Comms' },
-    { id: 'schedule', icon: Calendar, label: 'Mission Schedule' },
+    { id: 'schedule', icon: Calendar, label: 'Calendar' },
     { 
       id: 'missions', 
       icon: Target, 
-      label: 'Missions', 
+      label: 'Missions',
+      roles: ['Admin', 'Project Head', 'Department Head'],
+      depts: ['Operations', 'General'],
       subs: [
         { id: 'projects', label: 'Active Missions' },
         { id: 'roadmap', label: 'Strategic Roadmap' },
@@ -92,16 +94,18 @@ export const MobileShell = ({
       id: 'finance', 
       icon: IndianRupee, 
       label: 'Finance Command',
+      roles: ['Admin', 'Finance Head', 'Department Head'],
       subs: [
-        { id: 'expense-approvals', label: 'Authorizations', roles: ['Admin', 'Department Head'] },
+        { id: 'expense-approvals', label: 'Authorizations', roles: ['Admin', 'Department Head', 'Finance Head'] },
         { id: 'finance-requests', label: 'Fund Requests' },
-        { id: 'finance', label: 'Digital Ledger' }
+        { id: 'finance', label: 'Digital Ledger', roles: ['Admin', 'Finance Head'] }
       ]
     },
     { 
       id: 'network', 
       icon: Users, 
       label: 'Personnel Network',
+      roles: ['Admin'],
       subs: [
         { id: 'volunteers', label: 'Unit Directory' },
         { id: 'users', label: 'Access Control', roles: ['Admin'] },
@@ -112,15 +116,38 @@ export const MobileShell = ({
       id: 'media', 
       icon: Megaphone, 
       label: 'Communications',
+      roles: ['Admin', 'Marketing Head', 'Department Head'],
+      depts: ['Marketing'],
       subs: [
         { id: 'social-media', label: 'Social Pipeline' },
         { id: 'public-relations', label: 'PR & Outreach' }
       ]
     },
     { id: 'docs', icon: FileText, label: 'Protocols Vault' },
-    { id: 'tasks', icon: Layout, label: 'Force Board' },
     { id: 'automation', icon: Zap, label: 'Automation Hub', roles: ['Admin'] },
   ];
+
+  const filteredNavigation = navigation.filter(item => {
+    if (!user) return false;
+    
+    const isYukta = user.email === 'yuktagarad@gmail.com' || user.name === 'Yukta';
+    
+    // Strict filtering for Yukta as requested: Only Comms, Finance, and Calendar
+    if (isYukta) {
+      const allowedForYukta = ['messages', 'finance', 'schedule'];
+      return allowedForYukta.includes(item.id);
+    }
+
+    if (user.role === 'Admin') return true;
+    
+    // Check main item role/dept
+    const roleMatch = item.roles ? item.roles.some(r => r === user.role) : true;
+    const deptMatch = item.depts ? item.depts.includes(user.department) : true;
+    
+    if (!(roleMatch && deptMatch)) return false;
+
+    return true;
+  });
 
   const handleNavClick = (id: string) => {
     onNavigate(id);
@@ -140,8 +167,7 @@ export const MobileShell = ({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1 custom-scrollbar">
-        {navigation.map((item) => {
-          if (item.roles && user && !item.roles.includes(user.role)) return null;
+        {filteredNavigation.map((item) => {
           const isMenuActive = activePath === item.id || item.subs?.some(s => s.id === activePath);
           const isExpanded = expandedMenus.includes(item.id);
           const Icon = item.icon;
@@ -192,17 +218,15 @@ export const MobileShell = ({
                     />
                   </div>
                 )}
-                {!item.subs && item.id === 'tasks' && tasksCount > 0 && (
-                  <span className="w-5 h-5 bg-blue-100 text-blue-600 text-[9px] font-black flex items-center justify-center rounded-full">
-                    {tasksCount}
-                  </span>
-                )}
               </button>
 
               {item.subs && isExpanded && (
                 <div className="ml-10 space-y-1 border-l-2 border-slate-50 pl-4 py-1">
-                  {item.subs.map(sub => {
-                    if (sub.roles && user && !sub.roles.includes(user.role)) return null;
+                  {item.subs.filter((sub: any) => {
+                    if (user?.role === 'Admin') return true;
+                    if (sub.roles && !sub.roles.includes(user?.role || 'Guest')) return false;
+                    return true;
+                  }).map((sub: any) => {
                     const isSubActive = activePath === sub.id;
                     return (
                       <button
@@ -391,7 +415,7 @@ export const MobileShell = ({
             { id: 'schedule', icon: Calendar, label: 'Cal' },
             { id: 'create', icon: Plus, label: 'New', isSpecial: true },
             { id: 'messages', icon: MessageCircle, label: 'Comms' },
-            { id: 'tasks', icon: Layout, label: 'Tasks' }
+            { id: 'projects', icon: Target, label: 'Missions' }
           ].map((item) => {
             const isActive = activePath === item.id;
             const Icon = item.icon;

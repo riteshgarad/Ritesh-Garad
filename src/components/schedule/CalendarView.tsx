@@ -16,6 +16,7 @@ import {
 import { 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
   Calendar as CalendarIcon, 
   Plus, 
   Filter, 
@@ -24,7 +25,8 @@ import {
   Compass,
   Target,
   Shield,
-  Globe
+  Globe,
+  Video
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../../lib/firebase';
@@ -43,6 +45,7 @@ export const CalendarView = ({ user }: CalendarViewProps) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [meetings, setMeetings] = useState<any[]>([]);
   const [showScheduler, setShowScheduler] = useState(false);
+  const [selectedMeetingDetails, setSelectedMeetingDetails] = useState<any | null>(null);
   const [filter, setFilter] = useState<'all' | 'global' | 'mission' | 'dept'>('all');
 
   useEffect(() => {
@@ -124,25 +127,28 @@ export const CalendarView = ({ user }: CalendarViewProps) => {
         <div className="flex items-center justify-between py-4">
            <div>
              <h1 className="text-xl font-black text-mahogany tracking-tight uppercase leading-none mb-1">
-               {format(selectedDate, 'MMMM yyyy')}
+               {format(currentDate, 'MMMM yyyy')}
              </h1>
              <p className="text-[9px] font-bold text-terracotta/40 uppercase tracking-[0.2em]">Mission Schedule</p>
            </div>
-           <div className="flex gap-2">
-             <button className="p-2 text-mahogany/40 hover:bg-slate-50 rounded-xl">
-               <Search size={20} />
+           <div className="flex items-center gap-1">
+             <button onClick={prevMonth} className="p-2 text-mahogany/40 hover:bg-slate-50 rounded-xl transition-colors">
+               <ChevronLeft size={20} strokeWidth={2.5} />
              </button>
-             <div className="w-8 h-8 rounded-full bg-slate-100 border border-mahogany/10 flex items-center justify-center text-[10px] font-black text-mahogany">
+             <button onClick={nextMonth} className="p-2 text-mahogany/40 hover:bg-slate-50 rounded-xl transition-colors">
+               <ChevronRight size={20} strokeWidth={2.5} />
+             </button>
+             <div className="w-8 h-8 rounded-full bg-slate-100 border border-mahogany/10 flex items-center justify-center text-[10px] font-black text-mahogany ml-2">
                {user.name?.[0] || 'U'}
              </div>
            </div>
         </div>
 
         {/* Horizontal Date Strip */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 -mx-2 px-2">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 -mx-2 px-2 scroll-smooth">
           {eachDayOfInterval({
-            start: subMonths(new Date(), 0),
-            end: addDays(new Date(), 14)
+            start: startOfMonth(currentDate),
+            end: endOfMonth(currentDate)
           }).map((day, idx) => {
             const isSelected = isSameDay(day, selectedDate);
             const hasMeeting = meetings.some(m => isSameDay(m.start?.toDate ? m.start.toDate() : new Date(m.start), day));
@@ -208,6 +214,7 @@ export const CalendarView = ({ user }: CalendarViewProps) => {
                      meeting={meeting} 
                      currentUserUid={user.uid}
                      onRSVP={handleRSVP}
+                     onClick={setSelectedMeetingDetails}
                    />
                  </div>
                ))
@@ -263,6 +270,127 @@ export const CalendarView = ({ user }: CalendarViewProps) => {
                 onClose={() => setShowScheduler(false)}
                 onSave={handleSaveMeeting}
               />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Meeting Details Drawer */}
+      <AnimatePresence>
+        {selectedMeetingDetails && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedMeetingDetails(null)}
+              className="fixed inset-0 bg-mahogany/40 backdrop-blur-sm z-[110]"
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed inset-x-0 bottom-0 max-h-[85vh] bg-[#FAF7F2] z-[111] rounded-t-[3rem] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="w-12 h-1.5 bg-mahogany/10 rounded-full mx-auto my-4" />
+              
+              <div className="px-8 pb-10 overflow-y-auto">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className={cn(
+                        "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
+                        selectedMeetingDetails.type === 'mission' ? "bg-terracotta/10 text-terracotta" :
+                        selectedMeetingDetails.type === 'global' ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
+                      )}>
+                        {selectedMeetingDetails.type}
+                      </span>
+                      {selectedMeetingDetails.meetingLink && (
+                        <div className="flex items-center gap-1 text-emerald-600">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-[9px] font-black uppercase tracking-widest">Active Pulse</span>
+                        </div>
+                      )}
+                    </div>
+                    <h2 className="text-2xl font-black text-mahogany tracking-tight leading-tight">
+                      {selectedMeetingDetails.title}
+                    </h2>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedMeetingDetails(null)}
+                    className="p-2 bg-white rounded-2xl shadow-sm text-slate-400"
+                  >
+                    <ChevronDown size={24} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="bg-white p-4 rounded-3xl border border-mahogany/5">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Time Range</p>
+                    <p className="text-sm font-bold text-mahogany">
+                      {format(selectedMeetingDetails.start?.toDate ? selectedMeetingDetails.start.toDate() : new Date(selectedMeetingDetails.start), 'hh:mm a')} - {format(selectedMeetingDetails.end?.toDate ? selectedMeetingDetails.end.toDate() : new Date(selectedMeetingDetails.end), 'hh:mm a')}
+                    </p>
+                  </div>
+                  <div className="bg-white p-4 rounded-3xl border border-mahogany/5">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Mission Lead</p>
+                    <p className="text-sm font-bold text-mahogany">{selectedMeetingDetails.creatorName}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-[10px] font-black text-mahogany uppercase tracking-widest mb-3 flex items-center gap-2">
+                       Mission Objectives
+                    </h4>
+                    <div className="bg-white/50 p-6 rounded-[2rem] border border-mahogany/5">
+                      <p className="text-xs font-bold text-slate-600 leading-relaxed">
+                        {selectedMeetingDetails.description || 'No detailed objectives provided for this mission pulse.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedMeetingDetails.meetingLink && (
+                    <a 
+                      href={selectedMeetingDetails.meetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between w-full bg-blue-600 text-white p-5 rounded-[2rem] shadow-xl shadow-blue-200"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
+                          <Video size={20} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Communication Link</p>
+                          <p className="text-sm font-bold">Join Video Conference</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={20} />
+                    </a>
+                  )}
+
+                  <div>
+                     <h4 className="text-[10px] font-black text-mahogany uppercase tracking-widest mb-3">
+                       Confirmed Personnel ({Object.keys(selectedMeetingDetails.attendees || {}).length})
+                     </h4>
+                     <div className="flex flex-wrap gap-2">
+                       {Object.entries(selectedMeetingDetails.attendees || {}).map(([uid, status]: [string, any]) => (
+                         <div key={uid} className={cn(
+                           "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-tight",
+                           status === 'going' ? "bg-green-50 border-green-200 text-green-700" :
+                           status === 'declined' ? "bg-red-50 border-red-200 text-red-700" : "bg-slate-50 border-slate-200 text-slate-400"
+                         )}>
+                           <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-sm text-[6px]">
+                             {status === 'going' ? '✓' : status === 'declined' ? '✕' : '?'}
+                           </div>
+                           {uid === user.uid ? 'You' : 'Team Member'}
+                         </div>
+                       ))}
+                     </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           </>
         )}

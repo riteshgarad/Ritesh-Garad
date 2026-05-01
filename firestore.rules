@@ -10,12 +10,18 @@ service cloud.firestore {
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
     function isVerified() { 
-      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email == 'riteshgarad4@gmail.com' || true); // Temporarily allow for testing
+      return isSignedIn() && (
+        request.auth.token.email_verified == true || 
+        request.auth.token.email == 'riteshgarad4@gmail.com' || 
+        request.auth.token.email == 'yuktagarad@gmail.com' ||
+        true // Temporarily allow for testing
+      );
     }
 
     function isAdmin() { 
       return isSignedIn() && (
              request.auth.token.email == 'riteshgarad4@gmail.com' ||
+             request.auth.token.email == 'yuktagarad@gmail.com' ||
              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin')
       );
@@ -64,14 +70,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /notifications/{notifId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
         allow write: if isAdmin() || isDeptHead('Finance') || isDeptHead('HR') || isDeptHead('Operations');
       }
     }
 
     // --- Projects ---
     match /projects/{projectId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isVerified(); 
       allow update: if (
         isAdmin() || 
@@ -81,14 +89,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
       
       match /milestones/{milestoneId} {
-        allow read: if isSignedIn();
+        allow list: if isSignedIn() && resource.data.projectId != null;
+        allow get: if isSignedIn();
         allow write: if isAdmin() || isDeptHead(get(/databases/$(database)/documents/projects/$(projectId)).data.department);
       }
     }
 
     // --- Tasks ---
     match /tasks/{taskId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isVerified();
       allow update: if isVerified() && (
         isAdmin() || 
@@ -100,13 +110,15 @@ service cloud.firestore {
 
     // --- Volunteers ---
     match /volunteers/{volunteerId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow write: if isAdmin();
     }
 
     // --- Documentation ---
     match /documents/{docId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isVerified();
       allow update: if (
         isAdmin() || 
@@ -119,52 +131,65 @@ service cloud.firestore {
 
     // --- Finance & Transactions ---
     match /finance/{fId} {
-      allow read: if isAdmin() || isDeptHead('Finance');
+      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow get: if isAdmin() || isDeptHead('Finance');
       allow create: if isAdmin() || isDeptHead('Finance');
     }
 
     match /transactions/{tId} {
-      allow read: if isAdmin() || isDeptHead('Finance');
+      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow get: if isAdmin() || isDeptHead('Finance');
       allow create: if isAdmin() || isDeptHead('Finance') || isDeptHead('Operations');
       allow update: if isAdmin() || isDeptHead('Finance');
     }
 
     match /finance_requests/{rId} {
-      allow read, write: if isAdmin() || isDeptHead('Finance');
+      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow get: if isAdmin() || isDeptHead('Finance');
+      allow write: if isAdmin() || isDeptHead('Finance');
     }
 
     match /expense_requests/{rId} {
-      allow list: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && resource.data.requesterId == request.auth.uid);
+      allow list: if isSignedIn() && (
+        request.auth.token.email == 'riteshgarad4@gmail.com' || 
+        resource.data.requesterId == request.auth.uid ||
+        resource.data.department == 'Finance'
+      );
       allow get: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && resource.data.requesterId == request.auth.uid);
       allow update, delete: if isAdmin() || isDeptHead('Finance') || (isSignedIn() && existing().requesterId == request.auth.uid);
       allow create: if isVerified();
     }
 
     match /budget_requests/{rId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow write: if isAdmin() || isDeptHead('Finance') || isDeptHead(incoming().department);
     }
 
     // --- Campaigns ---
     match /campaigns/{cId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow write: if isAdmin() || isDeptHead('Marketing') || isDeptHead('Social Media') || isDeptHead('Public Relations');
     }
 
     // --- Donors & Donations ---
     match /donors/{dId} {
-      allow read: if isAdmin() || isDeptHead('Finance') || isDeptHead('Public Relations');
+      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department in ['Finance', 'Public Relations']);
+      allow get: if isAdmin() || isDeptHead('Finance') || isDeptHead('Public Relations');
       allow write: if isAdmin() || isDeptHead('Finance');
     }
 
     match /donations/{dId} {
-      allow read: if isAdmin() || isDeptHead('Finance');
+      allow list: if isSignedIn() && (request.auth.token.email == 'riteshgarad4@gmail.com' || resource.data.department == 'Finance');
+      allow get: if isAdmin() || isDeptHead('Finance');
       allow create: if isVerified();
     }
 
     // --- Misc ---
     match /activity_logs/{logId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isSignedIn();
     }
 
@@ -174,29 +199,34 @@ service cloud.firestore {
     }
     
     match /work_logs/{logId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isVerified();
       allow update: if isAdmin() || isDeptHead(existing().department);
     }
 
     match /volunteer_applications/{appId} {
-      allow read: if isAdmin() || isDeptHead('HR');
+      allow list: if isAdmin() || isDeptHead('HR');
+      allow get: if isAdmin() || isDeptHead('HR');
       allow create: if true; // Public access
       allow update: if isAdmin() || isDeptHead('HR');
     }
 
     match /volunteer_certificates/{certId} {
-      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isAdmin() || isDeptHead('HR');
     }
 
     // --- Schedule & Meetings ---
     match /schedule/{eventId} {
-      allow read: if isSignedIn() && (
+      allow list, get: if isSignedIn() && (
         isAdmin() ||
         resource.data.type == 'global' ||
-        resource.data.type == 'mission' || // Visibility filtered by project link in UI
-        (resource.data.type == 'departmental' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == resource.data.dept)
+        resource.data.type == 'mission' || 
+        (resource.data.type == 'departmental' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == resource.data.dept) ||
+        (resource.data.attendees != null && resource.data.attendees[request.auth.uid] != null) ||
+        resource.data.creatorId == request.auth.uid
       );
       allow create: if isAdmin() || (isVerified() && (isDeptHead(incoming().dept) || incoming().type == 'mission'));
       allow update: if isVerified() && (
