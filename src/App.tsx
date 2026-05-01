@@ -1539,7 +1539,10 @@ export default function App() {
         user={user}
         hasNotifications={unreadCount > 0}
         projectsCount={projects.length}
-        pendingApprovalsCount={expenseRequests.filter(r => r.status === 'pending').length}
+        pendingApprovalsCount={
+          expenseRequests.filter(r => r.status === 'pending').length + 
+          budgetRequests.filter(r => r.status === 'pending_finance').length
+        }
         tasksCount={tasks.filter(t => t.status !== 'done' && t.status !== 'completed').length}
       >
         <PageView 
@@ -2132,7 +2135,7 @@ const PageView = ({
   
   useEffect(() => {
     if (isFinanceHead) {
-      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'expense-approvals'];
+      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals'];
       if (!allowedPages.includes(page)) {
         // Redirect to dashboard if trying to access unauthorized page
         setCurrentPage('dashboard');
@@ -2142,7 +2145,7 @@ const PageView = ({
 
   // If Finance Head and on unauthorized page, don't render content for that frame
   if (isFinanceHead) {
-    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'expense-approvals'];
+    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals'];
     if (!allowedPages.includes(page)) {
       return null;
     }
@@ -2237,10 +2240,25 @@ const PageView = ({
 
       return <VolunteerDirectory volunteers={volunteers} applications={applications} projects={projects} onAddVolunteer={onAddVolunteer} user={user} onApprove={onApprove} onReject={onReject} onUpdateStatus={async () => {}} />;
     case 'finance':
+    case 'finance-requests':
+    case 'finance-ledger':
+    case 'finance-budgets':
+    case 'finance-income':
       if (user?.role === 'Volunteer') {
         return <VolunteerFinanceDashboard user={user} />;
       }
-      return <FinanceCommandHome user={user} projects={projects} />;
+      return (
+        <FinanceCommandHome 
+          user={user} 
+          projects={projects} 
+          initialTab={
+            page === 'finance-requests' ? 'inbox' :
+            page === 'finance-ledger' ? 'ledger' :
+            page === 'finance-budgets' ? 'budgets' :
+            page === 'finance-income' ? 'income' : 'inbox'
+          }
+        />
+      );
     case 'docs':
       return (
         <DocumentVault 

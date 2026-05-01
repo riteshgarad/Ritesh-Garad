@@ -96,9 +96,10 @@ export const MobileShell = ({
       label: 'Finance Command',
       roles: ['Admin', 'Finance Head', 'Department Head'],
       subs: [
-        { id: 'expense-approvals', label: 'Authorizations', roles: ['Admin', 'Department Head', 'Finance Head'] },
-        { id: 'finance-requests', label: 'Fund Requests' },
-        { id: 'finance', label: 'Digital Ledger', roles: ['Admin', 'Finance Head'] }
+        { id: 'finance-requests', label: 'Fund Requests', roles: ['Admin', 'Department Head', 'Finance Head'] },
+        { id: 'finance-ledger', label: 'Digital Ledger', roles: ['Admin', 'Finance Head'] },
+        { id: 'finance-budgets', label: 'Mission Budgets', roles: ['Admin', 'Finance Head'] },
+        { id: 'finance-income', label: 'Income Hub', roles: ['Admin', 'Finance Head'] }
       ]
     },
     { 
@@ -223,7 +224,8 @@ export const MobileShell = ({
               {item.subs && isExpanded && (
                 <div className="ml-10 space-y-1 border-l-2 border-slate-50 pl-4 py-1">
                   {item.subs.filter((sub: any) => {
-                    if (user?.role === 'Admin') return true;
+                    const isYukta = user?.email === 'yuktagarad@gmail.com' || user?.name === 'Yukta';
+                    if (user?.role === 'Admin' || isYukta) return true;
                     if (sub.roles && !sub.roles.includes(user?.role || 'Guest')) return false;
                     return true;
                   }).map((sub: any) => {

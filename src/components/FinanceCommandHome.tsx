@@ -40,10 +40,16 @@ import { BudgetGauge } from './BudgetGauge';
 interface FinanceCommandHomeProps {
   user: AppUser;
   projects: Project[];
+  initialTab?: 'inbox' | 'ledger' | 'budgets' | 'income';
 }
 
-const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects }) => {
-  const [activeTab, setActiveTab] = useState<'inbox' | 'ledger' | 'budgets' | 'income'>('inbox');
+const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects, initialTab = 'inbox' }) => {
+  const [activeTab, setActiveTab] = useState<'inbox' | 'ledger' | 'budgets' | 'income'>(initialTab);
+
+  // Sync activeTab if initialTab changes
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
   const [budgetRequests, setBudgetRequests] = useState<BudgetRequest[]>([]);
