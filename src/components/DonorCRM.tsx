@@ -60,13 +60,13 @@ const DonorCRM: React.FC<DonorCRMProps> = ({ donors, donations }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative flex-1 max-w-lg">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text"
-            placeholder="Search donor neural net by name or email..."
-            className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none shadow-sm"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+            <input 
+              type="text"
+              placeholder="Search donor neural net by name or email..."
+              className="w-full bg-transparent border-b border-slate-200 rounded-none pl-12 pr-4 py-3.5 text-sm font-medium focus:border-blue-500 transition-all outline-none"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
         </div>
         
         <div className="flex items-center gap-3">
@@ -77,7 +77,7 @@ const DonorCRM: React.FC<DonorCRMProps> = ({ donors, donations }) => {
             <Download size={16} /> Export CRM Data
           </button>
           
-          <div className="flex p-1 bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <div className="flex p-1 bg-transparent border-none rounded-2xl">
             {['all', 'Gold', 'Silver', 'Bronze'].map((tier) => (
               <button
                 key={tier}
@@ -97,7 +97,7 @@ const DonorCRM: React.FC<DonorCRMProps> = ({ donors, donations }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Donor List Area */}
-        <div className="lg:col-span-12 xl:col-span-8 bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-sm">
+        <div className="lg:col-span-12 xl:col-span-8 bg-transparent overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -169,7 +169,7 @@ const DonorCRM: React.FC<DonorCRMProps> = ({ donors, donations }) => {
               exit={{ opacity: 0, x: 20 }}
               className="lg:col-span-12 xl:col-span-4 space-y-6"
             >
-              <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-xl shadow-slate-200/20 text-left">
+              <div className="bg-transparent p-0 overflow-hidden text-left">
                 <div className="flex items-start justify-between mb-8">
                   <div className="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center text-white text-xl font-black shadow-lg">
                     {selectedDonor.name[0]}

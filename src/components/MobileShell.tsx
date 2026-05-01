@@ -394,8 +394,8 @@ export const MobileShell = ({
 
         {/* Main Scrolling Content Area */}
         <main className={cn(
-          "flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/30 max-w-full",
-          activePath === 'messages' ? "p-0" : "p-4 lg:p-10"
+          "flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/20 max-w-full",
+          activePath === 'messages' ? "p-0" : "p-0 md:p-6 lg:p-10"
         )}>
           <AnimatePresence mode="wait">
             <motion.div
@@ -405,8 +405,8 @@ export const MobileShell = ({
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
               className={cn(
-                "w-full",
-                activePath === 'messages' ? "px-0" : "px-4 md:px-8 xl:px-12"
+                "w-full h-full",
+                activePath === 'messages' ? "px-0" : "px-0 md:px-8 xl:px-12"
               )}
             >
               {children}
@@ -414,16 +414,16 @@ export const MobileShell = ({
           </AnimatePresence>
         </main>
 
-        {/* Mobile-Only Bottom Navigation (Simplified for focus) */}
-        <nav className="lg:hidden h-[calc(80px+env(safe-area-inset-bottom,24px))] bg-white border-t border-slate-100 flex items-center justify-around px-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
+        {/* Mobile-Only Bottom Navigation (Sleek Modern Profile) */}
+        <nav className="lg:hidden h-[calc(70px+env(safe-area-inset-bottom,16px))] bg-white/95 backdrop-blur-xl border-t border-slate-100 flex items-center justify-around px-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-50">
           {[
-            { id: 'dashboard', icon: Home, label: 'Hub' },
-            { id: 'schedule', icon: Calendar, label: 'Cal' },
-            { id: 'create', icon: Plus, label: 'New', isSpecial: true },
-            { id: 'messages', icon: MessageCircle, label: 'Comms' },
-            { id: 'projects', icon: Target, label: 'Missions' }
+            { id: 'dashboard', icon: Home, label: 'HUB' },
+            { id: 'schedule', icon: Calendar, label: 'CAL' },
+            { id: 'create', icon: Plus, label: 'NEW', isSpecial: true },
+            { id: 'messages', icon: MessageCircle, label: 'COMMS' },
+            { id: 'projects', icon: Target, label: 'MISSIONS' }
           ].map((item) => {
-            const isActive = activePath === item.id;
+            const isActive = activePath === item.id || (item.id === 'projects' && activePath === 'roadmap');
             const Icon = item.icon;
 
             if (item.id === 'create') {
@@ -431,10 +431,10 @@ export const MobileShell = ({
                 <button
                   key={item.id}
                   onClick={() => handleNavClick('create')}
-                  className="relative -top-6"
+                  className="relative -top-5"
                 >
-                  <div className="w-14 h-14 bg-terracotta rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-terracotta/30 ring-4 ring-white transition-transform active:scale-90">
-                    <Plus size={24} />
+                  <div className="w-16 h-16 bg-mahogany rounded-[22px] flex items-center justify-center text-white shadow-2xl shadow-mahogany/30 ring-8 ring-white/50 transition-all active:scale-90 hover:rotate-90">
+                    <Plus size={28} strokeWidth={2.5} />
                   </div>
                 </button>
               );
@@ -444,21 +444,32 @@ export const MobileShell = ({
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className="flex flex-col items-center gap-1.5 px-4 py-2 relative group"
+                className="flex flex-col items-center gap-1.5 px-4 h-full justify-center relative group min-w-[64px]"
               >
-                <Icon 
-                  size={20} 
-                  className={cn(
-                    "transition-all duration-300",
-                    isActive ? "text-terracotta scale-110" : "text-slate-400 group-active:scale-95"
-                  )} 
-                />
+                <div className={cn(
+                  "p-2 rounded-xl transition-all duration-300",
+                  isActive ? "bg-mahogany/5" : "bg-transparent"
+                )}>
+                  <Icon 
+                    size={22} 
+                    className={cn(
+                      "transition-all duration-300",
+                      isActive ? "text-mahogany scale-110" : "text-slate-400 group-active:scale-90"
+                    )} 
+                  />
+                </div>
                 <span className={cn(
-                  "text-[9px] font-black uppercase tracking-widest leading-none transition-colors",
-                  isActive ? "text-terracotta" : "text-slate-400"
+                  "text-[8px] font-black uppercase tracking-[0.15em] leading-none transition-colors",
+                  isActive ? "text-mahogany" : "text-slate-400"
                 )}>
                   {item.label}
                 </span>
+                {isActive && (
+                  <motion.div 
+                    layoutId="active-nav-dot"
+                    className="absolute bottom-1 w-1 h-1 bg-mahogany rounded-full"
+                  />
+                )}
               </button>
             );
           })}

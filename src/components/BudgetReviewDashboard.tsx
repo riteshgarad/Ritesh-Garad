@@ -104,7 +104,7 @@ export const BudgetReviewDashboard: React.FC<BudgetReviewDashboardProps> = ({ us
         {requests.map((req) => (
           <div 
             key={req.id} 
-            className={`bg-white border transition-all rounded-[24px] overflow-hidden ${expandedId === req.id ? 'border-blue-200 shadow-xl shadow-blue-500/5' : 'border-slate-100 hover:border-slate-200 shadow-sm'}`}
+            className={`bg-transparent overflow-hidden transition-all ${expandedId === req.id ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
           >
             <div 
               className="p-6 cursor-pointer flex items-center justify-between group"
@@ -152,7 +152,7 @@ export const BudgetReviewDashboard: React.FC<BudgetReviewDashboardProps> = ({ us
                   <div className="p-8">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                       <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                        <div className="bg-transparent border border-slate-100 overflow-hidden">
                           <table className="w-full text-left">
                             <thead className="bg-slate-50/80 border-b border-slate-100">
                               <tr>

@@ -139,23 +139,23 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
   }, [filters]);
 
   return (
-    <div className="space-y-8 p-4 md:p-0 bg-[#F9FAFB]/50 min-h-screen">
+    <div className="space-y-8 p-0 bg-transparent min-h-screen">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4 md:px-0">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3 italic">
-            Finance <span className="bg-emerald-500 text-white text-[10px] not-italic px-2 py-1 rounded-md uppercase tracking-widest font-black">Ledger v2</span>
+            Finance <span className="bg-emerald-500 text-white text-[10px] not-italic px-2 py-1 rounded-md uppercase tracking-widest font-black shadow-lg shadow-emerald-500/20">Ledger v2</span>
           </h1>
-          <div className="flex items-center gap-6 mt-2">
+          <div className="flex items-center gap-8 mt-4 overflow-x-auto pb-2 scrollbar-hide">
             <button 
               onClick={() => setActiveTab('ledger')}
-              className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'text-slate-900 border-b-2 border-slate-900 pb-1' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all shrink-0 ${activeTab === 'ledger' ? 'text-mahogany border-b-2 border-mahogany pb-2' : 'text-slate-400 hover:text-slate-600 pb-2 border-b-2 border-transparent'}`}
             >
               Primary Ledger
             </button>
             <button 
               onClick={() => setActiveTab('budgets')}
-              className={`text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'budgets' ? 'text-slate-900 border-b-2 border-slate-900 pb-1' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all shrink-0 ${activeTab === 'budgets' ? 'text-mahogany border-b-2 border-mahogany pb-2' : 'text-slate-400 hover:text-slate-600 pb-2 border-b-2 border-transparent'}`}
             >
               Project Budgets
             </button>
@@ -163,24 +163,24 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
         </div>
         
         {activeTab === 'ledger' && (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <button 
               onClick={() => exportTransactionsToExcel(filteredTransactions)}
-              className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all uppercase tracking-widest shadow-sm"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-600 hover:bg-slate-50 transition-all uppercase tracking-widest shadow-sm"
             >
-              <Download size={16} /> Export Statement
+              <Download size={14} /> Export
             </button>
             <button 
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black hover:bg-slate-800 transition-all uppercase tracking-widest shadow-lg shadow-slate-200"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black hover:bg-slate-800 transition-all uppercase tracking-widest shadow-xl shadow-slate-900/10"
             >
-              <Plus size={16} /> Log Entry
+              <Plus size={14} /> Log Entry
             </button>
             <button 
               onClick={() => setIsExpenseRequestModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl text-xs font-black hover:bg-blue-700 transition-all uppercase tracking-widest shadow-lg shadow-blue-500/20"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black hover:bg-blue-700 transition-all uppercase tracking-widest shadow-xl shadow-blue-600/20"
             >
-              <Send className="rotate-[-20deg]" size={16} /> Request Expense
+              <Send className="rotate-[-20deg]" size={14} /> Request Fund
             </button>
           </div>
         )}
@@ -193,10 +193,10 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="space-y-8"
+            className="space-y-12"
           >
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4 md:px-0">
               <motion.div 
                 whileHover={{ y: -4 }}
                 className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-[32px] shadow-2xl relative overflow-hidden group"
@@ -259,7 +259,7 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({ user, projects = []
             </div>
 
             {/* Primary Toolbar */}
-            <div className="flex flex-col md:flex-row items-center gap-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col md:flex-row items-center gap-4 bg-transparent p-0">
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 

@@ -68,8 +68,8 @@ const CampaignManager: React.FC<CampaignManagerProps> = ({ campaigns, user }) =>
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             type="text"
-            placeholder="Search campaigns by title..."
-            className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none"
+            placeholder="Search campaigns..."
+            className="w-full bg-transparent border-b border-slate-200 rounded-none pl-12 pr-4 py-3 text-sm font-medium focus:border-blue-500 transition-all outline-none"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -109,7 +109,7 @@ const CampaignManager: React.FC<CampaignManagerProps> = ({ campaigns, user }) =>
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               key={campaign.id}
-              className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl hover:shadow-slate-200/40 transition-all text-left"
+              className="bg-transparent overflow-hidden flex flex-col group transition-all text-left"
             >
               {/* Card Header & Status */}
               <div className="p-8 pb-4">

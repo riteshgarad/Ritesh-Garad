@@ -164,7 +164,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
           </p>
         </div>
         
-        <div className="flex p-1 bg-white border border-slate-200 rounded-3xl shadow-sm">
+        <div className="flex p-1 bg-transparent border-none rounded-3xl">
           {['overview', 'campaigns', 'donors', 'impact'].map((tab) => (
             <button
               key={tab}
@@ -221,8 +221,8 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Chart Area */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm text-left">
+            <div className="lg:col-span-2 space-y-12">
+              <div className="bg-transparent p-0 overflow-hidden text-left">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Donation Velocity</h3>
@@ -281,7 +281,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
               </div>
 
               {/* Recent Activity Mini-Feed */}
-              <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm text-left">
+              <div className="bg-transparent p-0 overflow-hidden text-left">
                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                   Live Contribution Feed
                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -394,7 +394,7 @@ const MarketingDashboard: React.FC<MarketingDashboardProps> = ({ user }) => {
 const MetricCard = ({ label, value, subValue, icon: Icon, color, bg }: any) => (
   <motion.div 
     whileHover={{ y: -4 }}
-    className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm relative overflow-hidden group text-left"
+    className="bg-transparent p-0 overflow-hidden group text-left"
   >
     <div className={`p-4 ${bg} ${color} w-fit rounded-2xl mb-6 group-hover:scale-110 transition-transform`}>
       <Icon size={24} />

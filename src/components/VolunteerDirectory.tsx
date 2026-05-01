@@ -282,13 +282,13 @@ export const VolunteerDirectory = ({
             className="space-y-4"
           >
             {pendingApps.length === 0 ? (
-              <div className="bg-white rounded-[3rem] p-20 text-center flex flex-col items-center gap-4 shadow-soft">
+              <div className="bg-transparent p-20 text-center flex flex-col items-center gap-4">
                 <CheckCircle2 className="text-emerald-100" size={60} />
                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">All clear. No pending recruits.</p>
               </div>
             ) : (
               pendingApps.map(app => (
-                <div key={app.id} className="bg-white p-6 rounded-[2.5rem] shadow-soft border border-emerald-50 flex items-center justify-between gap-4">
+                <div key={app.id} className="bg-transparent p-6 overflow-hidden flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 text-xl font-black">
                       {app.name.charAt(0)}
@@ -351,7 +351,7 @@ const VolunteerCard = ({ v, index, projects, onDelete, isDeleting, onAssign }: a
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
       whileTap={{ scale: 0.98 }}
-      className="bg-white p-6 rounded-[2.5rem] shadow-soft border border-slate-50/50 relative overflow-hidden group"
+      className="bg-transparent p-6 overflow-hidden relative group"
     >
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">

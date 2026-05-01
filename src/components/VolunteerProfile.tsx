@@ -108,8 +108,8 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Left Column: Stats & Skills */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
+        <div className="lg:col-span-1 space-y-12">
+          <div className="bg-transparent p-0 overflow-hidden text-left">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Impact Milestone</h3>
             <div className="relative w-32 h-32 mx-auto mb-6">
               <svg className="w-full h-full transform -rotate-90">
@@ -126,7 +126,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
+          <div className="bg-transparent p-0 overflow-hidden text-left">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Mastered Skills</h3>
             <div className="flex flex-wrap gap-2">
               {(Array.isArray(volunteer.skills) ? volunteer.skills : []).map(skill => (
@@ -137,7 +137,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
+          <div className="bg-transparent p-0 overflow-hidden text-left">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Badges</h3>
             <div className="flex flex-wrap gap-4">
               {volunteer.badges.map(badge => (
@@ -263,7 +263,7 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
             {activeTab === 'certs' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myCerts.map(cert => (
-                  <div key={cert.id} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm group hover:border-indigo-200 transition-all">
+                  <div key={cert.id} className="bg-transparent overflow-hidden group transition-all text-left">
                     <div className="w-full aspect-[1/1.4] bg-slate-50 rounded-2xl mb-6 relative overflow-hidden flex items-center justify-center border border-slate-100">
                       <FileText size={48} className="text-slate-200" />
                       <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/80 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
