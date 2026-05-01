@@ -9,7 +9,9 @@ import {
   onSnapshot,
   serverTimestamp,
   or,
-  and
+  and,
+  doc,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../App';
 import { AppUser, ChatMessage } from '../types';
@@ -29,6 +31,7 @@ interface ChatViewProps {
 export function ChatView({ user, operators }: ChatViewProps) {
   const [selectedRecipientId, setSelectedRecipientId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter operators for sidebar
@@ -36,6 +39,73 @@ export function ChatView({ user, operators }: ChatViewProps) {
     (o.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
      o.role?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  // Fetch unread counts for all conversations
+  useEffect(() => {
+    const q = query(
+      collection(db, 'messages'),
+      where('read', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const counts: Record<string, number> = {};
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        // If it's a global message, anyone except the sender sees it as unread until they open it
+        // Note: In a true production app, we'd track per-user read status for global, 
+        // but for this prototype we'll track if the user has seen the global thread.
+        if (data.recipientId === 'global' && data.senderId !== user.uid) {
+          counts['global'] = (counts['global'] || 0) + 1;
+        } else if (data.recipientId === user.uid) {
+          counts[data.senderId] = (counts[data.senderId] || 0) + 1;
+        }
+      });
+      setUnreadCounts(counts);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'messages');
+    });
+
+    return () => unsubscribe();
+  }, [user.uid]);
+
+  // Mark messages as read when opening a thread
+  useEffect(() => {
+    if (!selectedRecipientId) return;
+
+    // Direct query for unread messages in the active thread
+    let unreadQuery;
+    if (selectedRecipientId === 'global') {
+      unreadQuery = query(
+        collection(db, 'messages'),
+        where('recipientId', '==', 'global'),
+        where('read', '==', false)
+      );
+    } else {
+      unreadQuery = query(
+        collection(db, 'messages'),
+        where('senderId', '==', selectedRecipientId),
+        where('recipientId', '==', user.uid),
+        where('read', '==', false)
+      );
+    }
+
+    const unsubscribe = onSnapshot(unreadQuery, (snapshot) => {
+      snapshot.docs.forEach(async (msgDoc) => {
+        // Mark as read in Firestore
+        if (msgDoc.data().senderId !== user.uid) {
+          try {
+            await updateDoc(msgDoc.ref, { read: true });
+          } catch (err) {
+            console.error("Mark as read error:", err);
+          }
+        }
+      });
+    }, (err) => {
+      console.error("Unread snapshot error:", err);
+    });
+
+    return () => unsubscribe();
+  }, [selectedRecipientId, user.uid]);
 
   useEffect(() => {
     if (!selectedRecipientId) return;
@@ -127,6 +197,7 @@ export function ChatView({ user, operators }: ChatViewProps) {
           onSelect={setSelectedRecipientId}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          unreadCounts={unreadCounts}
         />
       </div>
 

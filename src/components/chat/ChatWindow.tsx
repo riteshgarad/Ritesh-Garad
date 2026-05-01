@@ -26,40 +26,42 @@ export const ChatWindow = ({
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-cream relative overflow-hidden">
+    <div className="flex flex-col h-full bg-[#FAF7F2] relative overflow-hidden">
       {/* WhatsApp Wallpaper Pattern Overlay */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#A63A1B 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#A63A1B 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
       {/* Header */}
-      <header className="bg-white border-b border-mahogany/5 px-4 pt-safe pb-3 flex items-center justify-between shrink-0 z-10 shadow-sm">
+      <header className="bg-white/90 backdrop-blur-md border-b border-mahogany/5 px-4 pt-safe pb-4 flex items-center justify-between shrink-0 z-20 shadow-sm sticky top-0">
         <div className="flex items-center gap-3">
           <button 
             onClick={onBack}
-            className="md:hidden p-2 -ml-2 text-slate-400 hover:text-mahogany transition-colors"
+            className="md:hidden p-2 -ml-2 text-slate-400 hover:text-mahogany transition-colors active:scale-95"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={22} />
           </button>
-          <div className="relative">
-            <div className="w-10 h-10 rounded-2xl bg-mahogany/5 flex items-center justify-center text-mahogany text-sm font-black shadow-sm">
+          <div className="relative group cursor-pointer">
+            <div className="w-11 h-11 rounded-full bg-mahogany/5 flex items-center justify-center text-mahogany text-base font-black shadow-inner border border-mahogany/10 group-hover:scale-105 transition-transform">
               {recipient.uid === 'global' ? 'G' : recipient.name.charAt(0)}
             </div>
             {recipient.uid !== 'global' && (
-               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
+               <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
             )}
           </div>
-          <div className="flex flex-col">
-            <h3 className="text-[13px] font-black text-mahogany uppercase tracking-widest leading-none">
+          <div className="flex flex-col truncate max-w-[160px] sm:max-w-xs">
+            <h3 className="text-[14px] font-black text-mahogany uppercase tracking-tight leading-none truncate">
               {recipient.uid === 'global' ? 'General Operations' : recipient.name}
             </h3>
-            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1.5 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              {recipient.uid === 'global' ? 'System Bridge Active' : 'Secure Online'}
-            </p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+               <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">
+                 {recipient.uid === 'global' ? 'System Bridge' : 'Active Secure'}
+               </p>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-slate-400">
-           <Shield size={18} className="text-terracotta/40" />
-           <MoreVertical size={20} className="cursor-pointer hover:text-mahogany transition-colors" />
+        <div className="flex items-center gap-1 text-slate-400">
+           <button className="p-2 hover:bg-slate-50 rounded-full transition-colors"><Shield size={18} className="text-terracotta/50" /></button>
+           <button className="p-2 hover:bg-slate-50 rounded-full transition-colors"><MoreVertical size={20} /></button>
         </div>
       </header>
 
@@ -114,7 +116,7 @@ export const ChatWindow = ({
                     )}>
                       {message.timestamp ? (message.timestamp.toDate ? message.timestamp.toDate() : new Date(message.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </p>
-                    {isMe && <CheckCheck size={12} className={cn(message.read ? "text-blue-300" : "text-white/40")} />}
+                    {isMe && <CheckCheck size={12} className={cn(message.read ? "text-[#34B7F1]" : "text-white/40")} />}
                   </div>
                 </div>
               </motion.div>
