@@ -120,82 +120,63 @@ export const CalendarView = ({ user }: CalendarViewProps) => {
   return (
     <div className="flex flex-col h-full bg-[#FAF7F2] font-sans pb-32">
       {/* Header */}
-      <div className="bg-white px-6 pt-safe pb-6 border-b border-mahogany/5 sticky top-0 z-20">
+      <div className="bg-white px-6 pt-[env(safe-area-inset-top,24px)] pb-4 border-b border-mahogany/5 sticky top-0 z-20 shadow-sm">
         <div className="flex items-center justify-between py-4">
-           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-mahogany rounded-2xl flex items-center justify-center text-white shadow-lg shadow-mahogany/20">
-                <CalendarIcon size={20} strokeWidth={2.5} />
-             </div>
-             <div>
-               <h1 className="text-xl font-black text-mahogany tracking-tight uppercase leading-none mb-1">Schedule</h1>
-               <p className="text-[9px] font-bold text-terracotta/40 uppercase tracking-widest">Garad Foundation Bridge</p>
-             </div>
+           <div>
+             <h1 className="text-xl font-black text-mahogany tracking-tight uppercase leading-none mb-1">
+               {format(selectedDate, 'MMMM yyyy')}
+             </h1>
+             <p className="text-[9px] font-bold text-terracotta/40 uppercase tracking-[0.2em]">Mission Schedule</p>
            </div>
            <div className="flex gap-2">
-             {['Admin', 'Department Head'].includes(user.role) && (
-               <button 
-                 onClick={() => setShowScheduler(true)}
-                 className="p-3 bg-terracotta text-white rounded-2xl shadow-xl shadow-terracotta/20 active:scale-95 transition-all"
-               >
-                 <Plus size={20} strokeWidth={3} />
-               </button>
-             )}
+             <button className="p-2 text-mahogany/40 hover:bg-slate-50 rounded-xl">
+               <Search size={20} />
+             </button>
+             <div className="w-8 h-8 rounded-full bg-slate-100 border border-mahogany/10 flex items-center justify-center text-[10px] font-black text-mahogany">
+               {user.name?.[0] || 'U'}
+             </div>
            </div>
         </div>
 
-        {/* Custom Calendar Grid */}
-        <div className="mt-4 bg-cream/50 rounded-[2.5rem] p-4 border border-mahogany/5">
-          <div className="flex items-center justify-between mb-4 px-2">
-             <h2 className="text-sm font-black text-mahogany uppercase tracking-widest">
-               {format(currentDate, 'MMMM yyyy')}
-             </h2>
-             <div className="flex gap-1">
-               <button onClick={prevMonth} className="p-2 hover:bg-white rounded-xl text-slate-400"><ChevronLeft size={18} /></button>
-               <button onClick={nextMonth} className="p-2 hover:bg-white rounded-xl text-slate-400"><ChevronRight size={18} /></button>
-             </div>
-          </div>
-          
-          <div className="grid grid-cols-7 gap-1">
-            {weekDayNames.map(day => (
-              <div key={day} className="text-center text-[9px] font-black text-slate-400 uppercase tracking-tighter py-2">
-                {day}
-              </div>
-            ))}
-            {calendarDays().map((day, idx) => {
-              const isSelected = isSameDay(day, selectedDate);
-              const isCurrentMonth = isSameMonth(day, currentDate);
-              const hasMeeting = meetings.some(m => isSameDay(m.start?.toDate ? m.start.toDate() : new Date(m.start), day));
+        {/* Horizontal Date Strip */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar py-2 -mx-2 px-2">
+          {eachDayOfInterval({
+            start: subMonths(new Date(), 0),
+            end: addDays(new Date(), 14)
+          }).map((day, idx) => {
+            const isSelected = isSameDay(day, selectedDate);
+            const hasMeeting = meetings.some(m => isSameDay(m.start?.toDate ? m.start.toDate() : new Date(m.start), day));
 
-              return (
-                <button
-                  key={idx}
-                  onClick={() => onDateClick(day)}
-                  className={cn(
-                    "relative aspect-square flex flex-col items-center justify-center rounded-xl transition-all",
-                    !isCurrentMonth ? "opacity-20" : "opacity-100",
-                    isSelected ? "bg-terracotta text-white shadow-lg shadow-terracotta/20 scale-110 z-10" : "hover:bg-white"
-                  )}
-                >
-                  <span className={cn(
-                    "text-xs font-bold",
-                    isToday(day) && !isSelected ? "text-terracotta underline decoration-2 underline-offset-4" : ""
-                  )}>
-                    {format(day, 'd')}
-                  </span>
-                  {hasMeeting && !isSelected && (
-                    <span className="absolute bottom-1 w-1 h-1 bg-terracotta/40 rounded-full" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+            return (
+              <button
+                key={idx}
+                onClick={() => setSelectedDate(day)}
+                className={cn(
+                  "flex flex-col items-center justify-center min-w-[54px] h-[72px] rounded-[1.5rem] transition-all shrink-0",
+                  isSelected 
+                    ? "bg-terracotta text-white shadow-xl shadow-terracotta/20 scale-105" 
+                    : "bg-cream border border-mahogany/5 text-mahogany hover:bg-white"
+                )}
+              >
+                <span className="text-[9px] font-black uppercase tracking-tighter mb-1 opacity-60">
+                  {format(day, 'EEE')}
+                </span>
+                <span className="text-sm font-black tracking-tight">
+                  {format(day, 'd')}
+                </span>
+                {hasMeeting && !isSelected && (
+                  <div className="w-1 h-1 bg-terracotta mt-1 rounded-full" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Agenda Section */}
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-mahogany/5 shadow-sm">
-           <div className="flex gap-1 overflow-x-auto no-scrollbar">
+      {/* Agenda Timeline List */}
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div className="flex items-center justify-between mb-4">
+           <div className="flex gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
              {[
                { id: 'all', label: 'All', icon: Compass },
                { id: 'global', label: 'Global', icon: Globe },
@@ -206,25 +187,20 @@ export const CalendarView = ({ user }: CalendarViewProps) => {
                  key={f.id}
                  onClick={() => setFilter(f.id as any)}
                  className={cn(
-                   "flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0",
-                   filter === f.id ? "bg-terracotta text-white shadow-md shadow-terracotta/20" : "text-slate-400 hover:bg-slate-50"
+                   "flex items-center gap-2 px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0 border",
+                   filter === f.id 
+                    ? "bg-mahogany text-white border-mahogany shadow-lg shadow-mahogany/20" 
+                    : "bg-white border-mahogany/5 text-slate-400"
                  )}
                >
-                 {filter === f.id && <f.icon size={12} />}
                  {f.label}
                </button>
              ))}
            </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 ml-2">
-            <h3 className="text-[11px] font-black text-mahogany uppercase tracking-[0.2em]">Agenda</h3>
-            <div className="h-px flex-1 bg-slate-200/50" />
-            <span className="text-[10px] font-bold text-slate-400">{format(selectedDate, 'EEE, MMM d')}</span>
-          </div>
-
-          <div className="space-y-4 min-h-[200px]">
+        <div className="space-y-2">
+           <AnimatePresence mode="popLayout">
              {filteredMeetings.length > 0 ? (
                filteredMeetings.map(meeting => (
                  <div key={meeting.id}>
@@ -236,19 +212,33 @@ export const CalendarView = ({ user }: CalendarViewProps) => {
                  </div>
                ))
              ) : (
-               <div className="py-20 flex flex-col items-center justify-center text-center px-10">
-                  <div className="w-16 h-16 bg-cream border border-mahogany/5 rounded-[2rem] flex items-center justify-center text-slate-300 mb-4">
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.95 }}
+                 animate={{ opacity: 1, scale: 1 }}
+                 className="py-24 flex flex-col items-center justify-center text-center"
+               >
+                  <div className="w-20 h-20 bg-white border border-mahogany/5 rounded-[2.5rem] flex items-center justify-center text-slate-200 mb-6 shadow-soft">
                     <CalendarIcon size={32} />
                   </div>
-                  <h4 className="text-sm font-black text-mahogany uppercase tracking-widest mb-2">No pulses detected</h4>
-                  <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tight">
-                    The bridge is clear for this sector. Start a new mission to sync the foundation.
+                  <h4 className="text-base font-black text-mahogany uppercase tracking-widest mb-2">Clear Skies</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight max-w-[200px] leading-relaxed">
+                    No missions scheduled for this quadrant today.
                   </p>
-               </div>
+               </motion.div>
              )}
-          </div>
+           </AnimatePresence>
         </div>
       </div>
+
+      {/* Branded FAB */}
+      {['Admin', 'Department Head'].includes(user.role) && (
+        <button 
+          onClick={() => setShowScheduler(true)}
+          className="fixed bottom-[calc(100px+env(safe-area-inset-bottom,24px))] right-6 w-14 h-14 bg-terracotta text-white rounded-2xl shadow-2xl shadow-terracotta/40 flex items-center justify-center active:scale-90 transition-all z-40 border-4 border-white/20 backdrop-blur-sm"
+        >
+          <Plus size={28} strokeWidth={3} />
+        </button>
+      )}
 
       {/* Mobile Drawer Overlay */}
       <AnimatePresence>

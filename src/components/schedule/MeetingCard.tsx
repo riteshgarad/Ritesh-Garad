@@ -37,93 +37,93 @@ export const MeetingCard = ({ meeting, currentUserUid, onRSVP }: MeetingCardProp
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-3xl p-5 border border-mahogany/5 shadow-soft hover:shadow-md transition-all relative group"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex gap-4 relative group"
       id={`meeting-${meeting.id}`}
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className={cn(
-          "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-          config.color
-        )}>
-          {config.label}
-        </div>
-        <button className="text-slate-300 hover:text-mahogany transition-colors">
-          <MoreVertical size={18} />
-        </button>
+      {/* Timeline Column */}
+      <div className="flex flex-col items-center w-12 pt-1 shrink-0">
+        <span className="text-[10px] font-black text-mahogany uppercase tracking-tighter text-right w-full mb-1">
+          {format(startTime, 'HH:mm')}
+        </span>
+        <div className="w-2.5 h-2.5 rounded-full bg-terracotta border-2 border-white shadow-sm z-10" />
+        <div className="w-0.5 flex-1 bg-slate-100 group-last:bg-transparent mt-1" />
       </div>
 
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-base font-black text-mahogany tracking-tight leading-tight mb-1 group-hover:text-terracotta transition-colors">
+      {/* Card Content Column */}
+      <div className="flex-1 pb-8">
+        <div className={cn(
+          "bg-white rounded-3xl p-5 border-l-4 shadow-soft hover:shadow-md transition-all relative",
+          meeting.type === 'mission' ? "border-terracotta" : 
+          meeting.type === 'global' ? "border-blue-500" : "border-emerald-500"
+        )}>
+          <div className="flex justify-between items-start mb-2">
+            <div className={cn(
+              "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+              config.color
+            )}>
+              {config.label}
+            </div>
+            {meeting.meetingLink && (
+              <a 
+                href={meeting.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700 transition-colors"
+                title="Join Mission Pulse"
+              >
+                <Video size={16} />
+              </a>
+            )}
+          </div>
+
+          <h3 className="text-sm font-black text-mahogany tracking-tight leading-tight mb-1">
             {meeting.title}
           </h3>
+          
           {meeting.description && (
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed line-clamp-2">
+            <p className="text-[10px] font-bold text-slate-400 leading-relaxed line-clamp-2 mb-3">
               {meeting.description}
             </p>
           )}
-        </div>
 
-        <div className="flex flex-wrap gap-4 pt-1">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Clock size={14} className="text-terracotta/40" />
-            <span className="text-[10px] font-black uppercase tracking-tight">
-              {format(startTime, 'hh:mm a')} - {format(endTime, 'hh:mm a')}
-            </span>
-          </div>
-          
-          {meeting.meetingLink && (
-            <a 
-              href={meeting.meetingLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-blue-500 hover:text-blue-700 transition-colors"
-            >
-              <Video size={14} />
-              <span className="text-[10px] font-black uppercase tracking-tight flex items-center gap-1">
-                Join Meet <ExternalLink size={10} />
-              </span>
-            </a>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-          <div className="flex -space-x-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-slate-400">
-                {String.fromCharCode(64 + i)}
+          <div className="flex items-center justify-between mt-auto">
+            <div className="flex -space-x-1.5">
+              {[1, 2].map((i) => (
+                <div key={i} className="w-6 h-6 rounded-full bg-slate-50 border border-white flex items-center justify-center text-[7px] font-bold text-slate-400">
+                  {String.fromCharCode(64 + i)}
+                </div>
+              ))}
+              <div className="w-6 h-6 rounded-full bg-cream border border-white flex items-center justify-center text-[7px] font-black text-terracotta">
+                +{Object.keys(meeting.attendees || {}).length}
               </div>
-            ))}
-            <div className="w-7 h-7 rounded-full bg-cream border-2 border-white flex items-center justify-center text-[8px] font-black text-terracotta">
-              +{Object.keys(meeting.attendees || {}).length}
             </div>
-          </div>
 
-          <div className="flex gap-2">
-            <button 
-              onClick={() => onRSVP(meeting.id, 'going')}
-              className={cn(
-                "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                myStatus === 'going' 
-                  ? "bg-green-500 text-white shadow-lg shadow-green-200" 
-                  : "bg-slate-50 text-slate-400 hover:bg-green-50 hover:text-green-600"
-              )}
-            >
-              Going
-            </button>
-            <button 
-              onClick={() => onRSVP(meeting.id, 'declined')}
-              className={cn(
-                "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                myStatus === 'declined' 
-                  ? "bg-red-500 text-white shadow-lg shadow-red-200" 
-                  : "bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600"
-              )}
-            >
-              Decline
-            </button>
+            <div className="flex gap-1.5">
+              <button 
+                onClick={() => onRSVP(meeting.id, 'going')}
+                className={cn(
+                  "px-3 py-1 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all",
+                  myStatus === 'going' 
+                    ? "bg-green-500 text-white" 
+                    : "bg-slate-50 text-slate-400"
+                )}
+              >
+                Intend
+              </button>
+              <button 
+                onClick={() => onRSVP(meeting.id, 'declined')}
+                className={cn(
+                  "px-3 py-1 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all",
+                  myStatus === 'declined' 
+                    ? "bg-red-500 text-white" 
+                    : "bg-slate-50 text-slate-400"
+                )}
+              >
+                Skip
+              </button>
+            </div>
           </div>
         </div>
       </div>
