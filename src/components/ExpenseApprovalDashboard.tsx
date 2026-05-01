@@ -38,26 +38,41 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
   const pendingRequests = requests.filter(r => r.status === 'pending');
   const selectedRequest = requests.find(r => r.id === selectedRequestId);
 
-  const handleApprove = async (request: ExpenseRequest) => {
+  const handleApprove = async (request: any) => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
       // PHASE 1: DATABASE INTEGRITY (Critical)
-      const requestRef = doc(db, 'expense_requests', request.id);
-      await updateDoc(requestRef, {
-        status: 'approved',
+      const collectionName = request.type === 'budget' ? 'budget_requests' : 'expense_requests';
+      const requestRef = doc(db, collectionName, request.id);
+      
+      const updateData: any = {
         reviewedBy: user.name,
         reviewedAt: serverTimestamp(),
-        approvedBy: user.uid, // Add as requested
-        approvedAt: serverTimestamp() // Add as requested
-      });
+        approvedBy: user.uid,
+        approvedAt: serverTimestamp(),
+        status: 'approved'
+      };
+
+      await updateDoc(requestRef, updateData);
+
+      // If budget request, update project status
+      if (request.type === 'budget' && request.projectId) {
+        try {
+          await updateDoc(doc(db, 'projects', request.projectId), {
+            budget_status: 'approved'
+          });
+        } catch (e) {
+          console.warn('Project budget status update failed', e);
+        }
+      }
 
       // Create ledger entry in transactions (Existing system)
       await addDoc(collection(db, 'transactions'), {
         type: 'expense',
         amount: request.amount,
-        category: 'Approved Expense',
-        description: `Approved request from ${request.requesterName}: ${request.description}`,
+        category: request.category || (request.type === 'budget' ? 'Project Budget' : 'Approved Expense'),
+        description: `Approved ${request.type} request: ${request.description}`,
         status: 'approved',
         date: serverTimestamp(),
         createdBy: user.uid,
@@ -158,16 +173,31 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
 
   const handleReject = async () => {
     if (!selectedRequest || isProcessing || !rejectionReason.trim()) return;
+    const request = selectedRequest as any;
     setIsProcessing(true);
     try {
       // PHASE 1: DATABASE INTEGRITY
-      const requestRef = doc(db, 'expense_requests', selectedRequest.id);
+      const collectionName = request.type === 'budget' ? 'budget_requests' : 'expense_requests';
+      const requestRef = doc(db, collectionName, request.id);
+      
       await updateDoc(requestRef, {
         status: 'rejected',
         rejectionReason: rejectionReason,
         reviewedBy: user.name,
         reviewedAt: serverTimestamp()
       });
+
+      // If budget request, update project status
+      if (request.type === 'budget' && request.projectId) {
+        try {
+          await updateDoc(doc(db, 'projects', request.projectId), {
+            budget_status: 'rejected',
+            budget_rejection_reason: rejectionReason
+          });
+        } catch (e) {
+          console.warn('Project budget status update failed', e);
+        }
+      }
 
       // Notify requester via in-app
       try {
@@ -258,8 +288,15 @@ export default function ExpenseApprovalDashboard({ user, requests }: ExpenseAppr
                 className="bg-white p-6 rounded-[2.5rem] shadow-soft border border-blue-50/50 relative overflow-hidden group border-l-4 border-l-blue-500"
               >
                 <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black">
-                    <Mail size={20} />
+                  <div className="flex gap-2">
+                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black">
+                      <Mail size={20} />
+                    </div>
+                    {(request as any).type === 'budget' && (
+                      <div className="px-2 py-1 bg-[#A63A1B]/10 text-[#A63A1B] text-[8px] font-black uppercase rounded mt-1 h-fit">
+                        Project Budget
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Verification Req</p>

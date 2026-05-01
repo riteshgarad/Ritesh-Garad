@@ -8,12 +8,31 @@ import {
   ShieldCheck,
   ChevronRight,
   IndianRupee,
-  Activity
+  Activity,
+  Zap,
+  Target,
+  Star,
+  ChevronLeft
 } from 'lucide-react';
-import { AppUser, Transaction, Project, ExpenseRequest } from '../types';
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid 
+} from 'recharts';
+import { AppUser, Transaction, Project, ExpenseRequest, BudgetRequest, FinanceRequest } from '../types';
 import { db, auth } from '../App';
-import { collection, query, onSnapshot, orderBy, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, where, limit } from 'firebase/firestore';
+import { Card } from './ui/card';
+import { Badge } from './ui/badge';
 import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { cn } from '../lib/utils';
 import ExpenseApprovalDashboard from './ExpenseApprovalDashboard';
 import { LedgerList } from './LedgerList';
 import { BudgetGauge } from './BudgetGauge';
@@ -27,6 +46,8 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects 
   const [activeTab, setActiveTab] = useState<'inbox' | 'ledger' | 'budgets' | 'income'>('inbox');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
+  const [budgetRequests, setBudgetRequests] = useState<BudgetRequest[]>([]);
+  const [financeRequests, setFinanceRequests] = useState<FinanceRequest[]>([]);
 
   // Real-time Data Listeners
   useEffect(() => {
@@ -40,13 +61,43 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects 
       setExpenseRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRequest)));
     }, err => handleFirestoreError(err, OperationType.LIST, 'expense_requests'));
 
-    return () => { unsubTx(); unsubReq(); };
+    const qBudgets = query(collection(db, 'budget_requests'), orderBy('submittedAt', 'desc'));
+    const unsubBudgets = onSnapshot(qBudgets, (snapshot) => {
+      setBudgetRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BudgetRequest)));
+    }, err => handleFirestoreError(err, OperationType.LIST, 'budget_requests'));
+
+    const qFin = query(collection(db, 'finance_requests'), orderBy('requested_at', 'desc'), limit(10));
+    const unsubFin = onSnapshot(qFin, (snapshot) => {
+      setFinanceRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinanceRequest)));
+    }, err => handleFirestoreError(err, OperationType.LIST, 'finance_requests'));
+
+    return () => { unsubTx(); unsubReq(); unsubBudgets(); unsubFin(); };
   }, []);
 
-  const pendingCount = useMemo(() => expenseRequests.filter(r => r.status === 'pending').length, [expenseRequests]);
+  const DONATION_DATA = [
+    { month: 'Nov', amount: 80000 },
+    { month: 'Dec', amount: 95000 },
+    { month: 'Jan', amount: 72000 },
+    { month: 'Feb', amount: 110000 },
+    { month: 'Mar', amount: 88000 },
+    { month: 'Apr', amount: 120000 },
+  ];
+
+  const ALLOCATION_DATA = [
+    { name: 'Health', value: 400, color: '#3b82f6' },
+    { name: 'Education', value: 300, color: '#10b981' },
+    { name: 'Environment', value: 200, color: '#f59e0b' },
+    { name: 'Community', value: 100, color: '#6366f1' },
+  ];
+
+  const totalPending = useMemo(() => {
+    const expPending = expenseRequests.filter(r => r.status === 'pending').length;
+    const budPending = budgetRequests.filter(r => r.status === 'pending_finance').length;
+    return expPending + budPending;
+  }, [expenseRequests, budgetRequests]);
 
   const tabs = [
-    { id: 'inbox', label: 'Approval Inbox', icon: Inbox, count: pendingCount },
+    { id: 'inbox', label: 'Fund Requests', icon: Inbox, count: totalPending },
     { id: 'ledger', label: 'Digital Ledger', icon: BookOpen },
     { id: 'budgets', label: 'Mission Budgets', icon: ChartIcon },
     { id: 'income', label: 'Income Hub', icon: TrendingUp },
@@ -55,6 +106,34 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects 
   const totalInflow = useMemo(() => 
     transactions.filter(t => t.type === 'income' && t.status === 'cleared').reduce((s, t) => s + t.amount, 0)
   , [transactions]);
+
+  const normalizedRequests: ExpenseRequest[] = useMemo(() => {
+    const normalizedExpenses = expenseRequests.map(er => ({
+      ...er,
+      type: 'expense' as const
+    }));
+
+    const normalizedBudgets = budgetRequests.map(br => ({
+      id: br.id,
+      projectId: br.projectId,
+      requesterId: br.proposerId,
+      requesterName: br.projectName,
+      requesterEmail: '', // br.proposedBy used instead?
+      department: br.department,
+      amount: br.totalAmount,
+      description: `Budget Request for ${br.projectName}`,
+      professionalMessage: `Proposed by ${br.proposedBy}. Contains ${br.itemizedList?.length || 0} items.`,
+      status: br.status === 'pending_finance' ? 'pending' : (br.status === 'approved' ? 'approved' : 'rejected'),
+      submittedAt: br.submittedAt,
+      type: 'budget' as const
+    } as any));
+
+    return [...normalizedExpenses, ...normalizedBudgets].sort((a, b) => {
+      const timeA = a.submittedAt?.toMillis ? a.submittedAt.toMillis() : (a.timestamp?.toMillis ? a.timestamp.toMillis() : 0);
+      const timeB = b.submittedAt?.toMillis ? b.submittedAt.toMillis() : (b.timestamp?.toMillis ? b.timestamp.toMillis() : 0);
+      return timeB - timeA;
+    });
+  }, [expenseRequests, budgetRequests]);
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]/40 pb-20">
@@ -126,7 +205,7 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects 
           >
             {activeTab === 'inbox' && (
               <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden min-h-[600px]">
-                <ExpenseApprovalDashboard user={user} requests={expenseRequests} />
+                <ExpenseApprovalDashboard user={user} requests={normalizedRequests} />
               </div>
             )}
 
@@ -140,27 +219,136 @@ const FinanceCommandHome: React.FC<FinanceCommandHomeProps> = ({ user, projects 
             )}
 
             {activeTab === 'budgets' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xl font-black text-[#4A1412] uppercase tracking-tighter italic">Mission Expenditure Velocity</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Real-time Project Linking</p>
+              <div className="space-y-12">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-left">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">Asset Allocation Matrix</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-8">
+                      <div className="h-64 w-full relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={ALLOCATION_DATA}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={8}
+                              dataKey="value"
+                            >
+                              {ALLOCATION_DATA.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Ops</span>
+                          <span className="text-xl font-black text-slate-900 leading-none">100%</span>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        {ALLOCATION_DATA.map((item) => (
+                          <div key={item.name} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl">
+                            <div className="flex items-center gap-3">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
+                              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{item.name}</span>
+                            </div>
+                            <span className="text-[11px] font-black text-slate-900">{(item.value / 10).toFixed(0)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-left">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">System Diagnostics</h3>
+                    <div className="space-y-4">
+                      {[
+                        { label: 'Operational Efficiency', value: '94.2%', icon: Zap, color: 'text-emerald-500' },
+                        { label: 'Asset Utilization', value: '78.5%', icon: Target, color: 'text-blue-500' },
+                        { label: 'Fund Health Index', value: 'Gold', icon: Star, color: 'text-amber-500' },
+                      ].map((hub, i) => (
+                        <div key={i} className="flex items-center justify-between p-5 bg-slate-50 border border-slate-100 rounded-2xl">
+                          <div className="flex items-center gap-4">
+                            <div className={cn("p-2 rounded-lg bg-white shadow-sm", hub.color)}>
+                              <hub.icon size={16} />
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{hub.label}</span>
+                          </div>
+                          <span className="text-sm font-black text-slate-900">{hub.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <BudgetGauge projects={projects} transactions={transactions} />
+
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xl font-black text-[#4A1412] uppercase tracking-tighter italic">Mission Expenditure Velocity</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Real-time Project Linking</p>
+                  </div>
+                  <BudgetGauge projects={projects} transactions={transactions} />
+                </div>
               </div>
             )}
 
             {activeTab === 'income' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-emerald-600 p-8 rounded-[3rem] text-white shadow-xl shadow-emerald-900/10">
-                    <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-4">Total Realized Inflow</p>
-                    <h3 className="text-4xl font-black tracking-tighter">₹{totalInflow.toLocaleString()}</h3>
+              <div className="space-y-12">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="md:col-span-2 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-left">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                      Donation Inflow Pulse
+                    </h3>
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={DONATION_DATA}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis 
+                            dataKey="month" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} 
+                            dy={10}
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }}
+                            tickFormatter={(val) => `₹${val/1000}k`}
+                          />
+                          <Tooltip 
+                            cursor={{ fill: '#f8fafc' }}
+                            contentStyle={{ 
+                              backgroundColor: '#fff', 
+                              borderRadius: '16px', 
+                              border: '1px solid #e2e8f0',
+                              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                              fontWeight: 900,
+                              fontSize: '11px',
+                              textTransform: 'uppercase'
+                            }} 
+                          />
+                          <Bar dataKey="amount" fill="#10b981" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-600 p-8 rounded-[3rem] text-white shadow-xl shadow-emerald-900/10 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-4">Total Realized Inflow</p>
+                      <h3 className="text-5xl font-black tracking-tighter text-white">₹{totalInflow.toLocaleString()}</h3>
+                    </div>
                     <div className="mt-6 flex items-center gap-2">
                       <TrendingUp size={16} />
-                      <span className="text-[10px] font-bold uppercase">Steady Growth Sector</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Steady Growth Sector</span>
                     </div>
                   </div>
                 </div>
+
                 <LedgerList 
                   transactions={transactions.filter(t => t.type === 'income')} 
                   projects={projects} 
