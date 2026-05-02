@@ -346,70 +346,99 @@ export default function App() {
       return;
     }
 
-    const tId = toast.loading("Connecting to Comms Node...", { duration: 15000 });
+    const tId = toast.loading("Checking comms status...", { duration: 15000 });
     
     try {
       const os = OneSignal as any;
-      console.log("OneSignal Status Probe:", {
-        initialized: os.initialized,
-        hasNotifications: !!os.Notifications,
-        hasSlidedown: !!os.Slidedown,
-        permission: os.Notifications?.permission,
-        nativePermission: os.Notifications?.permissionNative
-      });
-
-      if (!os.initialized && !os.Notifications) {
-        toast.error("Comms Bridge Offline. Refreshing...", { id: tId });
-        await initOneSignal();
-        if (!os.initialized && !os.Notifications) {
-          throw new Error("Comms system failed to initialize. Check App ID.");
+      
+      // 1. Check for Median (GoNative) Bridge
+      const isMedian = (window as any).median || (window as any).gonative;
+      if (isMedian) {
+        console.log("Median detected. Initializing native push registration.");
+        toast.loading("Invoking Native Signal Bridge...", { id: tId });
+        
+        try {
+          if ((window as any).median?.onesignal?.register) {
+            await (window as any).median.onesignal.register();
+          } else {
+            window.location.href = "gonative://onesignal/register";
+          }
+          
+          setTimeout(() => {
+            toast.success("Native Link Active", { id: tId });
+            setNotifPermission('granted');
+          }, 2000);
+          return;
+        } catch (me) {
+          console.error("Median registration failed:", me);
         }
       }
 
-      if (os.Notifications?.permissionNative === 'denied') {
-        toast.error("Access Forbidden by Browser", { id: tId });
-        alert("Notifications are permanently blocked for this site. Click the Lock icon in the address bar to reset permissions.");
+      // 2. Web initialization ensure
+      if (!os.initialized && !os.Notifications) {
+        toast.loading("Synthesizing Comms Bridge...", { id: tId });
+        await initOneSignal();
+      }
+
+      const permission = os.Notifications?.permission;
+      const nativePermission = os.Notifications?.permissionNative;
+
+      console.log("Comms Debug:", { permission, nativePermission });
+
+      if (nativePermission === 'denied') {
+        toast.error("Blocked by Browser", { id: tId });
+        alert("Mission Alerts are blocked in your browser site settings. Toggle the 'Lock' icon in the URL bar to allow notifications.");
         return;
       }
 
-      toast.loading("Awaiting Browser Authorization...", { id: tId });
-      
-      // Native Prompt with 10s fallback
-      const result = await Promise.race([
-        os.Notifications.requestPermission(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("PROMPT_TIMEOUT")), 10000))
-      ]).catch(async (e) => {
-        if (e.message === "PROMPT_TIMEOUT") {
-          console.warn("Native prompt timed out. Attempting Slidedown Fallback.");
-          toast.loading("Native prompt ignored. Deploying Slidedown...", { id: tId });
-          
-          try {
-            if (typeof os.Slidedown?.prompt === 'function') await os.Slidedown.prompt({ type: 'push' });
-            else if (typeof os.slidedown?.prompt === 'function') await os.slidedown.prompt({ type: 'push' });
-            else if (typeof os.showSlidedownPrompt === 'function') await os.showSlidedownPrompt();
-            else console.warn("No slidedown method found.");
-          } catch (se) {
-            console.error("Slidedown failure:", se);
-          }
-          return os.Notifications?.permission;
-        }
-        throw e;
-      });
-
-      const isGranted = os.Notifications?.permission;
-      console.log("Permission Analysis Result:", isGranted);
-
-      if (isGranted === true || isGranted === 'granted') {
+      if (permission === true || permission === 'granted') {
+        toast.success("Comms Link Already Secure", { id: tId });
         setNotifPermission('granted');
-        toast.success("Signals Online!", { id: tId });
-        alert("Signals Activated! You will now receive mission alerts.");
-      } else {
-        setNotifPermission('denied');
-        toast.error("Authorization Dismissed", { id: tId });
+        return;
+      }
+
+      // 3. Deployment of Authorization Interface
+      toast.loading("Deploying Authorization Prompt...", { id: tId });
+      
+      // We use a timer to ensure the UI doesn't hang if the browser blocks the prompt silently
+      const promptTimeout = setTimeout(() => {
+        toast.dismiss(tId);
+        alert("The authorization prompt seems blocked. Please check if your browser blocked a popup or look for a bell icon 🔔 at the bottom of the screen.");
+      }, 8000);
+
+      try {
+        console.log("Executing OS Permission Request...");
+        // In modern OneSignal (v16), requestPermission() is the most reliable entry point for user-triggered prompts
+        const result = await os.Notifications.requestPermission();
+        clearTimeout(promptTimeout);
+        toast.dismiss(tId);
+
+        console.log("OS Prompt Result:", result);
+        
+        if (os.Notifications.permission) {
+          setNotifPermission('granted');
+          toast.success("Signals Authorized!");
+          alert("Authorization Successful! You'll now receive mission critical alerts.");
+        } else {
+          // If native prompt failed/was ignored, try the Slidedown fallback
+          console.log("Native prompt did not resolve, attempting Slidedown...");
+          if (os.Slidedown?.prompt) {
+             await os.Slidedown.prompt({ type: 'push' });
+          } else if (os.showSlidedownPrompt) {
+             await os.showSlidedownPrompt();
+          }
+        }
+      } catch (promptErr) {
+        clearTimeout(promptTimeout);
+        toast.dismiss(tId);
+        console.error("Prompt Error:", promptErr);
+        // Fallback to Slidedown if one is available
+        if (os.Slidedown?.prompt) await os.Slidedown.prompt({ type: 'push' });
       }
     } catch (err: any) {
-      console.error("Comms Authorization Critical Failure:", err);
-      toast.error("Comms Link Error: " + (err.message || "Unknown"), { id: tId });
+      toast.dismiss(tId);
+      console.error("Comms Link Error:", err);
+      toast.error("Authorization Error: " + (err.message || "Unknown"));
     }
   };
 
