@@ -86,7 +86,7 @@ export const attendanceService = {
         navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
 
-      let position: GeolocationPosition;
+      let position: GeolocationPosition | null = null;
       try {
         // Try high accuracy first
         position = await getPos({
@@ -96,42 +96,50 @@ export const attendanceService = {
         });
       } catch (err: any) {
         // Fallback to low accuracy / cached
-        if (err.code === 1) throw err; // If PERMISSION_DENIED, throw immediately to UI
-        
         console.warn("High accuracy failed, attempting fallback", err);
-        position = await getPos({
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 300000 
-        });
+        try {
+          position = await getPos({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 300000 
+          });
+        } catch (fallbackErr: any) {
+          console.warn("Location fallback failed or denied:", fallbackErr);
+          // If denied or timed out, we don't throw, we just proceed with 0,0
+          position = null;
+        }
       }
       
-      lat = position.coords.latitude;
-      lng = position.coords.longitude;
+      if (position) {
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
 
-      // Reverse Geocode
-      try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
-          headers: {
-            'Accept-Language': 'en-IN,en-US,en;q=0.9',
-            'User-Agent': 'GaradFoundationMissionApp/1.0 (riteshgerad@gmail.com)'
-          }
-        });
-        const data = await response.json();
-        
-        if (data && data.address) {
-          const addr = data.address;
-          const parts = [
-            addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood,
-            addr.city || addr.town || addr.village || addr.district
-          ].filter(Boolean);
+        // Reverse Geocode
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+            headers: {
+              'Accept-Language': 'en-IN,en-US,en;q=0.9',
+              'User-Agent': 'GaradFoundationMissionApp/1.0 (riteshgerad@gmail.com)'
+            }
+          });
+          const data = await response.json();
           
-          locationName = parts.length > 0 ? parts.join(', ') : (data.name || data.display_name);
-        } else {
+          if (data && data.address) {
+            const addr = data.address;
+            const parts = [
+              addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood,
+              addr.city || addr.town || addr.village || addr.district
+            ].filter(Boolean);
+            
+            locationName = parts.length > 0 ? parts.join(', ') : (data.name || data.display_name);
+          } else {
+            locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          }
+        } catch (e) {
           locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
-      } catch (e) {
-        locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      } else {
+        locationName = "Location Restricted";
       }
 
       const attendanceData = {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import toast from 'react-hot-toast';
 import { 
   MapPin, 
   Play, 
@@ -10,7 +11,6 @@ import {
   AlertCircle,
   ChevronDown,
   Navigation,
-  ExternalLink,
   Timer
 } from 'lucide-react';
 import { auth, db } from '../../lib/firebase';
@@ -29,7 +29,6 @@ export const AttendanceHub: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPunching, setIsPunching] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<'pending' | 'active' | 'denied'>('pending');
-  const [showLocationHelp, setShowLocationHelp] = useState(false);
 
   const [selectedSession, setSelectedSession] = useState<Attendance | null>(null);
 
@@ -87,6 +86,7 @@ export const AttendanceHub: React.FC = () => {
     const project = projects.find(p => p.id === selectedProjectId);
     if (!project) return;
 
+    const tId = toast.loading("Launching mission protocols...");
     setIsPunching(true);
     try {
       const { id, locationName } = await attendanceService.punchIn(
@@ -109,16 +109,10 @@ export const AttendanceHub: React.FC = () => {
       };
       setActiveSession(newSession);
       setGpsStatus('active');
+      toast.success("Mission Started Successfully", { id: tId });
     } catch (err: any) {
       console.error("Punch in error:", err);
-      if (err.code === 1) { // PERMISSION_DENIED
-        setGpsStatus('denied');
-        setShowLocationHelp(true);
-      } else if (err.code === 3) { // TIMEOUT
-        alert("GEOLOCATION TIMEOUT: Could not get a GPS fix. Please ensure you are in an open area.");
-      } else {
-        alert("Failed to access location. Please ensure GPS is active and permissions are granted.");
-      }
+      toast.error("Deployment failed. Please check connection.", { id: tId });
     } finally {
       setIsPunching(false);
     }
@@ -127,6 +121,7 @@ export const AttendanceHub: React.FC = () => {
   const handlePunchOut = async () => {
     if (!activeSession) return;
 
+    const tId = toast.loading("Securing mission logs...");
     setIsPunching(true);
     try {
       const durationMins = Math.floor(elapsed / 60);
@@ -141,13 +136,10 @@ export const AttendanceHub: React.FC = () => {
       if (!userSnap.empty) {
         setTotalHours(userSnap.docs[0].data().hours || 0);
       }
+      toast.success("Mission Logged Successfully", { id: tId });
     } catch (err: any) {
       console.error("Punch out error:", err);
-      if (err.code === 1) {
-        alert("GEOLOCATION DENIED: Please enable location access to punch out.");
-      } else {
-        alert("Failed to capture location for punch out. Please try again.");
-      }
+      toast.error("Failed to secure mission log.", { id: tId });
     } finally {
       setIsPunching(false);
     }
@@ -164,66 +156,6 @@ export const AttendanceHub: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto space-y-8 pb-32 px-4 md:px-0">
-      {/* Location Access Help Modal */}
-      <AnimatePresence>
-        {showLocationHelp && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md px-6"
-            onClick={() => setShowLocationHelp(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full space-y-6 shadow-2xl"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto">
-                <MapPin size={32} />
-              </div>
-              
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Enable Location</h3>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Mission protocols require verified GPS coordinates. To enable:
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  "Tap the 'Lock' icon next to the URL",
-                  "Enable 'Location' permission",
-                  "Refresh this mission log",
-                  "Try 'Open in New Tab' if on mobile"
-                ].map((step, i) => (
-                  <div key={i} className="flex items-center gap-3 text-left">
-                    <div className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shrink-0">
-                      {i + 1}
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700">{step}</span>
-                  </div>
-                ))}
-              </div>
-
-              <button 
-                onClick={() => {
-                  setShowLocationHelp(false);
-                  handlePunchIn();
-                }}
-                className="w-full py-4 bg-mahogany text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-mahogany/20 active:scale-95 transition-all"
-              >
-                Grant Access & Retry Launch
-              </button>
-              
-              <p className="text-[10px] text-slate-400 font-medium text-center">
-                Still stuck? Use the <span className="font-bold text-mahogany">"Open in New Tab"</span> arrow at the top right of your screen.
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* Mission Detail Inspection Modal */}
       <AnimatePresence>
         {selectedSession && (
@@ -409,15 +341,14 @@ export const AttendanceHub: React.FC = () => {
             </span>
           </div>
           <button 
-            onClick={() => setShowLocationHelp(true)}
             className={cn(
-              "px-3 py-1 rounded-full flex items-center gap-1.5 transition-all active:scale-95",
-              gpsStatus === 'active' ? "bg-blue-50 text-blue-600" : "bg-rose-50 text-rose-600 hover:bg-rose-100"
+              "px-3 py-1 rounded-full flex items-center gap-1.5 transition-all",
+              gpsStatus === 'active' ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
             )}
           >
             <Navigation size={10} className={gpsStatus === 'active' ? "animate-pulse" : ""} />
             <span className="text-[8px] font-black uppercase tracking-widest">
-              GPS {gpsStatus === 'active' ? "Active" : "Permission Required"}
+              GPS {gpsStatus === 'active' ? "Verified" : "Syncing..."}
             </span>
           </button>
         </div>
