@@ -95,9 +95,10 @@ export const VolunteerDirectory = ({
   // Filter & Sort Logic
   const filteredVolunteers = useMemo(() => {
     let result = volunteers.filter(v => 
-      v.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (v.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
       v.email?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      v.skills?.toString().toLowerCase().includes(searchQuery.toLowerCase())
+      v.skills?.toString().toLowerCase().includes(searchQuery.toLowerCase())) &&
+      v.name !== 'Anonymous Volunteer'
     );
 
     if (sortBy === 'experience') {

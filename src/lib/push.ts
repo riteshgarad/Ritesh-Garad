@@ -6,6 +6,8 @@ export async function sendPushNotification(data: {
   segment?: string;
   externalIds?: string[];
   url?: string;
+  icon?: string;
+  data?: any;
 }) {
   try {
     const user = auth.currentUser;

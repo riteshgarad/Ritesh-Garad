@@ -106,7 +106,7 @@ const PublicRelationsDashboard: React.FC<PRDashboardProps> = ({ user }) => {
           {activeTab === 'releases' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center bg-transparent p-0 mb-8 overflow-hidden">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Media Kits: 12</p>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active System Signals: {projects.length}</p>
                  <button className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-purple-200 transition-all hover:scale-105 active:scale-95">
                    <Plus size={14} /> Draft New Release
                  </button>
@@ -181,24 +181,24 @@ const PublicRelationsDashboard: React.FC<PRDashboardProps> = ({ user }) => {
           {activeTab === 'metrics' && (
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-transparent p-0 overflow-hidden text-left">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Impressions</p>
-                   <h3 className="text-3xl font-black text-slate-900 italic">450k+</h3>
-                   <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
-                      <TrendingUp size={14} /> +15% Branding lift
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Stakeholder Base</p>
+                   <h3 className="text-3xl font-black text-slate-900 italic">{donors.length}+ Units</h3>
+                   <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-purple-500 uppercase tracking-widest">
+                      <TrendingUp size={14} /> Total Entity Count
                    </div>
                 </div>
                 <div className="bg-transparent p-0 overflow-hidden text-left">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Mentions</p>
-                   <h3 className="text-3xl font-black text-slate-900 italic">120</h3>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Strategic Partnerships</p>
+                   <h3 className="text-3xl font-black text-slate-900 italic">{donors.filter(d => d.tier === 'Platinum' || d.tier === 'Gold').length}</h3>
                    <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
-                      <TrendingUp size={14} /> +8% Sentimental gain
+                      <TrendingUp size={14} /> High-tier partners
                    </div>
                 </div>
                 <div className="bg-transparent p-0 overflow-hidden text-left">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Trust Quotient</p>
-                   <h3 className="text-3xl font-black text-slate-900 italic">9.4</h3>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Impact Visibility</p>
+                   <h3 className="text-3xl font-black text-slate-900 italic">High</h3>
                    <div className="mt-6 flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <Bookmark size={14} /> NGO Benchmark
+                      <Bookmark size={14} /> System Verified
                    </div>
                 </div>
              </div>

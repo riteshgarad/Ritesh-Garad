@@ -24,6 +24,7 @@ export const AttendanceHub: React.FC = () => {
   const [activeSession, setActiveSession] = useState<Attendance | null>(null);
   const [recentSessions, setRecentSessions] = useState<Attendance[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [totalHours, setTotalHours] = useState<number>(0);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isPunching, setIsPunching] = useState(false);
@@ -43,6 +44,12 @@ export const AttendanceHub: React.FC = () => {
         // Fetch projects
         const projectsSnap = await getDocs(query(collection(db, 'projects'), where('status', '==', 'active')));
         setProjects(projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
+
+        // Fetch User Hours
+        const userSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid), limit(1)));
+        if (!userSnap.empty) {
+          setTotalHours(userSnap.docs[0].data().hours || 0);
+        }
 
         // Fetch active session
         const active = await attendanceService.getActiveSession(user.uid);
@@ -84,7 +91,7 @@ export const AttendanceHub: React.FC = () => {
     try {
       const { id, locationName } = await attendanceService.punchIn(
         user.uid,
-        user.displayName || 'Anonymous Volunteer',
+        user.displayName || user.email?.split('@')[0] || 'Unknown Operative',
         project.id,
         project.name
       );
@@ -92,7 +99,7 @@ export const AttendanceHub: React.FC = () => {
       const newSession: Attendance = {
         id,
         userId: user.uid,
-        userName: user.displayName || 'Anonymous Volunteer',
+        userName: user.displayName || user.email?.split('@')[0] || 'Unknown Operative',
         projectId: project.id,
         missionName: project.name,
         location: { lat: 0, lng: 0 }, 
@@ -126,9 +133,14 @@ export const AttendanceHub: React.FC = () => {
       await attendanceService.punchOut(activeSession.id, activeSession.userId, durationMins);
       
       setActiveSession(null);
-      // Refresh recent sessions
+      // Refresh recent sessions and hours
       const recent = await attendanceService.getRecentSessions(activeSession.userId);
       setRecentSessions(recent);
+
+      const userSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', activeSession.userId), limit(1)));
+      if (!userSnap.empty) {
+        setTotalHours(userSnap.docs[0].data().hours || 0);
+      }
     } catch (err: any) {
       console.error("Punch out error:", err);
       if (err.code === 1) {
@@ -196,11 +208,18 @@ export const AttendanceHub: React.FC = () => {
               </div>
 
               <button 
-                onClick={() => setShowLocationHelp(false)}
-                className="w-full py-4 bg-mahogany text-white rounded-2xl text-[10px] font-black uppercase tracking-widest"
+                onClick={() => {
+                  setShowLocationHelp(false);
+                  handlePunchIn();
+                }}
+                className="w-full py-4 bg-mahogany text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-mahogany/20 active:scale-95 transition-all"
               >
-                Understood, Retrying...
+                Grant Access & Retry Launch
               </button>
+              
+              <p className="text-[10px] text-slate-400 font-medium text-center">
+                Still stuck? Use the <span className="font-bold text-mahogany">"Open in New Tab"</span> arrow at the top right of your screen.
+              </p>
             </motion.div>
           </motion.div>
         )}
@@ -334,6 +353,36 @@ export const AttendanceHub: React.FC = () => {
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
         </div>
       </div>
+
+      {/* Impact Banner */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-mahogany rounded-[2.5rem] p-6 text-white flex items-center justify-between shadow-2xl shadow-mahogany/20 overflow-hidden relative"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-terracotta/20 rounded-full -ml-12 -mb-12 blur-2xl" />
+        
+        <div className="flex items-center gap-5 relative z-10">
+          <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20">
+            <Timer size={32} className="text-terracotta" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Total Service Impact</p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-black italic tracking-tighter">{totalHours.toFixed(1)}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-terracotta">Hours</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-right flex flex-col items-end relative z-10">
+          <div className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border border-emerald-500/20 mb-2">
+            Verified Rank
+          </div>
+          <p className="text-[11px] font-black tracking-widest text-white uppercase italic">Active Operative</p>
+        </div>
+      </motion.div>
 
       {/* Status Card */}
       <motion.div 

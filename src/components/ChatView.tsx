@@ -161,18 +161,24 @@ export function ChatView({ user, operators }: ChatViewProps) {
       await addDoc(collection(db, 'messages'), messageData);
       
       // Trigger Push Notification for the recipient
+      const senderAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4A1412&color=fff`;
+      const notificationUrl = `${window.location.origin}${window.location.pathname}?nav=messages`;
+
       if (selectedRecipientId !== 'global') {
-        const recipient = operators.find(o => o.uid === selectedRecipientId);
         sendPushNotification({
-          title: `Message from ${user.name} 💬`,
-          message: text.slice(0, 50) + (text.length > 50 ? '...' : ''),
-          externalIds: [selectedRecipientId]
+          title: user.name,
+          message: text.slice(0, 100),
+          externalIds: [selectedRecipientId],
+          url: notificationUrl,
+          icon: senderAvatar
         });
       } else {
         sendPushNotification({
-          title: 'General Ops Message 📡',
-          message: `${user.name}: ${text.slice(0, 50)}`,
-          segment: 'Subscribed Users'
+          title: 'General Ops',
+          message: `${user.name}: ${text.slice(0, 100)}`,
+          segment: 'Subscribed Users',
+          url: notificationUrl,
+          icon: senderAvatar
         });
       }
     } catch (err) {

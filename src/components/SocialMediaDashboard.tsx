@@ -178,16 +178,16 @@ const SocialMediaDashboard: React.FC<SocialMediaDashboardProps> = ({ user }) => 
                    <div className="space-y-6">
                       <div className="grid grid-cols-3 gap-4">
                         <div className="bg-slate-50 p-4 rounded-2xl">
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Reach</p>
-                           <p className="text-lg font-black text-slate-900">12.5k</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Missions Covered</p>
+                           <p className="text-lg font-black text-slate-900">{projects.length}</p>
                         </div>
                         <div className="bg-slate-50 p-4 rounded-2xl">
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Engagement</p>
-                           <p className="text-lg font-black text-slate-900">8.2%</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Content Index</p>
+                           <p className="text-lg font-black text-slate-900">{pendingDocs.length}</p>
                         </div>
                         <div className="bg-slate-50 p-4 rounded-2xl">
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Shares</p>
-                           <p className="text-lg font-black text-slate-900">450</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Campaign ROI</p>
+                           <p className="text-lg font-black text-emerald-600">Optimal</p>
                         </div>
                       </div>
                    </div>

@@ -21,6 +21,7 @@ import { AttendanceHub } from './components/attendance/AttendanceHub';
 import { MilestoneStepper } from './components/MilestoneStepper';
 import { VelocityGauge } from './components/VelocityGauge';
 import { generateProjectImpactReport } from './services/reportGenerator';
+import { ImpactReports } from './components/admin/ImpactReports';
 import { generateVolunteerCertificate } from './services/certificateGenerator';
 import { TaskEngine } from './components/TaskEngine';
 import { 
@@ -170,7 +171,7 @@ const Button = ({ children, variant = 'primary', className, ...props }: React.Bu
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'attendance' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'attendance' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule' | 'impact-reports';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -282,6 +283,19 @@ export default function App() {
     };
   }, []);
 
+  const [notifPermission, setNotifPermission] = useState<string>('default');
+
+  const requestNotificationPermission = async () => {
+    try {
+      if ((OneSignal as any).initialized) {
+        await OneSignal.Notifications.requestPermission();
+        setNotifPermission((OneSignal.Notifications as any).permission ? 'granted' : 'denied');
+      }
+    } catch (err) {
+      console.error("Failed to request permission:", err);
+    }
+  };
+
   useEffect(() => {
     const initOneSignal = async () => {
       const appId = (import.meta as any).env.VITE_ONESIGNAL_APP_ID;
@@ -290,14 +304,18 @@ export default function App() {
           // Check if already initialized to prevent error
           if ((OneSignal as any).initialized) {
             console.log("OneSignal already initialized");
+            if (user) {
+              OneSignal.login(user.uid);
+            }
+            setNotifPermission((OneSignal.Notifications as any).permission || 'default');
             return;
           }
-
-          const isDev = window.location.hostname.includes('run.app') || window.location.hostname === 'localhost';
 
           await OneSignal.init({
             appId: appId,
             allowLocalhostAsSecureOrigin: true,
+            serviceWorkerParam: { scope: '/' },
+            serviceWorkerPath: 'OneSignalSDKWorker.js',
             notifyButton: {
               enable: true,
               position: 'bottom-right',
@@ -305,9 +323,27 @@ export default function App() {
               displayPredicate: () => true,
               showCredit: false,
               prenotify: true,
+              text: {
+                'tip.state.unsubscribed': 'Subscribe to mission alerts',
+                'tip.state.subscribed': "You're subscribed to alerts",
+                'tip.state.blocked': "You've blocked notifications",
+                'message.prenotify': 'Click to subscribe to mission alerts',
+                'message.action.subscribed': "Refined: You're now on the alert list",
+                'message.action.resubscribed': "Refined: You're back on the alert list",
+                'message.action.unsubscribed': "Refined: You won't receive alerts",
+                'dialog.main.title': 'Mission Alerts',
+                'dialog.main.button.subscribe': 'SUBSCRIBE',
+                'dialog.main.button.unsubscribe': 'UNSUBSCRIBE'
+              }
             } as any,
           });
+          
           console.log("OneSignal Status: Active");
+          setNotifPermission((OneSignal.Notifications as any).permission || 'default');
+          
+          if (user) {
+            OneSignal.login(user.uid);
+          }
         } catch (err: any) {
           // Squelch domain mismatch errors in development/preview environments
           if (err.message?.includes('Can only be used on') || err.message?.includes('initialized')) {
@@ -319,6 +355,15 @@ export default function App() {
       }
     };
     initOneSignal();
+  }, [user?.uid]);
+
+  // Handle Deep Linking from Notifications
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const navTo = params.get('nav');
+    if (navTo === 'messages') {
+      setCurrentPage('messages');
+    }
   }, []);
 
   useEffect(() => {
@@ -327,10 +372,6 @@ export default function App() {
         OneSignal.logout();
       }
       return;
-    }
-
-    if ((OneSignal as any).initialized) {
-      OneSignal.login(user.uid);
     }
 
     const unsubProjects = onSnapshot(collection(db, 'projects'), 
@@ -631,12 +672,8 @@ export default function App() {
 
       // Trigger Auto-Report Generation if completed
       if (newStatus === 'completed') {
-        const proj = projects.find(p => p.id === projectId);
-        if (proj) {
-          const projectTransactions = transactions.filter(t => t.projectID === projectId);
-          generateProjectImpactReport(proj, proj.budget_items || [], projectTransactions);
-          toast.success("Impact Report auto-generated successfully.");
-        }
+        // Impact Report generation logic needs updating to support per-project summaries
+        toast.success("Mission marked as completed.");
       }
 
       // Financial Integration Trigger
@@ -1283,6 +1320,7 @@ export default function App() {
       badge: expenseRequests.filter(r => r.status === 'pending').length || undefined 
     },
     { id: 'users', label: 'User Network', icon: Shield, roles: ['Admin'] },
+    { id: 'impact-reports', label: 'Impact Analytics', icon: TrendingUp, roles: ['Admin'] },
   ];
 
   const navItems = allNavItems.filter(item => {
@@ -1597,6 +1635,8 @@ export default function App() {
               activityLogs={activityLogs}
               setProofTaskTargetId={setProofTaskTargetId}
               operators={operators}
+              notifPermission={notifPermission}
+              requestNotificationPermission={requestNotificationPermission}
             />
       </MobileShell>
 
@@ -1979,7 +2019,7 @@ const ProjectModal = ({ isOpen, onClose, onCreate, volunteers }: any) => {
               onChange={e => setFormData({...formData, lead_name: e.target.value})}
             >
               <option value="">Select Personnel...</option>
-              {volunteers.map((v: any) => (
+              {volunteers.filter((v: any) => v.name !== 'Anonymous Volunteer').map((v: any) => (
                 <option key={v.id} value={v.name}>{v.name}</option>
               ))}
             </select>
@@ -2129,14 +2169,16 @@ const PageView = ({
   financeRequests, budgetRequests, expenseRequests,
   onUploadDocument, onVerifyDocument,
   onTaskStatusChange, onAddTask, activityLogs, setProofTaskTargetId,
-  operators
+  operators,
+  notifPermission,
+  requestNotificationPermission
 }: any) => {
   // --- Protection Logic ---
   const isFinanceHead = (user?.department === 'Finance' && (user?.role === 'Department Head' || user?.role === 'DH')) || user?.email === 'yuktagarad@gmail.com' || user?.name === 'Yukta';
   
   useEffect(() => {
     if (isFinanceHead) {
-      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-expenses', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
+      const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-expenses', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects', 'impact-reports'];
       if (!allowedPages.includes(page)) {
         // Redirect to dashboard if trying to access unauthorized page
         setCurrentPage('dashboard');
@@ -2146,7 +2188,7 @@ const PageView = ({
 
   // If Finance Head and on unauthorized page, don't render content for that frame
   if (isFinanceHead) {
-    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-expenses', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects'];
+    const allowedPages = ['dashboard', 'messages', 'schedule', 'finance', 'finance-requests', 'finance-expenses', 'finance-ledger', 'finance-budgets', 'finance-income', 'expense-approvals', 'projects', 'impact-reports'];
     if (!allowedPages.includes(page)) {
       return null;
     }
@@ -2157,7 +2199,19 @@ const PageView = ({
 
   switch (page) {
     case 'dashboard':
-      return <DashboardView projects={projects} tasks={tasks} volunteers={volunteers} onOpenProject={onOpenProject} setCurrentPage={setCurrentPage} onDeleteProject={onDeleteProject} user={user} />;
+      return <DashboardView 
+        projects={projects} 
+        tasks={tasks} 
+        volunteers={volunteers} 
+        transactions={transactions} 
+        activityLogs={activityLogs} 
+        onOpenProject={onOpenProject} 
+        setCurrentPage={setCurrentPage} 
+        onDeleteProject={onDeleteProject} 
+        user={user} 
+        notifPermission={notifPermission}
+        requestNotificationPermission={requestNotificationPermission}
+      />;
     case 'attendance':
       return <AttendanceHub />;
     case 'messages':
@@ -2281,8 +2335,12 @@ const PageView = ({
       return <PublicRelationsDashboard user={user} />;
     case 'users':
       return <UserManagement currentUser={user} />;
+    case 'fundraising':
+      return <FundraisingView transactions={transactions} />;
     case 'automation':
       return <AutomationView />;
+    case 'impact-reports':
+      return <ImpactReports />;
     case 'expense-approvals':
       return <ExpenseApprovalDashboard user={user} requests={expenseRequests} />;
     case 'create':
@@ -2348,7 +2406,7 @@ const PageView = ({
 
 // --- Sub-Views ---
 
-const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentPage, onDeleteProject, user }: any) => {
+const DashboardView = ({ projects, tasks, volunteers, transactions, activityLogs, onOpenProject, setCurrentPage, onDeleteProject, user, notifPermission, requestNotificationPermission }: any) => {
   const isDH = user?.role === 'DH';
   const isAdmin = user?.role === 'Admin';
   
@@ -2363,11 +2421,15 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
     p && (p.status === 'approved' || p.status === 'active')
   );
 
+  const totalIncome = transactions.filter(t => t.type === 'income' && t.status === 'success').reduce((acc, current) => acc + (Number(current.amount) || 0), 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense' && t.status === 'success' || t.status === 'completed').reduce((acc, current) => acc + (Number(current.amount) || 0), 0);
+  const totalAllocation = totalIncome - totalExpense;
+
   const stats = [
     { label: 'Pending Review', value: pendingByMe.length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
     { label: 'Active Missions', value: activeMissions.length, icon: FolderKanban, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
     { label: 'Units Deployed', value: volunteers.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    { label: 'Fiscal Allocation', value: '₹12.4L', icon: IndianRupee, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+    { label: 'Fiscal Allocation', value: `₹${(totalAllocation / 100000).toFixed(1)}L`, icon: IndianRupee, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
   ];
 
   const functionalNodes = [
@@ -2382,7 +2444,32 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
 
   return (
     <div className="space-y-10">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      {/* OS Warning Banner if notifications not enabled */}
+      {notifPermission !== 'granted' && (
+        <motion.div 
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="bg-slate-900 border-l-4 border-emerald-500 p-6 rounded-3xl mb-10 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden shadow-2xl"
+        >
+          <div className="flex items-center gap-6">
+            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-emerald-400 shrink-0">
+              <Zap size={24} className="animate-pulse" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none mb-2 text-left">Comms Infrastructure: Signals Offline</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed text-left">Strategic alert delivery requires push authorization. Activate to receive mission-critical notifications on mobile.</p>
+            </div>
+          </div>
+          <button 
+            onClick={requestNotificationPermission}
+            className="px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all w-full md:w-auto"
+          >
+            Activate Signals
+          </button>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, i) => (
           <div key={i} className="metric-card shadow-xl shadow-slate-200/50 p-5 md:p-7 group hover:translate-y-[-2px] transition-all border-slate-100 bg-white rounded-[24px] md:rounded-[32px]">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -2435,10 +2522,10 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
         <Card className="p-8 text-left bg-white border-slate-200 shadow-xl shadow-slate-200/20">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Personnel Network Pulse</h3>
-            <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">{volunteers.length} Active Units</Badge>
+            <Badge className="bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1 text-[9px] font-black uppercase tracking-widest">{volunteers.filter(v => v.name !== 'Anonymous Volunteer').length} Active Units</Badge>
           </div>
           <div className="space-y-4">
-            {volunteers.slice(0, 4).map((v: any) => (
+            {volunteers.filter(v => v.name !== 'Anonymous Volunteer').slice(0, 4).map((v: any) => (
               <div key={v.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl group hover:border-blue-500/20 transition-all cursor-pointer" onClick={() => setCurrentPage('volunteers')}>
                 <div className="flex items-center gap-4">
                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 font-black text-xs shadow-sm shadow-slate-200/50">
@@ -2506,28 +2593,32 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
             </div>
           </Card>
 
-          <Card className="p-8">
-            <h3 className="font-bold text-white uppercase tracking-widest text-sm mb-8">Recent Transaction Logs</h3>
-            <div className="divide-y divide-white/5">
-              {[
-                { name: 'Ramesh Shah', amount: '₹25,000', campaign: 'Clean Water', time: '2h ago' },
-                { name: 'Nisha Patil', amount: '₹10,000', campaign: 'Digital Literacy', time: '5h ago' },
-                { name: 'Global Grant', amount: '₹2,50,000', campaign: 'Education Fund', time: '1d ago' }
-              ].map((d, i) => (
+        <Card className="p-8">
+            <h3 className="font-bold text-slate-900 uppercase tracking-widest text-xs mb-8">Recent Transaction Logs</h3>
+            <div className="divide-y divide-slate-100">
+              {transactions && transactions.length > 0 ? transactions.slice(0, 3).map((d: any, i: number) => (
                 <div key={i} className="py-6 flex items-center gap-6 group hover:bg-slate-50 transition-all px-4 -mx-4 rounded-3xl border border-transparent hover:border-slate-100">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 text-[11px] font-black shadow-sm group-hover:scale-110 transition-transform">
-                    {INITIALS(d.name)}
+                  <div className={cn("w-12 h-12 rounded-2xl border flex items-center justify-center text-[11px] font-black shadow-sm group-hover:scale-110 transition-transform", d.type === 'income' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-red-50 border-red-100 text-red-600')}>
+                    {d.type === 'income' ? '+' : '-'}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-[14px] font-black text-slate-900 truncate tracking-tight uppercase leading-none">{d.name}</p>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-2">{d.campaign}</p>
+                    <p className="text-[14px] font-black text-slate-900 truncate tracking-tight uppercase leading-none">{d.description || d.category}</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate mt-2">{d.paymentMethod || 'System Ledger'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[14px] font-black text-emerald-600 tracking-tight leading-none">{d.amount}</p>
-                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-2">{d.time}</p>
+                    <p className={cn("text-[14px] font-black tracking-tight leading-none", d.type === 'income' ? 'text-emerald-600' : 'text-red-600')}>
+                      ₹{Number(d.amount).toLocaleString()}
+                    </p>
+                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-2">
+                      {d.date?.toDate ? format(d.date.toDate(), 'HH:mm') : 'Recent'}
+                    </p>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="py-12 border-2 border-dashed border-slate-100 rounded-3xl flex flex-col items-center justify-center">
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No Recent Capital Flux</p>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -2561,20 +2652,22 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
           <Card className="p-6 bg-slate-900 text-white">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-[10px] font-bold uppercase tracking-widest">Live Activity</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest">Live System Activity</span>
             </div>
             <div className="space-y-4">
-              {[
-                { text: 'Budget assessment approved for Satara site', time: '10m ago' },
-                { text: 'Siddhesh moved 3 tasks to Done', time: '2h ago' },
-                { text: 'Digital Literacy 2026 phase advanced', time: '1d ago' }
-              ].map((act, i) => (
+              {activityLogs && activityLogs.length > 0 ? activityLogs.slice(0, 3).map((act: any, i: number) => (
                 <div key={i} className="relative pl-4 border-l border-slate-700">
                   <div className="absolute left-[-4.5px] top-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <p className="text-xs font-medium text-slate-300 leading-relaxed">{act.text}</p>
-                  <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold">{act.time}</p>
+                  <p className="text-xs font-medium text-slate-300 leading-relaxed">{act.details || act.action}</p>
+                  <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold">
+                    {act.timestamp?.toDate ? format(act.timestamp.toDate(), 'HH:mm') : 'Live'}
+                  </p>
                 </div>
-              ))}
+              )) : (
+                <div className="relative pl-4 border-l border-slate-700">
+                   <p className="text-xs font-medium text-slate-500 italic uppercase">System Idle. Monitoring for signals...</p>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -2651,14 +2744,21 @@ const SocialMediaView = () => {
   );
 };
 
-const FundraisingView = () => {
+const FundraisingView = ({ transactions }: { transactions: Transaction[] }) => {
+  const activeCampaigns = Array.from(new Set(transactions.map(t => t.category))).filter(c => c !== 'General' && c !== 'Project Fund');
+  
+  const totalDonations = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+  const avgDonation = transactions.filter(t => t.type === 'income').length > 0 
+    ? (totalDonations / transactions.filter(t => t.type === 'income').length).toFixed(0)
+    : '0';
+
   return (
     <div className="space-y-10 text-left">
        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { label: 'Active Campaigns', value: '4' },
-            { label: 'Avg Donation', value: '₹1,240' },
-            { label: 'Donor Retention', value: '82%' }
+            { label: 'Active Campaigns', value: activeCampaigns.length.toString() },
+            { label: 'Avg Donation', value: `₹${Number(avgDonation).toLocaleString()}` },
+            { label: 'Total Capital Inflow', value: `₹${(totalDonations / 1000).toFixed(1)}k` }
           ].map((stat, i) => (
             <Card key={i} className="p-8">
                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</p>
@@ -2831,5 +2931,6 @@ const PAGE_TITLES: Record<Page, string> = {
   'new-proposal': 'Mission Proposal',
   'finance-requests': 'Resource Requisition',
   'kyc': 'Personnel Authentication',
-  'schedule': 'Mission Schedule / Calendar'
+  'schedule': 'Mission Schedule / Calendar',
+  'impact-reports': 'Impact Analytics Dashboard'
 };

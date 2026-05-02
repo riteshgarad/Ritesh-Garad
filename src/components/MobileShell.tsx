@@ -25,6 +25,7 @@ import {
   Zap,
   X,
   MessageCircle,
+  TrendingUp,
   Calendar
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -76,6 +77,7 @@ export const MobileShell = ({
 
   const navigation = [
     { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Home Hub' },
+    { id: 'impact-reports', icon: TrendingUp, label: 'Impact Analytics', roles: ['Admin'] },
     { id: 'messages', icon: MessageCircle, label: 'Mission Comms' },
     { id: 'schedule', icon: Calendar, label: 'Calendar' },
     {
@@ -84,8 +86,7 @@ export const MobileShell = ({
       label: 'Operational Logs',
       roles: ['Admin', 'Volunteer', 'Staff Operative'],
       subs: [
-        { id: 'attendance', label: 'Mission Punch-In' },
-        { id: 'attendance-analytics', label: 'Impact Analytics', roles: ['Admin'] }
+        { id: 'attendance', label: 'Mission Punch-In' }
       ]
     },
     { 

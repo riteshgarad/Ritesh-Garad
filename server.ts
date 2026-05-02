@@ -119,6 +119,23 @@ async function startServer() {
     }
   };
 
+  // Utility to log automation events safely
+  const logAutomationEvent = async (event: any) => {
+    try {
+      // Deep clean to ensure no undefined values are sent to Firestore
+      const cleanEvent = JSON.parse(JSON.stringify(event, (key, value) => 
+        value === undefined ? null : value
+      ));
+      
+      await db.collection('automation_logs').add({
+        ...cleanEvent,
+        timestamp: FieldValue.serverTimestamp()
+      });
+    } catch (logErr: any) {
+      console.warn(`[Automation Log] Best-effort logging failed: ${logErr.message}. Primary operation continued.`);
+    }
+  };
+
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ 
@@ -188,6 +205,25 @@ async function startServer() {
             <p style="font-size: 12px; color: #6b7280; margin-top: 30px;">Mission Control Finance Hub.</p>
           </div>`
         };
+      } else if (type === 'REPORT_SUMMARY') {
+        emailOptions = {
+          from: "NGO Impact Audit <reports@resend.dev>",
+          to: to || ["riteshgarad4@gmail.com", "yuktagarad@gmail.com"],
+          subject: subject || `WEEKLY IMPACT REPORT: ${new Date().toLocaleDateString()}`,
+          html: html || `<div style="font-family: sans-serif; padding: 20px; border: 1px solid #4A1412; border-radius: 24px; background-color: #fafaf9;">
+            <div style="background-color: #4A1412; color: white; padding: 30px; border-radius: 16px 16px 0 0; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; letter-spacing: 2px;">GARAD FOUNDATION</h1>
+              <p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">MISSION BHARARI OS • AUDIT COMMUNIQUE</p>
+            </div>
+            <div style="padding: 30px;">
+              <h2 style="color: #4A1412; border-bottom: 2px solid #E2E8F0; padding-bottom: 15px;">Operational Summary</h2>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6;">${message || 'The weekly mission audit has been finalized. Access the full strategic dashboard for deep-dive analytics.'}</p>
+              <div style="margin-top: 30px; text-align: center;">
+                <p style="font-size: 10px; font-weight: bold; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px;">Verified by Mission Bharari OS Security Protocols</p>
+              </div>
+            </div>
+          </div>`
+        };
       } else {
         // Generic send
         emailOptions = {
@@ -201,37 +237,29 @@ async function startServer() {
 
       const data = await resend.emails.send(emailOptions);
       
-      // Log to automation_logs for visibility in the dashboard
-      try {
-        await db.collection('automation_logs').add({
-          action: 'Email Dispatch',
-          type: type || 'GENERIC',
-          recipient: emailOptions.to,
-          subject: emailOptions.subject,
-          status: 'success',
-          resendId: data.data?.id,
-          timestamp: FieldValue.serverTimestamp(),
-          details: `Autonomous signal transmitted to ${Array.isArray(emailOptions.to) ? emailOptions.to.join(', ') : emailOptions.to}`
-        });
-      } catch (logErr) {
-        console.error("Failed to log automation event:", logErr);
-      }
+      // Log to automation_logs safely
+      await logAutomationEvent({
+        action: 'Email Dispatch',
+        type: type || 'GENERIC',
+        recipient: emailOptions.to || 'Unknown',
+        subject: emailOptions.subject || 'No Subject',
+        status: 'success',
+        resendId: data.data?.id || 'resend-dispatch-confirmed',
+        details: `Autonomous signal transmitted to ${Array.isArray(emailOptions.to) ? emailOptions.to.join(', ') : emailOptions.to}`
+      });
 
       res.json({ success: true, id: data.data?.id });
     } catch (error: any) {
       console.error("[Resend Error]:", error);
       
-      // Log failure
-      try {
-        await db.collection('automation_logs').add({
-          action: 'Email Dispatch',
-          type: type || 'GENERIC',
-          status: 'error',
-          error: error.message,
-          timestamp: FieldValue.serverTimestamp(),
-          details: `Transmission failure: ${error.message}`
-        });
-      } catch (logErr) {}
+      // Log failure safely
+      await logAutomationEvent({
+        action: 'Email Dispatch',
+        type: type || 'GENERIC',
+        status: 'error',
+        error: error.message,
+        details: `Transmission failure: ${error.message}`
+      });
 
       res.status(500).json({ error: error.message });
     }
@@ -286,7 +314,7 @@ async function startServer() {
 
   // OneSignal Push Notification Endpoint
   app.post("/api/notify/push", verifyAuth, async (req, res) => {
-    const { title, message, segment, externalIds, url } = req.body;
+    const { title, message, segment, externalIds, url, icon, data } = req.body;
 
     const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID;
     const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
@@ -309,27 +337,30 @@ async function startServer() {
           contents: { en: message },
           included_segments: segment ? [segment] : undefined,
           include_external_user_ids: externalIds,
-          url: url || undefined
+          url: url || undefined,
+          chrome_web_icon: icon || undefined,
+          large_icon: icon || undefined,
+          adm_large_icon: icon || undefined,
+          data: data || undefined,
+          android_group: "ngo_messages",
+          thread_id: "ngo_messages"
         })
       });
 
-      const data = await response.json();
+      const responseData = await response.json();
       
-      // Log to automation_logs
-      try {
-        await db.collection('automation_logs').add({
-          action: 'Push Notification',
-          title,
-          message,
-          recipient: segment || (externalIds ? `External IDs: ${externalIds.length}` : 'Unknown'),
-          status: response.ok ? 'success' : 'error',
-          onesignalData: data,
-          timestamp: FieldValue.serverTimestamp(),
-          details: `OneSignal signal transmitted: ${message}`
-        });
-      } catch (logErr) {}
+      // Log to automation_logs safely
+      await logAutomationEvent({
+        action: 'Push Notification',
+        title,
+        message,
+        recipient: segment || (externalIds ? `External IDs: ${externalIds.length}` : 'Unknown'),
+        status: response.ok ? 'success' : 'error',
+        onesignalData: responseData || null,
+        details: `OneSignal signal transmitted: ${message}`
+      });
 
-      res.status(response.status).json(data);
+      res.status(response.status).json(responseData);
     } catch (error: any) {
       console.error("[OneSignal Error]:", error);
       res.status(500).json({ error: error.message });
@@ -493,18 +524,15 @@ async function startServer() {
         html: htmlContent,
       });
 
-      // Log success to DB
-      try {
-        await db.collection('automation_logs').add({
-          action: 'Email Dispatch',
-          status: 'success',
-          recipient: requesterEmail,
-          amount,
-          resendId: response.data?.id,
-          timestamp: FieldValue.serverTimestamp(),
-          details: `Absolute URL Endpoint Triggered for mobile compatibility.`
-        });
-      } catch (err) {}
+      // Log success to DB safely
+      await logAutomationEvent({
+        action: 'Email Dispatch',
+        status: 'success',
+        recipient: requesterEmail || 'Unknown',
+        amount: amount || 0,
+        resendId: response.data?.id || 'resend-dispatch-confirmed',
+        details: `Absolute URL Endpoint Triggered for mobile compatibility.`
+      });
 
       return res.status(200).json({ success: true, id: response.data?.id });
     } catch (error: any) {

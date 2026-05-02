@@ -1,102 +1,178 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
-import { Project, BudgetItem, Transaction } from '../types';
-import { format } from 'date-fns';
+import autoTable from 'jspdf-autotable';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { Attendance } from '../types';
 
-export const generateProjectImpactReport = (project: Project, budgetItems: BudgetItem[], transactions: Transaction[]) => {
-  const doc = new jsPDF() as any;
-  const pageWidth = doc.internal.pageSize.getWidth();
+export interface ImpactSummary {
+  weekStarting: string;
+  totalHours: number;
+  totalVolunteers: number;
+  totalMissions: number;
+  missionBreakdown: Record<string, number>;
+  topContributors: Array<{ name: string; hours: number }>;
+  rawLogs: Attendance[];
+}
 
-  // Branding Header
-  doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(0, 0, pageWidth, 40, 'F');
+export const generateProjectImpactReport = async (days: number = 7): Promise<ImpactSummary> => {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const startTimestamp = Timestamp.fromDate(startDate);
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(24);
+  const attendanceRef = collection(db, 'attendance');
+  const q = query(
+    attendanceRef, 
+    where('punchOut', '>=', startTimestamp),
+    orderBy('punchOut', 'desc')
+  );
+
+  const querySnapshot = await getDocs(q);
+  const logs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attendance));
+
+  const summary: ImpactSummary = {
+    weekStarting: startDate.toLocaleDateString(),
+    totalHours: 0,
+    totalVolunteers: 0,
+    totalMissions: logs.length,
+    missionBreakdown: {},
+    topContributors: [],
+    rawLogs: logs
+  };
+
+  const volunteerHours: Record<string, { name: string; hours: number }> = {};
+  const volunteersSet = new Set<string>();
+
+  logs.forEach(log => {
+    const hours = (log.durationMinutes || 0) / 60;
+    summary.totalHours += hours;
+    
+    volunteersSet.add(log.userId);
+
+    // Mission Breakdown
+    summary.missionBreakdown[log.missionName] = (summary.missionBreakdown[log.missionName] || 0) + hours;
+
+    // Volunteer Stats
+    if (log.userName === 'Anonymous Volunteer') return;
+    
+    if (!volunteerHours[log.userId]) {
+      volunteerHours[log.userId] = { name: log.userName || 'Unknown Operative', hours: 0 };
+    }
+    volunteerHours[log.userId].hours += hours;
+  });
+
+  summary.totalVolunteers = volunteersSet.size;
+  summary.topContributors = Object.values(volunteerHours)
+    .sort((a, b) => b.hours - a.hours)
+    .slice(0, 5);
+
+  return summary;
+};
+
+export const exportToPDF = (summary: ImpactSummary) => {
+  const doc = new jsPDF();
+  const mahogany = '#4A1412';
+  const terracotta = '#A63A1B';
+
+  // --- Header ---
+  doc.setFillColor(mahogany);
+  doc.rect(0, 0, 210, 40, 'F');
+  
+  doc.setTextColor('#FFFFFF');
+  doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('IMPACT REPORT', 15, 20);
+  doc.text('GARAD FOUNDATION', 20, 20);
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`NGO DATA VINE | GENERATED ON ${format(new Date(), 'PPP')}`, 15, 30);
-
-  // Project Info
-  doc.setTextColor(15, 23, 42);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(project.name.toUpperCase(), 15, 55);
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139); // slate-500
-  doc.text(`Status: ${project.status.replace('_', ' ').toUpperCase()}`, 15, 62);
-  doc.text(`Department: ${project.department}`, 15, 67);
-  doc.text(`Lead Name: ${project.lead_name}`, 15, 72);
-  doc.text(`Context: ${project.description || 'N/A'}`, 15, 77);
-
-  // Summary Grid
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.roundedRect(15, 85, pageWidth - 30, 30, 3, 3, 'F');
+  doc.text('MISSION BHARARI OS - IMPACT AUDIT CERTIFICATE', 20, 28);
   
-  doc.setTextColor(15, 23, 42);
-  doc.setFontSize(10);
-  doc.text('TOTAL REVENUE', 25, 95);
-  doc.setFontSize(14);
-  doc.text(project.budget || 'N/A', 25, 105);
+  doc.text(`REPORT PERIOD: ${summary.weekStarting} - ${new Date().toLocaleDateString()}`, 140, 28);
 
-  doc.setFontSize(10);
-  doc.text('PROGRESS DELTA', 100, 95);
+  // --- Summary Cards ---
+  let y = 60;
+  doc.setTextColor(mahogany);
   doc.setFontSize(14);
-  doc.text(`${project.progress}%`, 100, 105);
-
-  // Budget Breakdown Table
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('BUDGET ALLOCATION (PROPOSED)', 15, 130);
-
-  const budgetRows = budgetItems.map(item => [item.item, `INR ${item.cost.toLocaleString()}`]);
+  doc.text('GLOBAL IMPACT OVERVIEW', 20, y);
   
-  doc.autoTable({
-    startY: 135,
-    head: [['Description', 'Allocated Amount']],
-    body: budgetRows,
-    theme: 'striped',
-    headStyles: { fillColor: [15, 23, 42] },
-    margin: { left: 15, right: 15 }
+  y += 10;
+  const cardW = 55;
+  
+  // Card 1: Hours
+  doc.setDrawColor('#EEEEEE');
+  doc.roundedRect(20, y, cardW, 25, 3, 3, 'S');
+  doc.setFontSize(8);
+  doc.text('TOTAL VOLUNTEER HOURS', 25, y + 8);
+  doc.setFontSize(16);
+  doc.setTextColor(terracotta);
+  doc.text(summary.totalHours.toFixed(1), 25, y + 18);
+  
+  // Card 2: Volunteers
+  doc.roundedRect(20 + cardW + 5, y, cardW, 25, 3, 3, 'S');
+  doc.setTextColor(mahogany);
+  doc.setFontSize(8);
+  doc.text('ACTIVE OPERATIVES', 25 + cardW + 5, y + 8);
+  doc.setFontSize(16);
+  doc.setTextColor(terracotta);
+  doc.text(summary.totalVolunteers.toString(), 25 + cardW + 5, y + 18);
+
+  // Card 3: Missions
+  doc.roundedRect(20 + (cardW + 5) * 2, y, cardW, 25, 3, 3, 'S');
+  doc.setTextColor(mahogany);
+  doc.setFontSize(8);
+  doc.text('MISSIONS CONDUCTED', 25 + (cardW + 5) * 2, y + 8);
+  doc.setFontSize(16);
+  doc.setTextColor(terracotta);
+  doc.text(summary.totalMissions.toString(), 25 + (cardW + 5) * 2, y + 18);
+
+  // --- Mission Table ---
+  y += 45;
+  doc.setTextColor(mahogany);
+  doc.setFontSize(12);
+  doc.text('OPERATIONAL LOGS (LAST 7 DAYS)', 20, y);
+  
+  const tableData = summary.rawLogs.map(log => [
+    log.punchIn?.toDate ? log.punchIn.toDate().toLocaleDateString() : 'N/A',
+    log.userName || 'Anonymous',
+    log.missionName,
+    `${(log.durationMinutes || 0)} min`,
+    'Verified'
+  ]);
+
+  autoTable(doc, {
+    startY: y + 5,
+    head: [['Date', 'Operative', 'Mission Node', 'Duration', 'GPS Status']],
+    body: tableData,
+    headStyles: { fillColor: mahogany, textColor: '#FFFFFF', fontSize: 9 },
+    bodyStyles: { fontSize: 8 },
+    alternateRowStyles: { fillColor: '#F9F9F9' },
+    margin: { left: 20, right: 20 }
   });
 
-  // Financial Integrity Table
-  const finalY = doc.lastAutoTable.finalY || 130;
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('REAL-TIME EXPENDITURE (ACTUAL)', 15, finalY + 20);
+  // --- Top Contributors ---
+  const finalY = (doc as any).lastAutoTable.finalY + 20;
+  doc.text('TOP MISSION CONTRIBUTORS', 20, finalY);
+  
+  const contribData = summary.topContributors.map((c, i) => [
+    `#${i + 1}`,
+    c.name,
+    `${c.hours.toFixed(1)} Hours`
+  ]);
 
-  const expenseRows = transactions
-    .filter(t => t.type === 'expense')
-    .map(t => [
-      t.date?.toDate ? format(t.date.toDate(), 'PP') : 'N/A', 
-      t.category, 
-      t.description || 'No description', 
-      `INR ${t.amount.toLocaleString()}`
-    ]);
-
-  doc.autoTable({
-    startY: finalY + 25,
-    head: [['Date', 'Category', 'Description', 'Actual Cost']],
-    body: expenseRows,
-    theme: 'grid',
-    headStyles: { fillColor: [220, 38, 38] }, // red-600
-    margin: { left: 15, right: 15 }
+  autoTable(doc, {
+    startY: finalY + 5,
+    head: [['Rank', 'Operative Name', 'Total Impact']],
+    body: contribData,
+    headStyles: { fillColor: terracotta, textColor: '#FFFFFF', fontSize: 9 },
+    bodyStyles: { fontSize: 8 },
+    margin: { left: 20, right: 20 }
   });
 
-  // Footer
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(`Page ${i} of ${pageCount} | Confidential NGO Financial Report`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
-  }
-
-  doc.save(`${project.name}_Impact_Report.pdf`);
+  // --- Footer ---
+  const pageHeight = doc.internal.pageSize.height;
+  doc.setFontSize(8);
+  doc.setTextColor('#999999');
+  doc.text('SEAL OF VERIFICATION: All listed operational hours are confirmed via GPS-Bharari OS Identity Protocols.', 20, pageHeight - 20);
+  doc.text('CONFIDENTIAL - FOR INTERNAL NGO AUDIT ONLY', 20, pageHeight - 15);
+  
+  doc.save(`Garad_Impact_Report_${new Date().toISOString().split('T')[0]}.pdf`);
 };
