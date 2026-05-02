@@ -286,13 +286,49 @@ export default function App() {
   const [notifPermission, setNotifPermission] = useState<string>('default');
 
   const requestNotificationPermission = async () => {
+    console.log("Requesting notification permission... Initialized:", (OneSignal as any).initialized);
+    
+    // Check for Iframe
+    const isInIframe = window.self !== window.top;
+    if (isInIframe) {
+      const confirmOpen = confirm("Notification requests are often blocked inside previews. Would you like to open the app in a new tab to activate signals?");
+      if (confirmOpen) {
+        window.open(window.location.href, '_blank');
+        return;
+      }
+    }
+
     try {
       if ((OneSignal as any).initialized) {
+        // Try native prompt first
+        console.log("Internal OneSignal Permission State:", OneSignal.Notifications.permission);
+        
+        if (OneSignal.Notifications.permissionNative === 'denied') {
+          alert("Notifications are permanently blocked in your browser for this site. Please click the 'lock' or 'info' icon in the address bar and reset the notification permission to 'Ask' or 'Allow'.");
+          return;
+        }
+
         await OneSignal.Notifications.requestPermission();
-        setNotifPermission((OneSignal.Notifications as any).permission ? 'granted' : 'denied');
+        
+        // If still not granted, try slidedown
+        if (!OneSignal.Notifications.permission) {
+          console.log("Native prompt might have been blocked or ignored, trying slidedown...");
+          try {
+            await (OneSignal as any).Slidedown.prompt({ type: 'push' });
+          } catch (se) {
+            console.warn("Slidedown prompt failed:", se);
+          }
+        }
+        
+        const isGranted = (OneSignal.Notifications as any).permission;
+        console.log("Permission Result:", isGranted);
+        setNotifPermission(isGranted ? 'granted' : 'denied');
+      } else {
+        console.error("OneSignal not initialized yet. App ID might be missing or domain mismatch.");
+        alert("Comms setup is still initializing. Please wait a moment or check if you are on a compatible browser.");
       }
     } catch (err) {
-      console.error("Failed to request permission:", err);
+      console.error("Critical failure requesting permission:", err);
     }
   };
 
@@ -2453,19 +2489,35 @@ const DashboardView = ({ projects, tasks, volunteers, transactions, activityLogs
         >
           <div className="flex items-center gap-6">
             <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-emerald-400 shrink-0">
-              <Zap size={24} className="animate-pulse" />
+              <Zap size={24} className={cn("animate-pulse", notifPermission === 'denied' ? "text-amber-500" : "text-emerald-400")} />
             </div>
             <div className="text-left">
-              <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none mb-2 text-left">Comms Infrastructure: Signals Offline</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed text-left">Strategic alert delivery requires push authorization. Activate to receive mission-critical notifications on mobile.</p>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none mb-2 text-left">
+                {notifPermission === 'denied' ? 'Comms Link Severed (Blocked)' : 'Comms Infrastructure: Signals Offline'}
+              </h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed text-left">
+                {notifPermission === 'denied' 
+                  ? 'Strategic alerts are blocked by your device settings. Please reset site permissions or check browser preferences.'
+                  : 'Strategic alert delivery requires push authorization.'}
+                <br/>
+                <span className="text-emerald-400 font-black italic">CRITICAL: If you are in the AI Studio preview, you MUST open the app in a "NEW TAB" for the button below to work.</span>
+              </p>
             </div>
           </div>
-          <button 
-            onClick={requestNotificationPermission}
-            className="px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all w-full md:w-auto"
-          >
-            Activate Signals
-          </button>
+          <div className="flex flex-col gap-2 w-full md:w-auto">
+            <button 
+              onClick={requestNotificationPermission}
+              className="px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all w-full"
+            >
+              {notifPermission === 'denied' ? 'Try Reactivate' : 'Authorize Signals'}
+            </button>
+            <button 
+              onClick={() => window.open(window.location.href, '_blank')}
+              className="px-8 py-4 bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/20 transition-all w-full md:hidden"
+            >
+              Open in New Tab
+            </button>
+          </div>
         </motion.div>
       )}
 
