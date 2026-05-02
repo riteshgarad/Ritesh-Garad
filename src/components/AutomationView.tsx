@@ -105,9 +105,9 @@ export default function AutomationView() {
 
   return (
     <div className="space-y-10 text-left animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4 md:px-0">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic flex items-center gap-4">
+          <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter uppercase italic flex flex-wrap items-center gap-3">
             Workflow <span className="text-blue-600">Automata</span>
             <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
               <Zap size={12} className="text-blue-600 animate-pulse" />
@@ -117,7 +117,7 @@ export default function AutomationView() {
           <p className="text-sm font-medium text-slate-500 mt-2">Managing autonomous mission triggers and communication flows.</p>
         </div>
 
-        <div className="flex items-center gap-4 bg-white p-2 border border-slate-200 rounded-[2rem] shadow-sm">
+        <div className="flex items-center gap-4 bg-transparent md:bg-white p-0 md:p-2 border-none md:border md:border-slate-200 rounded-[2rem] shadow-none md:shadow-sm">
            <div className={cn(
              "px-4 py-2 rounded-2xl flex items-center gap-2",
              status === 'connected' ? "bg-emerald-50 text-emerald-600" : 
@@ -139,12 +139,12 @@ export default function AutomationView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-4 md:px-0">
+        <div className="lg:col-span-2 space-y-10">
           {/* Main Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-xl shadow-slate-200/20 relative overflow-hidden group">
-               <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-transparent p-0 overflow-hidden group">
+               <div className="hidden md:block absolute top-0 right-0 p-8 opacity-5 group-hover:rotate-12 transition-transform">
                  <Mail size={80} />
                </div>
                <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
@@ -160,21 +160,21 @@ export default function AutomationView() {
                  <input 
                   type="email"
                   placeholder="Target Email Address..."
-                  className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 outline-none"
+                  className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 outline-none shadow-inner"
                   value={testEmail}
                   onChange={e => setTestEmail(e.target.value)}
                  />
                  <button 
                   onClick={handleSendTest}
                   disabled={!testEmail || isSendingTest}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 disabled:opacity-50"
                  >
                    Send Test Pulse
                  </button>
                </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-xl shadow-slate-200/20">
+            <div className="bg-transparent p-0 overflow-hidden">
                <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
                  <Bell size={14} className="text-amber-500" />
                  Active Handlers
@@ -199,24 +199,24 @@ export default function AutomationView() {
           </div>
 
           {/* Activity Log */}
-          <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-xl shadow-slate-200/20">
+          <div className="bg-transparent p-0 overflow-hidden">
             <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-8">Pulse History</h3>
             <div className="space-y-4">
               {logs.length > 0 ? logs.map((log) => (
-                <div key={log.id} className="flex items-center gap-6 p-5 bg-slate-50 rounded-[2rem] border border-slate-100 group">
+                <div key={log.id} className="flex items-center gap-4 md:gap-6 p-4 md:p-5 bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 group text-left">
                   <div className={cn(
-                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110",
+                    "w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110",
                     log.status === 'success' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
                   )}>
-                    {log.status === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+                    {log.status === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
                   </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-black text-slate-900 uppercase tracking-tight leading-none mb-2">{log.action}</p>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-[13px] md:text-sm font-black text-slate-900 uppercase tracking-tight leading-none mb-2 truncate">{log.action}</p>
                     <p className="text-[10px] font-medium text-slate-500 line-clamp-1 italic italic italic">"{log.details || 'Operational record sanitized'}"</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                      {log.timestamp?.toDate ? new Date(log.timestamp.toDate()).toLocaleTimeString() : 'Recent'}
+                  <div className="text-right shrink-0">
+                    <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                      {log.timestamp?.toDate ? new Date(log.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}
                     </p>
                     <Badge className={log.status === 'success' ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}>
                       {log.status}
@@ -240,7 +240,7 @@ export default function AutomationView() {
               <Settings className="text-blue-500 mb-6" size={32} />
               <h3 className="text-xl font-black uppercase tracking-tighter mb-4 leading-none">Automation Engine v5.0</h3>
               <p className="text-xs text-slate-400 leading-relaxed font-medium mb-8">
-                Autonomous protocols are strictly monitored by the Mission Core. Unauthorized logic bypasses will be flagged and purged.
+                Autonomous protocols are strictly monitored by the Mission Core.
               </p>
               <div className="space-y-4">
                  <div className="flex items-center gap-3">
@@ -258,14 +258,14 @@ export default function AutomationView() {
               </div>
            </div>
 
-           <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm text-left">
+           <div className="bg-transparent p-0 overflow-hidden text-left">
               <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-6">Critical Node Status</h3>
               <div className="space-y-6">
-                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
                    <p className="text-[10px] font-black text-emerald-900 uppercase tracking-widest mb-1">Authorization Relay</p>
                    <p className="text-[10px] text-emerald-700 font-medium leading-relaxed">Direct connection established. Signal stability 99.8%.</p>
                 </div>
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100">
                    <p className="text-[10px] font-black text-amber-900 uppercase tracking-widest mb-1">Latency Throttling</p>
                    <p className="text-[10px] text-amber-700 font-medium leading-relaxed">System observing high mission frequency. Batch processing enabled.</p>
                 </div>

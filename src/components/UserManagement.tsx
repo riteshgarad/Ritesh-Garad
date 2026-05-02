@@ -191,40 +191,40 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 w-full">
+    <div className="space-y-10 animate-in fade-in duration-700 w-full">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4 italic uppercase text-left">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-4 md:px-0">
+        <div className="text-left">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-3 italic uppercase">
             User <span className="text-blue-600">Network</span>
-            <span className="bg-slate-900 text-white text-[10px] not-italic px-3 py-1 rounded-full uppercase tracking-[0.2em] font-black shadow-lg shadow-slate-200">
+            <span className="bg-slate-900 text-white text-[10px] not-italic px-3 py-1 rounded-full uppercase tracking-[0.2em] font-black shadow-lg shadow-slate-200 shrink-0">
               Admin Terminal
             </span>
           </h1>
-          <p className="text-sm font-medium text-slate-500 mt-2 flex items-center gap-2 text-left">
-            <Shield size={14} className="text-blue-600" /> Managing security roles, department access, and mission clearances.
+          <p className="text-sm font-medium text-slate-500 mt-2 flex items-center gap-2">
+            <Shield size={14} className="text-blue-600 shrink-0" /> Managing security roles & access.
           </p>
         </div>
         
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all w-full md:w-auto justify-center"
+          className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all w-full lg:w-auto justify-center"
         >
           <UserPlus size={16} /> Add Operative
         </button>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100 overflow-x-auto no-scrollbar">
+      <div className="flex flex-nowrap items-center gap-2 px-4 md:px-0 overflow-x-auto no-scrollbar scrollbar-hide">
         {['All', ...DEPARTMENTS].map(dept => (
           <button
             key={dept}
             onClick={() => setActiveTab(dept)}
             className={cn(
-              "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all whitespace-nowrap",
+              "px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all whitespace-nowrap shrink-0",
               activeTab === dept 
-                ? "bg-white text-blue-600 shadow-sm border border-slate-100" 
-                : "text-slate-400 hover:text-slate-600"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" 
+                : "bg-slate-50 text-slate-400 hover:text-slate-600 border border-slate-100"
             )}
           >
             {dept}
@@ -234,26 +234,26 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
 
       {/* User Grid List */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4 md:px-0">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-64 bg-slate-100 animate-pulse rounded-[32px]"></div>
+            <div key={i} className="h-64 bg-slate-50 animate-pulse rounded-[32px]"></div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 px-4 md:px-0 pb-20">
           <AnimatePresence mode="popLayout">
             {filteredUsers.map((user) => (
               <motion.div
                 key={user.uid}
                 layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="group relative"
               >
-                <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500 group-hover:-translate-y-1">
+                <div className="bg-transparent overflow-hidden transition-all duration-500">
                   <div className="flex items-start justify-between mb-6">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-xl ring-4 ring-slate-50 transition-all group-hover:bg-blue-50 group-hover:text-blue-500">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-xl shadow-inner transition-all group-hover:bg-blue-50 group-hover:text-blue-500">
                       {user.name.substring(0, 1).toUpperCase()}
                     </div>
                     <div className="flex items-center gap-2">
@@ -264,27 +264,24 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
                       )}>
                         {user.role}
                       </Badge>
-                      <button className="text-slate-300 hover:text-slate-600 p-1">
-                        <MoreVertical size={16} />
-                      </button>
                     </div>
                   </div>
 
                   <div className="space-y-4 text-left">
                     <div>
-                      <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase line-clamp-1">{user.name}</h3>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase line-clamp-1">{user.name}</h3>
                       <p className="text-xs font-medium text-slate-400 flex items-center gap-2">
-                        <Mail size={12} /> {user.email}
+                        <Mail size={12} className="shrink-0" /> {user.email}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3 pt-4 border-t border-slate-50">
+                    <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
                       <div className="flex items-center gap-2 flex-grow">
-                        <Building2 size={12} className="text-slate-300" />
+                        <Building2 size={12} className="text-slate-300 shrink-0" />
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{user.department}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                         <div className={cn("w-2 h-2 rounded-full", user.isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]')}></div>
+                         <div className={cn("w-2 h-2 rounded-full", user.isActive ? 'bg-emerald-500' : 'bg-red-500')}></div>
                          <span className={cn("text-[10px] font-black uppercase tracking-widest", user.isActive ? 'text-emerald-600' : 'text-red-600')}>
                            {user.isActive ? 'Active' : 'Locked'}
                          </span>
@@ -295,22 +292,22 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
                       <button 
                         onClick={() => handleToggleStatus(user.uid, user.isActive)}
                         className={cn(
-                          "flex-1 py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                          user.isActive ? "bg-slate-900 text-white" : "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                          "flex-1 py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-xl",
+                          user.isActive ? "bg-slate-900 text-white shadow-slate-900/10" : "bg-emerald-600 text-white shadow-emerald-600/20"
                         )}
                       >
                         {user.isActive ? 'Lock Access' : 'Restore'}
                       </button>
                       <button 
                         onClick={() => handleResetPassword(user.uid)}
-                        className="p-3.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all border border-slate-100"
+                        className="p-3.5 rounded-xl bg-white text-slate-400 hover:text-blue-600 transition-all border border-slate-100 shadow-sm"
                         title="Send Reset Email"
                       >
                         <Shield size={14} />
                       </button>
                       <button 
                         onClick={() => handleDeleteUser(user.uid)}
-                        className="p-3.5 rounded-xl bg-slate-50 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
+                        className="p-3.5 rounded-xl bg-white text-slate-300 hover:text-red-500 transition-all border border-slate-100 shadow-sm"
                         title="Revoke Access"
                       >
                         <Trash2 size={14} />

@@ -67,7 +67,7 @@ export const TaskEngine = ({
   };
 
   return (
-    <div className="flex h-full gap-8 p-1 text-left relative overflow-hidden">
+    <div className="flex h-full gap-8 p-0 text-left relative overflow-hidden">
       {/* Sidebar Analytics */}
       <div className="hidden xl:flex w-80 flex-col gap-6">
         <div className="bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl shadow-slate-200 relative overflow-hidden group">
@@ -134,9 +134,9 @@ export const TaskEngine = ({
 
       {/* Main Orchestration Node */}
       <div className="flex-1 flex flex-col gap-6 min-w-0">
-        <div className="bg-white border border-slate-100 rounded-[3rem] p-6 shadow-xl shadow-slate-200/20 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-4 w-full md:w-auto">
-             <div className="p-4 bg-slate-50 text-slate-900 rounded-[1.5rem] shadow-sm">
+        <div className="bg-transparent md:bg-white md:border md:border-slate-100 md:rounded-[3rem] p-4 md:p-6 shadow-none md:shadow-xl md:shadow-slate-200/20 flex flex-col lg:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4 w-full lg:w-auto">
+             <div className="p-4 bg-slate-50 text-slate-900 rounded-[1.5rem] shadow-sm hidden sm:block">
                 <Target size={24} />
              </div>
              <div>
@@ -145,8 +145,8 @@ export const TaskEngine = ({
              </div>
           </div>
 
-          <div className="flex items-center gap-4 w-full md:w-auto">
-             <div className="relative flex-1 md:w-64">
+          <div className="flex items-center gap-4 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+             <div className="relative shrink-0 w-48 sm:w-64">
                 <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
                   type="text"
@@ -158,14 +158,14 @@ export const TaskEngine = ({
              </div>
              <button 
                onClick={() => setView(view === 'board' ? 'feed' : 'board')}
-               className="p-4 bg-slate-50 text-slate-900 rounded-2xl hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 group"
+               className="p-4 bg-slate-50 text-slate-900 rounded-2xl hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 group shrink-0"
              >
                 {view === 'board' ? <Clock size={18} className="group-hover:rotate-12 transition-transform" /> : <Layout size={18} className="group-hover:rotate-12 transition-transform" />}
                 <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Telemetry</span>
              </button>
              <button 
                onClick={() => setIsAddingTask(true)}
-               className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+               className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shrink-0"
              >
                 <Plus size={18} />
                 <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">New Data Bridge</span>
@@ -173,7 +173,7 @@ export const TaskEngine = ({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 px-4 md:px-0">
           <AnimatePresence mode="wait">
             {view === 'board' ? (
               <motion.div
@@ -181,7 +181,7 @@ export const TaskEngine = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="h-full grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6 overflow-y-auto p-2 custom-scrollbar"
+                className="h-full grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-8 overflow-y-auto pb-24 md:pb-6 custom-scrollbar"
               >
                 {filteredTasks.length === 0 ? (
                   <div className="col-span-full h-full flex flex-col items-center justify-center opacity-30 italic text-slate-400 p-20 text-center">

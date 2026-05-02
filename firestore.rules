@@ -217,6 +217,16 @@ service cloud.firestore {
       allow create: if isAdmin() || isDeptHead('HR');
     }
 
+    // --- Attendance ---
+    match /attendance/{attendanceId} {
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && incoming().userId == request.auth.uid;
+      allow update: if (isAdmin() || (isOwner(existing().userId) && incoming().userId == existing().userId)) && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['punchOut', 'status', 'durationMinutes']);
+      allow delete: if isAdmin();
+    }
+
     // --- Schedule & Meetings ---
     match /schedule/{eventId} {
       allow list, get: if isSignedIn() && (

@@ -31,6 +31,29 @@
         "attendees": { "type": "object" }
       },
       "required": ["title", "start", "end", "type", "creatorId"]
+    },
+    "Attendance": {
+      "title": "Mission Attendance",
+      "description": "Volunteer punch-in/out record with geolocation",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "projectId": { "type": "string" },
+        "missionName": { "type": "string" },
+        "location": { 
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "punchIn": { "type": "object" },
+        "punchOut": { "type": "object" },
+        "status": { "type": "string", "enum": ["active", "completed"] },
+        "durationMinutes": { "type": "number" }
+      },
+      "required": ["userId", "projectId", "punchIn", "status"]
     }
   },
   "firestore": {
@@ -41,6 +64,10 @@
     "/schedule/{eventId}": {
       "schema": "Meeting",
       "description": "Scheduled mission pulses and meetings"
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Volunteer mission punch records"
     }
   }
 }

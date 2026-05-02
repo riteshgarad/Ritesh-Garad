@@ -23,16 +23,15 @@ const ImpactStories: React.FC<ImpactStoriesProps> = ({ projects, campaigns }) =>
   const completedProjects = projects.filter(p => p.status === 'completed');
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Narrative Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-100 pb-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-100 pb-10 px-4 md:px-0">
         <div className="max-w-2xl text-left">
           <h2 className="text-3xl font-black text-slate-900 tracking-tight italic uppercase">
             Impact <span className="text-blue-600">Story</span> Forge
           </h2>
           <p className="text-sm font-medium text-slate-500 mt-2 leading-relaxed">
             Convert operational success into donor-ready narrative assets. 
-            Select completed mission nodes to initialize new marketing cycles.
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -43,16 +42,16 @@ const ImpactStories: React.FC<ImpactStoriesProps> = ({ projects, campaigns }) =>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left px-4 md:px-0">
         {completedProjects.map((project) => (
           <motion.div 
             whileHover={{ y: -4 }}
             key={project.id} 
-            className="bg-white border border-slate-200 rounded-[32px] overflow-hidden flex flex-col group shadow-sm hover:shadow-xl hover:shadow-slate-200/40 transition-all"
+            className="bg-transparent overflow-hidden flex flex-col group transition-all"
           >
             <div className="flex flex-col md:flex-row">
               {/* Visual Placeholder */}
-              <div className="w-full md:w-1/3 aspect-square bg-slate-100 relative overflow-hidden flex items-center justify-center border-b md:border-b-0 md:border-r border-slate-100 group-hover:bg-slate-50 transition-all">
+              <div className="w-full md:w-1/3 aspect-[16/9] md:aspect-square bg-slate-100/50 rounded-3xl relative overflow-hidden flex items-center justify-center border border-slate-100 md:mr-6 shrink-0">
                 <ImageIcon size={40} className="text-slate-300 group-hover:text-blue-200 transition-colors" />
                 <div className="absolute top-4 left-4">
                   <span className="bg-emerald-500 text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md shadow-lg shadow-emerald-500/20">
@@ -62,19 +61,19 @@ const ImpactStories: React.FC<ImpactStoriesProps> = ({ projects, campaigns }) =>
               </div>
 
               {/* Content Area */}
-              <div className="flex-1 p-8">
+              <div className="flex-1 py-6 md:py-2">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest px-2 py-0.5 bg-blue-50 rounded-md border border-blue-100">
                     {project.tag}
                   </span>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none italic">MISSION_DEP: {project.id}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none italic">MISSION: {project.id}</p>
                 </div>
                 
                 <h3 className="text-xl font-black text-slate-900 tracking-tight leading-tight group-hover:text-blue-600 transition-colors mb-3">
                   {project.name}
                 </h3>
                 
-                <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-3 mb-6">
+                <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2 md:line-clamp-3 mb-6">
                   {project.description}
                 </p>
 
@@ -82,7 +81,7 @@ const ImpactStories: React.FC<ImpactStoriesProps> = ({ projects, campaigns }) =>
                   <div className="flex items-center gap-3">
                     <Users size={16} className="text-slate-400" />
                     <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Beneficiaries</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Impacted</p>
                       <p className="text-xs font-black text-slate-900 leading-none">420+ Souls</p>
                     </div>
                   </div>
@@ -96,10 +95,10 @@ const ImpactStories: React.FC<ImpactStoriesProps> = ({ projects, campaigns }) =>
                 </div>
 
                 <div className="flex gap-2">
-                  <button className="flex-1 bg-slate-900 text-white py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
-                    <Megaphone size={14} /> Forge Campaign
+                  <button className="flex-1 bg-slate-900 text-white py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-900/10">
+                    <Megaphone size={14} /> Forge Story
                   </button>
-                  <button className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                  <button className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm">
                     <Share2 size={16} />
                   </button>
                 </div>

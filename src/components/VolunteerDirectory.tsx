@@ -209,28 +209,28 @@ export const VolunteerDirectory = ({
   const canManage = user.role === 'Admin' || user.role === 'HR' || user.role === 'DH' || user.role === 'Department Head';
 
   return (
-    <div className="space-y-6 pb-28">
+    <div className="space-y-6 pb-32 px-4 md:px-0">
       {/* Search & Sort Area */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         <div className="relative group">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors" size={20} />
+          <Search className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors" size={20} />
           <input 
             type="text" 
             placeholder="Search agents..."
-            className="w-full pl-16 pr-6 py-5 bg-transparent border-b border-slate-200 rounded-none text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:border-blue-500 transition-all outline-none"
+            className="w-full pl-8 pr-6 py-5 bg-transparent border-b border-slate-200 rounded-none text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:border-blue-500 transition-all outline-none"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         
-        <div className="flex bg-transparent p-1.5 rounded-2xl self-start">
+        <div className="flex bg-slate-50/50 p-1.5 rounded-2xl self-start overflow-x-auto no-scrollbar scrollbar-hide">
           {['directory', 'applications'].map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab as any)}
               className={cn(
-                "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative",
-                activeTab === tab ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
+                "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative shrink-0",
+                activeTab === tab ? "bg-white text-slate-900 shadow-sm border border-slate-100" : "text-slate-400"
               )}
             >
               {tab}
@@ -321,7 +321,7 @@ export const VolunteerDirectory = ({
         )}
       </AnimatePresence>
 
-      <div className="fixed bottom-24 right-6 pointer-events-none">
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom,16px)+110px)] right-6 pointer-events-none z-50">
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => setIsModalOpen(true)}

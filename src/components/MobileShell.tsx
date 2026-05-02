@@ -78,14 +78,24 @@ export const MobileShell = ({
     { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Home Hub' },
     { id: 'messages', icon: MessageCircle, label: 'Mission Comms' },
     { id: 'schedule', icon: Calendar, label: 'Calendar' },
+    {
+      id: 'attendance',
+      icon: Clock,
+      label: 'Operational Logs',
+      roles: ['Admin', 'Volunteer', 'Staff Operative'],
+      subs: [
+        { id: 'attendance', label: 'Mission Punch-In' },
+        { id: 'attendance-analytics', label: 'Impact Analytics', roles: ['Admin'] }
+      ]
+    },
     { 
       id: 'missions', 
       icon: Target, 
       label: 'Missions',
-      roles: ['Admin', 'Project Head', 'Department Head'],
+      roles: ['Admin', 'Project Head', 'Department Head', 'Volunteer'],
       depts: ['Operations', 'General'],
       subs: [
-        { id: 'projects', label: 'Active Missions' },
+        { id: 'projects', label: 'Mission Board' },
         { id: 'roadmap', label: 'Strategic Roadmap' },
         { id: 'new-proposal', label: 'Draft Proposal' }
       ]
@@ -415,15 +425,17 @@ export const MobileShell = ({
         </main>
 
         {/* Mobile-Only Bottom Navigation (Sleek Modern Profile) */}
-        <nav className="lg:hidden h-[calc(70px+env(safe-area-inset-bottom,16px))] bg-white/95 backdrop-blur-xl border-t border-slate-100 flex items-center justify-around px-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-50">
+        <nav className="lg:hidden h-[calc(75px+env(safe-area-inset-bottom,16px))] bg-white/95 backdrop-blur-xl border-t border-slate-100 flex items-start justify-around px-2 pt-2 pb-[env(safe-area-inset-bottom,16px)] shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-50">
           {[
-            { id: 'dashboard', icon: Home, label: 'HUB' },
-            { id: 'schedule', icon: Calendar, label: 'CAL' },
+            { id: 'dashboard', icon: Home, label: 'DASH' },
+            { id: 'attendance', icon: Clock, label: 'PUNCH' },
             { id: 'create', icon: Plus, label: 'NEW', isSpecial: true },
             { id: 'messages', icon: MessageCircle, label: 'COMMS' },
             { id: 'projects', icon: Target, label: 'MISSIONS' }
           ].map((item) => {
-            const isActive = activePath === item.id || (item.id === 'projects' && activePath === 'roadmap');
+            const isActive = activePath === item.id || 
+                            (item.id === 'projects' && activePath === 'roadmap') ||
+                            (item.id === 'attendance' && activePath === 'attendance');
             const Icon = item.icon;
 
             if (item.id === 'create') {
@@ -431,11 +443,12 @@ export const MobileShell = ({
                 <button
                   key={item.id}
                   onClick={() => handleNavClick('create')}
-                  className="relative -top-5"
+                  className="relative -top-6 flex flex-col items-center"
                 >
                   <div className="w-16 h-16 bg-mahogany rounded-[22px] flex items-center justify-center text-white shadow-2xl shadow-mahogany/30 ring-8 ring-white/50 transition-all active:scale-90 hover:rotate-90">
                     <Plus size={28} strokeWidth={2.5} />
                   </div>
+                  <span className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-400 mt-2">NEW</span>
                 </button>
               );
             }
@@ -444,11 +457,11 @@ export const MobileShell = ({
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className="flex flex-col items-center gap-1.5 px-4 h-full justify-center relative group min-w-[64px]"
+                className="flex flex-col items-center gap-1 px-4 pt-1 relative group min-w-[64px]"
               >
                 <div className={cn(
                   "p-2 rounded-xl transition-all duration-300",
-                  isActive ? "bg-mahogany/5" : "bg-transparent"
+                  isActive ? "bg-mahogany/8" : "bg-transparent"
                 )}>
                   <Icon 
                     size={22} 
@@ -459,7 +472,7 @@ export const MobileShell = ({
                   />
                 </div>
                 <span className={cn(
-                  "text-[8px] font-black uppercase tracking-[0.15em] leading-none transition-colors",
+                  "text-[8px] font-black uppercase tracking-[0.12em] leading-none transition-colors",
                   isActive ? "text-mahogany" : "text-slate-400"
                 )}>
                   {item.label}
@@ -467,7 +480,7 @@ export const MobileShell = ({
                 {isActive && (
                   <motion.div 
                     layoutId="active-nav-dot"
-                    className="absolute bottom-1 w-1 h-1 bg-mahogany rounded-full"
+                    className="absolute -bottom-1 w-1 h-1 bg-mahogany rounded-full"
                   />
                 )}
               </button>

@@ -22,7 +22,7 @@ export const NotificationPanel = ({
       initial={{ opacity: 0, scale: 0.95, y: -10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-      className="absolute right-0 top-0 w-80 bg-[#121214] border border-white/10 rounded-2xl shadow-2xl z-[100] overflow-hidden"
+      className="fixed md:absolute right-0 md:right-0 inset-x-4 md:inset-x-auto top-24 md:top-0 w-auto md:w-80 bg-[#121214] border border-white/10 rounded-2xl shadow-2xl z-[100] overflow-hidden"
     >
       <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
         <h3 className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Notification Terminal</h3>

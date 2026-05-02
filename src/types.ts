@@ -292,3 +292,19 @@ export interface AppUser {
   department?: string;
   isActive?: boolean;
 }
+
+export interface Attendance {
+  id: string;
+  userId: string;
+  userName: string;
+  projectId: string;
+  missionName: string;
+  location: {
+    lat: number;
+    lng: number;
+  };
+  punchIn: any;
+  punchOut?: any;
+  status: 'active' | 'completed';
+  durationMinutes?: number;
+}

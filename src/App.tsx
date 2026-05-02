@@ -17,6 +17,7 @@ import { FileUploadModal } from './components/FileUploadModal';
 import { VolunteerApplicationForm } from './components/VolunteerApplication';
 import { VolunteerDirectory } from './components/VolunteerDirectory';
 import { VolunteerProfile } from './components/VolunteerProfile';
+import { AttendanceHub } from './components/attendance/AttendanceHub';
 import { MilestoneStepper } from './components/MilestoneStepper';
 import { VelocityGauge } from './components/VelocityGauge';
 import { generateProjectImpactReport } from './services/reportGenerator';
@@ -169,7 +170,7 @@ const Button = ({ children, variant = 'primary', className, ...props }: React.Bu
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'attendance' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -2157,6 +2158,8 @@ const PageView = ({
   switch (page) {
     case 'dashboard':
       return <DashboardView projects={projects} tasks={tasks} volunteers={volunteers} onOpenProject={onOpenProject} setCurrentPage={setCurrentPage} onDeleteProject={onDeleteProject} user={user} />;
+    case 'attendance':
+      return <AttendanceHub />;
     case 'messages':
       return (
         <ChatView 
@@ -2534,6 +2537,7 @@ const DashboardView = ({ projects, tasks, volunteers, onOpenProject, setCurrentP
             <h3 className="font-black text-slate-900 uppercase tracking-widest text-xs mb-8">Pulse Dispatch Node</h3>
             <div className="grid grid-cols-2 gap-5">
               {[
+                { label: 'Mission Punch', icon: Clock, color: 'bg-emerald-50 text-emerald-600 border-emerald-100', page: 'attendance' },
                 { label: 'New Mission', icon: FolderKanban, color: 'bg-blue-50 text-blue-600 border-blue-100', page: 'projects' },
                 { label: 'Protocols', icon: FileText, color: 'bg-emerald-50 text-emerald-600 border-emerald-100', page: 'docs' },
                 { label: 'Finance Command', icon: IndianRupee, color: 'bg-amber-50 text-amber-600 border-amber-100', page: 'finance' },
@@ -2811,6 +2815,7 @@ const PAGE_TITLES: Record<Page, string> = {
   'dashboard': 'Command Hub',
   'projects': 'Active Missions',
   'tasks': 'Operational Force Board',
+  'attendance': 'Mission Deployment Log',
   'messages': 'Mission Comms',
   'volunteers': 'Unit Records',
   'finance': 'Resource Cell / Ledger',
