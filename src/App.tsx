@@ -285,65 +285,131 @@ export default function App() {
 
   const [notifPermission, setNotifPermission] = useState<string>('default');
 
+  const initOneSignal = async () => {
+    const env = (import.meta as any).env;
+    const appId = env.VITE_ONESIGNAL_APP_ID;
+    if (appId) {
+      try {
+        if ((OneSignal as any).initialized) {
+          console.log("OneSignal Boot: Already initialized");
+          if (user) OneSignal.login(user.uid);
+          setNotifPermission((OneSignal.Notifications as any).permission ? 'granted' : 'default');
+          return;
+        }
+
+        await OneSignal.init({
+          appId: appId,
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerParam: { scope: '/' },
+          serviceWorkerPath: 'OneSignalSDKWorker.js',
+          notifyButton: {
+            enable: true,
+            position: 'bottom-right',
+            size: 'medium',
+            displayPredicate: () => true,
+            showCredit: false,
+            prenotify: true,
+          } as any,
+        });
+        
+        if ((OneSignal as any).Debug) {
+          (OneSignal as any).Debug.setLogLevel('debug');
+        }
+        
+        console.log("OneSignal Initialized Successfully");
+        const perm = (OneSignal.Notifications as any).permission;
+        setNotifPermission(perm ? 'granted' : 'default');
+        
+        if (user) {
+          OneSignal.login(user.uid);
+        }
+      } catch (err: any) {
+        const msg = err.message || String(err);
+        if (msg.includes('Can only be used on') || msg.includes('initialized') || msg.includes('Permission has already been requested')) {
+          console.warn("OneSignal (Env Compatibility Mode):", msg);
+        } else {
+          console.error("OneSignal Initialization Critical Error:", err);
+        }
+      }
+    } else {
+      console.warn("OneSignal Initialization Skipped: VITE_ONESIGNAL_APP_ID is not defined.");
+    }
+  };
+
   const requestNotificationPermission = async () => {
-    console.log("Button Clicked: requestNotificationPermission");
+    console.log("Action: requestNotificationPermission initiated");
     
-    // Check for Iframe - Browsers block notification requests in iframes
-    const isInIframe = window.self !== window.top;
-    if (isInIframe) {
-      const confirmOpen = confirm("Notification prompts are blocked within previews. To enable alerts, we need to open the app in a new tab. Proceed?");
-      if (confirmOpen) {
+    if (window.self !== window.top) {
+      if (confirm("Notification prompts are blocked within previews. Open in a New Tab to enable?")) {
         window.open(window.location.href, '_blank');
       }
       return;
     }
 
-    toast.loading("Contacting secure comms node...", { id: 'push-perm', duration: 8000 });
+    const tId = toast.loading("Connecting to Comms Node...", { duration: 15000 });
     
-    const isOneSignalReady = (OneSignal as any).initialized || !!(OneSignal as any).Notifications;
-    console.log("OneSignal Ready status:", isOneSignalReady);
-
-    if (!isOneSignalReady) {
-      toast.error("Comms system initializing. Please wait 5 seconds.", { id: 'push-perm' });
-      return;
-    }
-
     try {
-      if (OneSignal.Notifications.permissionNative === 'denied') {
-        toast.error("Access Denied. Check site settings.", { id: 'push-perm' });
-        alert("Notifications are permanently blocked in your browser for this site. Reset site permissions in your browser address bar.");
+      const os = OneSignal as any;
+      console.log("OneSignal Status Probe:", {
+        initialized: os.initialized,
+        hasNotifications: !!os.Notifications,
+        hasSlidedown: !!os.Slidedown,
+        permission: os.Notifications?.permission,
+        nativePermission: os.Notifications?.permissionNative
+      });
+
+      if (!os.initialized && !os.Notifications) {
+        toast.error("Comms Bridge Offline. Refreshing...", { id: tId });
+        await initOneSignal();
+        if (!os.initialized && !os.Notifications) {
+          throw new Error("Comms system failed to initialize. Check App ID.");
+        }
+      }
+
+      if (os.Notifications?.permissionNative === 'denied') {
+        toast.error("Access Forbidden by Browser", { id: tId });
+        alert("Notifications are permanently blocked for this site. Click the Lock icon in the address bar to reset permissions.");
         return;
       }
 
-      console.log("Triggering OneSignal prompt...");
-      // Wrap in a promise that rejects after 12s
-      const permResult = await Promise.race([
-        OneSignal.Notifications.requestPermission(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 12000))
+      toast.loading("Awaiting Browser Authorization...", { id: tId });
+      
+      // Native Prompt with 10s fallback
+      const result = await Promise.race([
+        os.Notifications.requestPermission(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("PROMPT_TIMEOUT")), 10000))
       ]).catch(async (e) => {
-        if (e.message === "TIMEOUT") {
-          console.warn("Permission prompt timed out or ignored.");
-          toast.error("Process timed out. Opening Slidedown fallback...", { id: 'push-perm' });
-          await (OneSignal as any).Slidedown.prompt({ type: 'push' });
-          return (OneSignal.Notifications as any).permission;
+        if (e.message === "PROMPT_TIMEOUT") {
+          console.warn("Native prompt timed out. Attempting Slidedown Fallback.");
+          toast.loading("Native prompt ignored. Deploying Slidedown...", { id: tId });
+          
+          try {
+            if (typeof os.Slidedown?.prompt === 'function') await os.Slidedown.prompt({ type: 'push' });
+            else if (typeof os.slidedown?.prompt === 'function') await os.slidedown.prompt({ type: 'push' });
+            else if (typeof os.showSlidedownPrompt === 'function') await os.showSlidedownPrompt();
+            else console.warn("No slidedown method found.");
+          } catch (se) {
+            console.error("Slidedown failure:", se);
+          }
+          return os.Notifications?.permission;
         }
         throw e;
       });
-      
-      const isGranted = (OneSignal.Notifications as any).permission;
-      console.log("Permission Result:", isGranted);
+
+      const isGranted = os.Notifications?.permission;
+      console.log("Permission Analysis Result:", isGranted);
 
       if (isGranted === true || isGranted === 'granted') {
         setNotifPermission('granted');
-        toast.success("Signals Online!", { id: 'push-perm' });
-        alert("Signals Activated! Mission-critical alerts will now reach your device.");
+        toast.success("Signals Online!", { id: tId });
+        alert("Signals Activated! You will now receive mission alerts.");
       } else {
         setNotifPermission('denied');
-        toast.error("Authorization not granted.", { id: 'push-perm' });
+        toast.error("Authorization Dismissed", { id: tId });
       }
     } catch (err: any) {
-      console.error("Critical failure during signal authorization:", err);
-      toast.error("Comms Link Error: " + (err.message || "Unknown Failure"), { id: 'push-perm' });
+      console.error("Comms Authorization Critical Failure:", err);
+      toast.error("Comms Link Error: " + (err.message || "Unknown"), { id: tId });
     }
   };
 
@@ -356,51 +422,6 @@ export default function App() {
       protocol: window.location.protocol
     });
 
-    const initOneSignal = async () => {
-      const appId = env.VITE_ONESIGNAL_APP_ID;
-      if (appId) {
-        try {
-          if ((OneSignal as any).initialized) {
-            console.log("OneSignal Boot: Already initialized");
-            if (user) OneSignal.login(user.uid);
-            setNotifPermission((OneSignal.Notifications as any).permission ? 'granted' : 'default');
-            return;
-          }
-
-          await OneSignal.init({
-            appId: appId,
-            allowLocalhostAsSecureOrigin: true,
-            serviceWorkerParam: { scope: '/' },
-            serviceWorkerPath: 'OneSignalSDKWorker.js',
-            notifyButton: {
-              enable: true,
-              position: 'bottom-right',
-              size: 'medium',
-              displayPredicate: () => true,
-              showCredit: false,
-              prenotify: true,
-            } as any,
-          });
-          
-          console.log("OneSignal Initialized Successfully");
-          const perm = (OneSignal.Notifications as any).permission;
-          setNotifPermission(perm ? 'granted' : 'default');
-          
-          if (user) {
-            OneSignal.login(user.uid);
-          }
-        } catch (err: any) {
-          const msg = err.message || String(err);
-          if (msg.includes('Can only be used on') || msg.includes('initialized') || msg.includes('Permission has already been requested')) {
-            console.warn("OneSignal (Env Compatibility Mode):", msg);
-          } else {
-            console.error("OneSignal Initialization Critical Error:", err);
-          }
-        }
-      } else {
-        console.warn("OneSignal Initialization Skipped: VITE_ONESIGNAL_APP_ID is not defined.");
-      }
-    };
     initOneSignal();
   }, [user?.uid]);
 
