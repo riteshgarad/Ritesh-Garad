@@ -76,57 +76,62 @@ export const attendanceService = {
       // Get Geolocation
       let lat = 0;
       let lng = 0;
-      let locationName = "Geofencing Pulse...";
+      let locationName = "";
 
-      try {
-        const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, options);
-        });
-
-        let position: GeolocationPosition;
-        try {
-          // Try high accuracy first
-          position = await getPos({
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
-          });
-        } catch (e) {
-          // Fallback to low accuracy
-          console.warn("High accuracy failed, falling back to low accuracy", e);
-          position = await getPos({
-            enableHighAccuracy: false,
-            timeout: 10000,
-            maximumAge: 60000
-          });
+      const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation not supported"));
+          return;
         }
-        
-        lat = position.coords.latitude;
-        lng = position.coords.longitude;
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
 
-        // Reverse Geocode
-        try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
-            headers: {
-              'Accept-Language': 'en-US,en;q=0.9'
-            }
-          });
-          const data = await response.json();
-          // Extract a readable portion of the address
-          const address = data.address;
-          const display = [
-            address?.road || address?.pedestrian || address?.suburb,
-            address?.city || address?.town || address?.village
-          ].filter(Boolean).join(', ') || data.display_name;
+      let position: GeolocationPosition;
+      try {
+        // Try high accuracy first
+        position = await getPos({
+          enableHighAccuracy: true,
+          timeout: 15000, 
+          maximumAge: 0
+        });
+      } catch (err: any) {
+        // Fallback to low accuracy / cached
+        if (err.code === 1) throw err; // If PERMISSION_DENIED, throw immediately to UI
+        
+        console.warn("High accuracy failed, attempting fallback", err);
+        position = await getPos({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 300000 
+        });
+      }
+      
+      lat = position.coords.latitude;
+      lng = position.coords.longitude;
+
+      // Reverse Geocode
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+          headers: {
+            'Accept-Language': 'en-IN,en-US,en;q=0.9',
+            'User-Agent': 'GaradFoundationMissionApp/1.0 (riteshgerad@gmail.com)'
+          }
+        });
+        const data = await response.json();
+        
+        if (data && data.address) {
+          const addr = data.address;
+          const parts = [
+            addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood,
+            addr.city || addr.town || addr.village || addr.district
+          ].filter(Boolean);
           
-          locationName = display || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        } catch (e) {
-          console.warn("Geocoding failed", e);
+          locationName = parts.length > 0 ? parts.join(', ') : (data.name || data.display_name);
+        } else {
           locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
-      } catch (geoErr) {
-        console.error("Punch-in location failed significantly", geoErr);
-        locationName = "Location Signal Lost";
+      } catch (e) {
+        locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       }
 
       const attendanceData = {
@@ -143,6 +148,10 @@ export const attendanceService = {
       const docRef = await addDoc(collection(db, 'attendance'), attendanceData);
       return { id: docRef.id, locationName };
     } catch (error) {
+      // Check if it's a Geolocation error
+      if (typeof error === 'object' && error !== null && 'code' in (error as any)) {
+        throw error; // Let UI handle geo errors
+      }
       handleFirestoreError(error, OperationType.CREATE, 'attendance');
       throw error;
     }
@@ -150,28 +159,31 @@ export const attendanceService = {
 
   async punchOut(attendanceId: string, userId: string, durationMinutes: number): Promise<void> {
     try {
-      // Get current position for punch out - make it non-blocking
+      // Get current position for punch out
       let lat = 0;
       let lng = 0;
-      let locationName = "Geofencing Pulse...";
+      let locationName = "Mission Node";
+
+      const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation not supported"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
 
       try {
-        const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, options);
-        });
-
         let position: GeolocationPosition;
         try {
           position = await getPos({
             enableHighAccuracy: true,
-            timeout: 15000,
+            timeout: 10000,
             maximumAge: 0
           });
         } catch (e) {
-          console.warn("High accuracy punch-out failed, falling back", e);
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 10000,
+            timeout: 8000,
             maximumAge: 60000
           });
         }
@@ -183,23 +195,26 @@ export const attendanceService = {
         try {
           const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
             headers: {
-              'Accept-Language': 'en-US,en;q=0.9'
+              'Accept-Language': 'en-IN,en-US,en;q=0.9',
+              'User-Agent': 'GaradFoundationMissionApp/1.0 (riteshgerad@gmail.com)'
             }
           });
           const data = await response.json();
-          const address = data.address;
-          const display = [
-            address?.road || address?.pedestrian || address?.suburb,
-            address?.city || address?.town || address?.village
-          ].filter(Boolean).join(', ') || data.display_name;
-          
-          locationName = display || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          if (data && data.address) {
+            const addr = data.address;
+            const parts = [
+              addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood,
+              addr.city || addr.town || addr.village || addr.district
+            ].filter(Boolean);
+            locationName = parts.length > 0 ? parts.join(', ') : data.display_name;
+          } else {
+            locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          }
         } catch (e) {
           locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
       } catch (geoErr) {
-        console.warn("Punch-out location failed significantly", geoErr);
-        locationName = "Location Signal Lost";
+        console.warn("Punch-out location failed tracking", geoErr);
       }
 
       const attendanceRef = doc(db, 'attendance', attendanceId);
