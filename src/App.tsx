@@ -286,7 +286,8 @@ export default function App() {
   const [notifPermission, setNotifPermission] = useState<string>('default');
 
   const requestNotificationPermission = async () => {
-    console.log("Requesting notification permission... Initialized:", (OneSignal as any).initialized);
+    const isOneSignalReady = (OneSignal as any).initialized || !!OneSignal.Notifications;
+    console.log("Requesting notification permission... Ready:", isOneSignalReady);
     
     // Check for Iframe
     const isInIframe = window.self !== window.top;
@@ -299,7 +300,7 @@ export default function App() {
     }
 
     try {
-      if ((OneSignal as any).initialized) {
+      if (isOneSignalReady) {
         // Try native prompt first
         console.log("Internal OneSignal Permission State:", OneSignal.Notifications.permission);
         
@@ -324,8 +325,14 @@ export default function App() {
         console.log("Permission Result:", isGranted);
         setNotifPermission(isGranted ? 'granted' : 'denied');
       } else {
-        console.error("OneSignal not initialized yet. App ID might be missing or domain mismatch.");
-        alert("Comms setup is still initializing. Please wait a moment or check if you are on a compatible browser.");
+        const appId = (import.meta as any).env.VITE_ONESIGNAL_APP_ID;
+        if (!appId) {
+          console.error("OneSignal Application ID (VITE_ONESIGNAL_APP_ID) is missing in environment variables.");
+          alert("Comms system configuration is missing. Please contact administrator (App ID missing).");
+        } else {
+          console.error("OneSignal not initialized yet. Domain mismatch or initialization error.");
+          alert("Comms setup is still initializing or blocked by domain security. If you just opened the app, please wait 3 seconds. Otherwise, ensure you are on the correct production domain.");
+        }
       }
     } catch (err) {
       console.error("Critical failure requesting permission:", err);
@@ -347,11 +354,16 @@ export default function App() {
             return;
           }
 
+          const currentDomain = window.location.hostname;
+          const isDev = currentDomain.includes('localhost') || currentDomain.includes('run.app');
+
           await OneSignal.init({
             appId: appId,
             allowLocalhostAsSecureOrigin: true,
             serviceWorkerParam: { scope: '/' },
             serviceWorkerPath: 'OneSignalSDKWorker.js',
+            // In v16, notifyButton is often handled differently or via dashboard
+            // But we keep it if the user likes the bell
             notifyButton: {
               enable: true,
               position: 'bottom-right',
@@ -359,33 +371,22 @@ export default function App() {
               displayPredicate: () => true,
               showCredit: false,
               prenotify: true,
-              text: {
-                'tip.state.unsubscribed': 'Subscribe to mission alerts',
-                'tip.state.subscribed': "You're subscribed to alerts",
-                'tip.state.blocked': "You've blocked notifications",
-                'message.prenotify': 'Click to subscribe to mission alerts',
-                'message.action.subscribed': "Refined: You're now on the alert list",
-                'message.action.resubscribed': "Refined: You're back on the alert list",
-                'message.action.unsubscribed': "Refined: You won't receive alerts",
-                'dialog.main.title': 'Mission Alerts',
-                'dialog.main.button.subscribe': 'SUBSCRIBE',
-                'dialog.main.button.unsubscribe': 'UNSUBSCRIBE'
-              }
             } as any,
           });
           
-          console.log("OneSignal Status: Active");
+          console.log("OneSignal Status: Active (Session Verified)");
           setNotifPermission((OneSignal.Notifications as any).permission || 'default');
           
           if (user) {
             OneSignal.login(user.uid);
           }
         } catch (err: any) {
-          // Squelch domain mismatch errors in development/preview environments
-          if (err.message?.includes('Can only be used on') || err.message?.includes('initialized')) {
-            console.warn("OneSignal Initialization skipped/failed (expected in dev):", err.message);
+          const msg = err.message || String(err);
+          // Squelch common environment mismatch errors
+          if (msg.includes('Can only be used on') || msg.includes('initialized') || msg.includes('Permission has already been requested')) {
+            console.warn("OneSignal (Dev/Env Mode): " + msg);
           } else {
-            console.error("OneSignal Initialization Error:", err);
+            console.error("OneSignal Initialization Critical Error:", err);
           }
         }
       }
@@ -404,7 +405,7 @@ export default function App() {
 
   useEffect(() => {
     if (!user) {
-      if ((OneSignal as any).initialized) {
+      if ((OneSignal as any).initialized || !!OneSignal.Notifications) {
         OneSignal.logout();
       }
       return;
