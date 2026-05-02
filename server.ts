@@ -37,10 +37,8 @@ async function startServer() {
   
   console.log(`[Firebase Admin] SDK Active. Project: ${projectToUse}, Database: ${dbId}`);
 
-  // Diagnostic: OneSignal Config
-  const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID;
-  const ONESIGNAL_REST_KEY = process.env.ONESIGNAL_REST_API_KEY;
-  console.log(`[OneSignal] Configuration Check: AppID: ${ONESIGNAL_APP_ID ? 'SET' : 'MISSING'}, RestKey: ${ONESIGNAL_REST_KEY ? 'SET' : 'MISSING'}`);
+  // Diagnostic: FCM Check
+  console.log(`[Firebase Cloud Messaging] Node Active. Built-in push delivery online.`);
 
   const app = express();
   const PORT = 3000;
@@ -317,57 +315,60 @@ async function startServer() {
     }
   });
 
-  // OneSignal Push Notification Endpoint
+  // Firebase Cloud Messaging Push Notification Endpoint
   app.post("/api/notify/push", verifyAuth, async (req, res) => {
-    const { title, message, segment, externalIds, url, icon, data } = req.body;
-
-    const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID;
-    const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
-
-    if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
-      console.warn("[OneSignal] configuration missing");
-      return res.status(503).json({ error: "OneSignal not configured" });
-    }
+    const { title, message, url, data, userId } = req.body;
 
     try {
-      const response = await fetch("https://onesignal.com/api/v1/notifications", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
-        },
-        body: JSON.stringify({
-          app_id: ONESIGNAL_APP_ID,
-          headings: { en: title },
-          contents: { en: message },
-          included_segments: segment ? [segment] : undefined,
-          include_external_user_ids: externalIds,
-          url: url || undefined,
-          chrome_web_icon: icon || undefined,
-          large_icon: icon || undefined,
-          adm_large_icon: icon || undefined,
-          data: data || undefined,
-          android_group: "ngo_messages",
-          thread_id: "ngo_messages"
-        })
-      });
+      let targetTokens: string[] = [];
 
-      const responseData = await response.json();
+      if (userId) {
+        // Target specific user
+        const userDoc = await db.collection("users").doc(userId).get();
+        const fcmToken = userDoc.data()?.fcmToken;
+        if (fcmToken) targetTokens.push(fcmToken);
+      } else {
+        // Broadcast to all active users with tokens
+        const usersSnapshot = await db.collection("users").where("fcmToken", "!=", null).get();
+        targetTokens = usersSnapshot.docs.map(doc => doc.data().fcmToken);
+      }
+
+      if (targetTokens.length === 0) {
+        return res.status(404).json({ error: "No target tokens found for push notification" });
+      }
+
+      const messagePayload = {
+        notification: {
+          title,
+          body: message,
+        },
+        data: {
+          ...data,
+          url: url || '',
+        },
+        tokens: targetTokens,
+      };
+
+      const response = await admin.messaging().sendEachForMulticast(messagePayload);
       
       // Log to automation_logs safely
       await logAutomationEvent({
-        action: 'Push Notification',
+        action: 'FCM Push Notification',
         title,
         message,
-        recipient: segment || (externalIds ? `External IDs: ${externalIds.length}` : 'Unknown'),
-        status: response.ok ? 'success' : 'error',
-        onesignalData: responseData || null,
-        details: `OneSignal signal transmitted: ${message}`
+        recipient: userId || `Broadcasting: ${targetTokens.length} users`,
+        status: response.failureCount === 0 ? 'success' : 'partial_success',
+        fcmResponse: response,
+        details: `Signals transmitted via FCM: ${message}`
       });
 
-      res.status(response.status).json(responseData);
+      res.status(200).json({ 
+        success: true, 
+        successCount: response.successCount, 
+        failureCount: response.failureCount 
+      });
     } catch (error: any) {
-      console.error("[OneSignal Error]:", error);
+      console.error("[FCM Error]:", error);
       res.status(500).json({ error: error.message });
     }
   });

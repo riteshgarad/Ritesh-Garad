@@ -70,7 +70,7 @@ import { sendPushNotification } from './lib/push';
 import { ChatView } from './components/ChatView';
 import { CalendarView } from './components/schedule/CalendarView';
 import { handleFirestoreError, OperationType } from './lib/firestore_errors';
-import OneSignal from 'react-onesignal';
+import { requestFirebaseNotificationPermission, onMessageListener } from './services/notificationService';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { 
@@ -283,61 +283,12 @@ export default function App() {
     };
   }, []);
 
-  const [notifPermission, setNotifPermission] = useState<string>('default');
-
-  const initOneSignal = async () => {
-    const env = (import.meta as any).env;
-    const appId = env.VITE_ONESIGNAL_APP_ID;
-    if (appId) {
-      try {
-        if ((OneSignal as any).initialized) {
-          console.log("OneSignal Boot: Already initialized");
-          if (user) OneSignal.login(user.uid);
-          setNotifPermission((OneSignal.Notifications as any).permission ? 'granted' : 'default');
-          return;
-        }
-
-        await OneSignal.init({
-          appId: appId,
-          allowLocalhostAsSecureOrigin: true,
-          serviceWorkerParam: { scope: '/' },
-          serviceWorkerPath: 'OneSignalSDKWorker.js',
-          notifyButton: {
-            enable: true,
-            position: 'bottom-right',
-            size: 'medium',
-            displayPredicate: () => true,
-            showCredit: false,
-            prenotify: true,
-          } as any,
-        });
-        
-        if ((OneSignal as any).Debug) {
-          (OneSignal as any).Debug.setLogLevel('debug');
-        }
-        
-        console.log("OneSignal Initialized Successfully");
-        const perm = (OneSignal.Notifications as any).permission;
-        setNotifPermission(perm ? 'granted' : 'default');
-        
-        if (user) {
-          OneSignal.login(user.uid);
-        }
-      } catch (err: any) {
-        const msg = err.message || String(err);
-        if (msg.includes('Can only be used on') || msg.includes('initialized') || msg.includes('Permission has already been requested')) {
-          console.warn("OneSignal (Env Compatibility Mode):", msg);
-        } else {
-          console.error("OneSignal Initialization Critical Error:", err);
-        }
-      }
-    } else {
-      console.warn("OneSignal Initialization Skipped: VITE_ONESIGNAL_APP_ID is not defined.");
-    }
-  };
+  const [notifPermission, setNotifPermission] = useState<string>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  );
 
   const requestNotificationPermission = async () => {
-    console.log("Action: requestNotificationPermission initiated");
+    console.log("Action: requestNotificationPermission initiated (FCM Alternative)");
     
     if (window.self !== window.top) {
       if (confirm("Notification prompts are blocked within previews. Open in a New Tab to enable?")) {
@@ -346,112 +297,63 @@ export default function App() {
       return;
     }
 
-    const tId = toast.loading("Checking comms status...", { duration: 15000 });
+    const tId = toast.loading("Connecting to Firebase Cloud Messaging...", { duration: 15000 });
     
     try {
-      const os = OneSignal as any;
+      const token = await requestFirebaseNotificationPermission();
       
-      // 1. Check for Median (GoNative) Bridge
-      const isMedian = (window as any).median || (window as any).gonative;
-      if (isMedian) {
-        console.log("Median detected. Initializing native push registration.");
-        toast.loading("Invoking Native Signal Bridge...", { id: tId });
-        
-        try {
-          if ((window as any).median?.onesignal?.register) {
-            await (window as any).median.onesignal.register();
-          } else {
-            window.location.href = "gonative://onesignal/register";
-          }
-          
-          setTimeout(() => {
-            toast.success("Native Link Active", { id: tId });
-            setNotifPermission('granted');
-          }, 2000);
-          return;
-        } catch (me) {
-          console.error("Median registration failed:", me);
-        }
-      }
-
-      // 2. Web initialization ensure
-      if (!os.initialized && !os.Notifications) {
-        toast.loading("Synthesizing Comms Bridge...", { id: tId });
-        await initOneSignal();
-      }
-
-      const permission = os.Notifications?.permission;
-      const nativePermission = os.Notifications?.permissionNative;
-
-      console.log("Comms Debug:", { permission, nativePermission });
-
-      if (nativePermission === 'denied') {
-        toast.error("Blocked by Browser", { id: tId });
-        alert("Mission Alerts are blocked in your browser site settings. Toggle the 'Lock' icon in the URL bar to allow notifications.");
-        return;
-      }
-
-      if (permission === true || permission === 'granted') {
-        toast.success("Comms Link Already Secure", { id: tId });
+      if (token) {
         setNotifPermission('granted');
-        return;
-      }
-
-      // 3. Deployment of Authorization Interface
-      toast.loading("Deploying Authorization Prompt...", { id: tId });
-      
-      // We use a timer to ensure the UI doesn't hang if the browser blocks the prompt silently
-      const promptTimeout = setTimeout(() => {
-        toast.dismiss(tId);
-        alert("The authorization prompt seems blocked. Please check if your browser blocked a popup or look for a bell icon 🔔 at the bottom of the screen.");
-      }, 8000);
-
-      try {
-        console.log("Executing OS Permission Request...");
-        // In modern OneSignal (v16), requestPermission() is the most reliable entry point for user-triggered prompts
-        const result = await os.Notifications.requestPermission();
-        clearTimeout(promptTimeout);
-        toast.dismiss(tId);
-
-        console.log("OS Prompt Result:", result);
+        toast.success("Signals Online via FCM!", { id: tId });
+        alert("Mission-critical alerts activated! (Standard Web Push)");
         
-        if (os.Notifications.permission) {
-          setNotifPermission('granted');
-          toast.success("Signals Authorized!");
-          alert("Authorization Successful! You'll now receive mission critical alerts.");
-        } else {
-          // If native prompt failed/was ignored, try the Slidedown fallback
-          console.log("Native prompt did not resolve, attempting Slidedown...");
-          if (os.Slidedown?.prompt) {
-             await os.Slidedown.prompt({ type: 'push' });
-          } else if (os.showSlidedownPrompt) {
-             await os.showSlidedownPrompt();
+        // Sync token to user profile if logged in
+        if (user) {
+          try {
+            const userRef = doc(db, 'users', user.uid);
+            await setDoc(userRef, { 
+              fcmToken: token,
+              lastTokenSync: serverTimestamp() 
+            }, { merge: true });
+          } catch (syncErr) {
+            console.error("Failed to sync FCM token to database:", syncErr);
           }
         }
-      } catch (promptErr) {
-        clearTimeout(promptTimeout);
-        toast.dismiss(tId);
-        console.error("Prompt Error:", promptErr);
-        // Fallback to Slidedown if one is available
-        if (os.Slidedown?.prompt) await os.Slidedown.prompt({ type: 'push' });
+      } else {
+        const currentPerm = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+        setNotifPermission(currentPerm);
+        
+        if (currentPerm === 'denied') {
+          toast.error("Access Refused by Browser", { id: tId });
+          alert("Notifications are blocked in your site settings. Please click the Lock icon in your address bar and reset permissions.");
+        } else {
+          toast.error("Authorization Session Cancelled", { id: tId });
+        }
       }
     } catch (err: any) {
-      toast.dismiss(tId);
-      console.error("Comms Link Error:", err);
-      toast.error("Authorization Error: " + (err.message || "Unknown"));
+      console.error("FCM Authorization Critical Failure:", err);
+      toast.error("Comms Link Error: " + (err.message || "Unknown"), { id: tId });
     }
   };
 
   useEffect(() => {
-    const env = (import.meta as any).env;
-    console.log("Environment Diagnostics:", {
-      hasAppId: !!env.VITE_ONESIGNAL_APP_ID,
-      appIdPrefix: env.VITE_ONESIGNAL_APP_ID ? env.VITE_ONESIGNAL_APP_ID.slice(0, 4) : 'none',
-      hostname: window.location.hostname,
-      protocol: window.location.protocol
-    });
+    if (user) {
+      // Setup listener for foreground messages
+      onMessageListener().then((payload: any) => {
+        console.log("Foreground message received:", payload);
+        toast.success(`${payload.notification.title}: ${payload.notification.body}`, {
+          icon: '🔔',
+          duration: 6000
+        });
+      }).catch(err => console.log('failed: ', err));
+    }
+  }, [user]);
 
-    initOneSignal();
+  useEffect(() => {
+    // Standard permission check
+    if (typeof Notification !== 'undefined') {
+      setNotifPermission(Notification.permission);
+    }
   }, [user?.uid]);
 
   // Handle Deep Linking from Notifications
@@ -465,9 +367,7 @@ export default function App() {
 
   useEffect(() => {
     if (!user) {
-      if ((OneSignal as any).initialized || !!OneSignal.Notifications) {
-        OneSignal.logout();
-      }
+      // Notifications are handled by browser permission in this mode
       return;
     }
 
@@ -1384,18 +1284,16 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      if ((OneSignal as any).initialized) {
-        await OneSignal.logout();
-      }
+      // Notification logout handled by clearing session
+      await signOut(auth);
+      setUser(null);
+      setLoginEmail('');
+      setLoginPass('');
+      setSidebarOpen(true);
+      setCurrentPage('dashboard');
     } catch (err) {
-      console.warn("OneSignal logout failed:", err);
+      console.error("Logout failed:", err);
     }
-    await signOut(auth);
-    setUser(null);
-    setLoginEmail('');
-    setLoginPass('');
-    setSidebarOpen(true);
-    setCurrentPage('dashboard');
   };
 
   // --- Navigation ---
