@@ -287,70 +287,63 @@ export default function App() {
 
   const requestNotificationPermission = async () => {
     console.log("Button Clicked: requestNotificationPermission");
-    alert("System check: Initiating secure comms link... If nothing follows, please open in a NEW TAB.");
-    
-    toast.loading("Testing comms link...", { id: 'push-perm' });
     
     // Check for Iframe - Browsers block notification requests in iframes
     const isInIframe = window.self !== window.top;
     if (isInIframe) {
-      toast.dismiss('push-perm');
-      const confirmOpen = confirm("Notification requests are blocked inside this preview. Click OK to open in a New Tab where you can activate signals.");
+      const confirmOpen = confirm("Notification prompts are blocked within previews. To enable alerts, we need to open the app in a new tab. Proceed?");
       if (confirmOpen) {
         window.open(window.location.href, '_blank');
-        return;
       }
+      return;
     }
 
+    toast.loading("Contacting secure comms node...", { id: 'push-perm', duration: 8000 });
+    
     const isOneSignalReady = (OneSignal as any).initialized || !!(OneSignal as any).Notifications;
     console.log("OneSignal Ready status:", isOneSignalReady);
 
-    try {
-      if (isOneSignalReady) {
-        if (OneSignal.Notifications.permissionNative === 'denied') {
-          toast.error("Notifications are blocked in your browser settings.", { id: 'push-perm' });
-          alert("Notifications are permanently blocked in your browser for this site. Please reset site permissions in your browser settings.");
-          return;
-        }
+    if (!isOneSignalReady) {
+      toast.error("Comms system initializing. Please wait 5 seconds.", { id: 'push-perm' });
+      return;
+    }
 
-        console.log("Triggering OneSignal requestPermission prompt...");
-        await OneSignal.Notifications.requestPermission();
-        
-        // Secondary attempt: Slidedown if native prompt didn't show or was ignored
-        if (!OneSignal.Notifications.permission) {
-          console.log("Native prompt did not resolve, trying Slidedown...");
-          try {
-            await (OneSignal as any).Slidedown.prompt({ type: 'push' });
-          } catch (se) {
-            console.warn("Slidedown failed:", se);
-          }
-        }
-        
-        const isGranted = (OneSignal.Notifications as any).permission;
-        console.log("Permission Final Result:", isGranted);
-        
-        if (isGranted) {
-          setNotifPermission('granted');
-          toast.success("Signals Activated!", { id: 'push-perm' });
-          alert("Signals Activated! You will now receive mission-critical notifications even if the app is closed.");
-        } else {
-          setNotifPermission('denied');
-          toast.error("Permission not granted", { id: 'push-perm' });
-        }
-      } else {
-        const appId = (import.meta as any).env.VITE_ONESIGNAL_APP_ID;
-        if (!appId) {
-          toast.error("Missing App ID", { id: 'push-perm' });
-          alert("CRITICAL ERROR: VITE_ONESIGNAL_APP_ID is not configured. Push notifications cannot be initialized.");
-        } else {
-          toast.error("Setup still initializing", { id: 'push-perm' });
-          alert("Comms setup is still initializing. Please wait 10 seconds and try again.");
-        }
+    try {
+      if (OneSignal.Notifications.permissionNative === 'denied') {
+        toast.error("Access Denied. Check site settings.", { id: 'push-perm' });
+        alert("Notifications are permanently blocked in your browser for this site. Reset site permissions in your browser address bar.");
+        return;
       }
-    } catch (err) {
-      console.error("Critical failure requesting permission:", err);
-      toast.error("Activation failed", { id: 'push-perm' });
-      alert("Failed to activate signals. Error: " + (err as any).message);
+
+      console.log("Triggering OneSignal prompt...");
+      // Wrap in a promise that rejects after 12s
+      const permResult = await Promise.race([
+        OneSignal.Notifications.requestPermission(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 12000))
+      ]).catch(async (e) => {
+        if (e.message === "TIMEOUT") {
+          console.warn("Permission prompt timed out or ignored.");
+          toast.error("Process timed out. Opening Slidedown fallback...", { id: 'push-perm' });
+          await (OneSignal as any).Slidedown.prompt({ type: 'push' });
+          return (OneSignal.Notifications as any).permission;
+        }
+        throw e;
+      });
+      
+      const isGranted = (OneSignal.Notifications as any).permission;
+      console.log("Permission Result:", isGranted);
+
+      if (isGranted === true || isGranted === 'granted') {
+        setNotifPermission('granted');
+        toast.success("Signals Online!", { id: 'push-perm' });
+        alert("Signals Activated! Mission-critical alerts will now reach your device.");
+      } else {
+        setNotifPermission('denied');
+        toast.error("Authorization not granted.", { id: 'push-perm' });
+      }
+    } catch (err: any) {
+      console.error("Critical failure during signal authorization:", err);
+      toast.error("Comms Link Error: " + (err.message || "Unknown Failure"), { id: 'push-perm' });
     }
   };
 
