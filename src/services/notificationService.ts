@@ -49,11 +49,11 @@ export const requestFirebaseNotificationPermission = async () => {
   }
 };
 
-export const onMessageListener = () =>
-  new Promise((resolve) => {
-    if (messaging) {
-      onMessage(messaging, (payload) => {
-        resolve(payload);
-      });
-    }
-  });
+export const onMessageListener = (callback: (payload: any) => void) => {
+  if (messaging) {
+    return onMessage(messaging, (payload) => {
+      callback(payload);
+    });
+  }
+  return () => {};
+};

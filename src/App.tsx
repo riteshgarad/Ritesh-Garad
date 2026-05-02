@@ -339,13 +339,14 @@ export default function App() {
   useEffect(() => {
     if (user) {
       // Setup listener for foreground messages
-      onMessageListener().then((payload: any) => {
+      const unsubscribe = onMessageListener((payload: any) => {
         console.log("Foreground message received:", payload);
         toast.success(`${payload.notification.title}: ${payload.notification.body}`, {
           icon: '🔔',
           duration: 6000
         });
-      }).catch(err => console.log('failed: ', err));
+      });
+      return () => unsubscribe();
     }
   }, [user]);
 

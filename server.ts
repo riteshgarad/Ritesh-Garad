@@ -317,24 +317,37 @@ async function startServer() {
 
   // Firebase Cloud Messaging Push Notification Endpoint
   app.post("/api/notify/push", verifyAuth, async (req, res) => {
-    const { title, message, url, data, userId } = req.body;
+    const { title, message, url, data, userId, externalIds, segment } = req.body;
 
     try {
       let targetTokens: string[] = [];
+      console.log(`[Push] Targeting request:`, { userId, externalIds, segment, title });
 
-      if (userId) {
-        // Target specific user
-        const userDoc = await db.collection("users").doc(userId).get();
-        const fcmToken = userDoc.data()?.fcmToken;
-        if (fcmToken) targetTokens.push(fcmToken);
-      } else {
-        // Broadcast to all active users with tokens
+      if (userId || (externalIds && externalIds.length > 0)) {
+        // Target specific user(s)
+        const idsToTarget = (externalIds && externalIds.length > 0) ? externalIds : [userId];
+        console.log(`[Push] Resolved IDs:`, idsToTarget);
+        
+        // Fetch tokens for all targeted users
+        const usersSnapshot = await db.collection("users")
+          .where(admin.firestore.FieldPath.documentId(), "in", idsToTarget)
+          .get();
+          
+        targetTokens = usersSnapshot.docs
+          .map(doc => doc.data().fcmToken)
+          .filter(token => !!token);
+          
+        console.log(`[Push] Found ${targetTokens.length} tokens for ${idsToTarget.length} users`);
+      } else if (segment === 'Subscribed Users' || !segment) {
+        // Broadcast to all active users with tokens (or by segment)
         const usersSnapshot = await db.collection("users").where("fcmToken", "!=", null).get();
         targetTokens = usersSnapshot.docs.map(doc => doc.data().fcmToken);
+        console.log(`[Push] Broadcast mode: Found ${targetTokens.length} tokens`);
       }
 
       if (targetTokens.length === 0) {
-        return res.status(404).json({ error: "No target tokens found for push notification" });
+        console.warn(`[Push] No tokens found for notification: ${title}`);
+        return res.status(200).json({ success: false, message: "No target tokens found" });
       }
 
       const messagePayload = {
