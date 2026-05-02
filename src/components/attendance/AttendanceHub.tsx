@@ -29,6 +29,8 @@ export const AttendanceHub: React.FC = () => {
   const [isPunching, setIsPunching] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<'pending' | 'active' | 'denied'>('pending');
 
+  const [selectedSession, setSelectedSession] = useState<Attendance | null>(null);
+
   const { formatted: timerDisplay, elapsed } = useLiveTimer(activeSession?.punchIn);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export const AttendanceHub: React.FC = () => {
 
     setIsPunching(true);
     try {
-      const id = await attendanceService.punchIn(
+      const { id, locationName } = await attendanceService.punchIn(
         user.uid,
         user.displayName || 'Anonymous Volunteer',
         project.id,
@@ -92,15 +94,22 @@ export const AttendanceHub: React.FC = () => {
         userName: user.displayName || 'Anonymous Volunteer',
         projectId: project.id,
         missionName: project.name,
-        location: { lat: 0, lng: 0 }, // Will be updated by server Timestamp but local UI needs something
+        location: { lat: 0, lng: 0 }, 
+        punchInLocationName: locationName,
         punchIn: new Date(),
         status: 'active'
       };
       setActiveSession(newSession);
       setGpsStatus('active');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Punch in error:", err);
-      alert("Failed to access location. Please enable GPS permissions.");
+      if (err.code === 1) { // PERMISSION_DENIED
+        alert("GEOLOCATION DENIED: Please enable location access in your browser settings to punch in.");
+      } else if (err.code === 3) { // TIMEOUT
+        alert("GEOLOCATION TIMEOUT: Could not get a GPS fix. Please ensure you are in an open area.");
+      } else {
+        alert("Failed to access location. Please ensure GPS is active and permissions are granted.");
+      }
     } finally {
       setIsPunching(false);
     }
@@ -118,8 +127,13 @@ export const AttendanceHub: React.FC = () => {
       // Refresh recent sessions
       const recent = await attendanceService.getRecentSessions(activeSession.userId);
       setRecentSessions(recent);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Punch out error:", err);
+      if (err.code === 1) {
+        alert("GEOLOCATION DENIED: Please enable location access to punch out.");
+      } else {
+        alert("Failed to capture location for punch out. Please try again.");
+      }
     } finally {
       setIsPunching(false);
     }
@@ -129,12 +143,133 @@ export const AttendanceHub: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="w-12 h-12 border-4 border-mahogany/10 border-t-mahogany rounded-full animate-spin" />
+        <p className="mt-4 text-[10px] font-black text-mahogany/40 uppercase tracking-widest">Loading Operational Data...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto space-y-8 pb-32">
+    <div className="max-w-md mx-auto space-y-8 pb-32 px-4 md:px-0">
+      {/* Mission Detail Inspection Modal */}
+      <AnimatePresence>
+        {selectedSession && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-mahogany/60 backdrop-blur-md px-4 pb-0 md:pb-4 md:px-0"
+            onClick={() => setSelectedSession(null)}
+          >
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              className="bg-[#FAF7F2] w-full max-w-md rounded-t-[3rem] md:rounded-[3rem] p-10 overflow-hidden shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-mahogany/50 uppercase tracking-[0.2em]">Deployment Log</p>
+                  <h3 className="text-2xl font-black text-mahogany italic uppercase tracking-tighter">Mission Pulse</h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedSession(null)}
+                  className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-400 hover:text-mahogany transition-colors"
+                >
+                  <AlertCircle size={20} className="rotate-45" />
+                </button>
+              </div>
+
+              <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-8">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Operative State</p>
+                  <h4 className="text-xl font-black text-mahogany">{selectedSession.missionName}</h4>
+                  <div className="flex items-center gap-2 text-emerald-600">
+                    <CheckCircle2 size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Mission Certified</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter italic">Entry Pulse</p>
+                      <p className="text-sm font-black text-mahogany">
+                        {selectedSession.punchIn?.toDate ? selectedSession.punchIn.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
+                      </p>
+                      <div className="flex gap-2 text-slate-500">
+                        <MapPin size={10} className="shrink-0 mt-0.5" />
+                        <p className="text-[9px] font-medium leading-tight line-clamp-3">
+                          {selectedSession.punchInLocationName || 'Mission Node'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1 text-right">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter italic">Exit Pulse</p>
+                      <p className="text-sm font-black text-mahogany">
+                        {selectedSession.punchOut?.toDate ? selectedSession.punchOut.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
+                      </p>
+                      <div className="flex gap-2 text-slate-500 justify-end">
+                        <p className="text-[9px] font-medium leading-tight line-clamp-3 text-right">
+                          {selectedSession.punchOutLocationName || 'Mission Node'}
+                        </p>
+                        <MapPin size={10} className="shrink-0 mt-0.5" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-slate-50 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Duration</p>
+                    <div className="flex items-center gap-2">
+                       <Clock size={16} className="text-terracotta" />
+                       <span className="text-2xl font-black text-mahogany tracking-tighter">{selectedSession.durationMinutes} <span className="text-xs uppercase tracking-normal">Minutes</span></span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Deployment Date</p>
+                    <p className="text-[11px] font-black text-mahogany uppercase">
+                      {selectedSession.punchIn?.toDate ? selectedSession.punchIn.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Today'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setSelectedSession(null)}
+                className="w-full mt-8 py-5 bg-mahogany text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-mahogany/20 active:scale-95 transition-all"
+              >
+                Close Operational Record
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Notifications / Overlay */}
+      <AnimatePresence>
+        {isPunching && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-mahogany/20 backdrop-blur-sm px-6"
+          >
+            <div className="bg-white p-8 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 text-center">
+              <div className="w-16 h-16 border-4 border-terracotta/10 border-t-terracotta rounded-full animate-spin" />
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-mahogany uppercase tracking-tight">Fetching Location</h3>
+                <p className="text-xs text-slate-500 font-medium">Synchronizing GPS coordinates for mission integrity...</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="text-center space-y-1">
         <p className="text-[10px] font-black text-mahogany/40 uppercase tracking-[0.3em]">Garv Manusakicha</p>
@@ -150,7 +285,7 @@ export const AttendanceHub: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "p-6 rounded-[2.5rem] border transition-all duration-500",
+          "p-6 rounded-[2.5rem] border transition-all duration-500 text-left",
           activeSession 
             ? "bg-emerald-50 border-emerald-100 shadow-xl shadow-emerald-500/10" 
             : "bg-white border-slate-100 shadow-xl shadow-slate-200/50"
@@ -175,15 +310,30 @@ export const AttendanceHub: React.FC = () => {
           )}>
             <Navigation size={10} className={gpsStatus === 'active' ? "animate-pulse" : ""} />
             <span className="text-[8px] font-black uppercase tracking-widest">
-              GPS {gpsStatus === 'active' ? "Signal Verified" : "Required"}
+              GPS {gpsStatus === 'active' ? "Active" : "Disabled"}
             </span>
           </div>
         </div>
         
         {activeSession ? (
-          <div className="space-y-1">
-            <h2 className="text-2xl font-black text-emerald-900 line-clamp-1">{activeSession.missionName}</h2>
-            <p className="text-xs text-emerald-600 font-bold opacity-70">Stationed @ Mission Hub</p>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-black text-emerald-900 line-clamp-1">{activeSession.missionName}</h2>
+              <div className="flex items-center gap-2 text-emerald-600/70">
+                <MapPin size={12} />
+                <p className="text-[10px] font-bold uppercase truncate max-w-[200px]">
+                  {activeSession.punchInLocationName || 'Mission Hub'}
+                </p>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-emerald-200/40 flex justify-between items-end">
+              <div>
+                <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">PUNCHED IN AT</p>
+                <p className="text-xs font-black text-emerald-900">
+                  {activeSession.punchIn?.toDate ? activeSession.punchIn.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-1">
@@ -195,8 +345,8 @@ export const AttendanceHub: React.FC = () => {
 
       {/* Mission Selector (Only if off-duty) */}
       {!activeSession && (
-        <div className="space-y-4">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Select Operations Node</label>
+        <div className="space-y-4 text-left">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Operations Node</label>
           <div className="relative">
             <select 
               value={selectedProjectId}
@@ -233,8 +383,8 @@ export const AttendanceHub: React.FC = () => {
             className={cn(
               "w-56 h-56 rounded-full flex flex-col items-center justify-center gap-3 shadow-2xl transition-all duration-500 relative z-10 disabled:opacity-50 disabled:grayscale",
               activeSession 
-                ? "bg-gradient-to-br from-mahogany to-slate-900 text-white shadow-mahogany/30 ring-8 ring-mahogany/10" 
-                : "bg-gradient-to-br from-terracotta to-[#8B2E15] text-white shadow-terracotta/30 ring-8 ring-terracotta/10"
+                ? "bg-gradient-to-br from-mahogany to-slate-900 text-white shadow-mahogany/30 ring-8 ring-mahogany/10 border-4 border-white/20" 
+                : "bg-gradient-to-br from-terracotta to-[#8B2E15] text-white shadow-terracotta/30 ring-8 ring-terracotta/10 border-4 border-white/20"
             )}
           >
             {isPunching ? (
@@ -275,31 +425,57 @@ export const AttendanceHub: React.FC = () => {
       {/* Recent History */}
       <div className="space-y-6">
         <div className="flex items-center justify-between px-4">
-          <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Recent Sessions</h3>
+          <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Operational Deployment Logs</h3>
           <History size={16} className="text-slate-300" />
         </div>
         
-        <div className="space-y-4 px-2">
+        <div className="space-y-4 px-0">
           {recentSessions.length > 0 ? (
             recentSessions.map((session) => (
               <motion.div 
                 key={session.id}
-                className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setSelectedSession(session)}
+                className="bg-white p-5 rounded-[2.5rem] border border-slate-100 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow text-left cursor-pointer active:bg-slate-50"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400">
-                    <CheckCircle2 size={24} className="text-emerald-500" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400">
+                      <CheckCircle2 size={24} className="text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-mahogany uppercase tracking-tight line-clamp-1">{session.missionName}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">
+                        {session.punchIn?.toDate ? new Date(session.punchIn.toDate()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Today'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <p className="text-sm font-black text-mahogany uppercase tracking-tight line-clamp-1">{session.missionName}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">
-                      {session.punchIn?.toDate ? new Date(session.punchIn.toDate()).toLocaleDateString() : 'Today'}
-                    </p>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-mahogany">{session.durationMinutes} min</p>
+                    <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md">Completed</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-black text-mahogany">{session.durationMinutes} min</p>
-                  <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md">Log Synced</p>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">In: {session.punchIn?.toDate ? new Date(session.punchIn.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</p>
+                    <div className="flex items-start gap-1.5">
+                      <MapPin size={8} className="text-slate-300 mt-0.5 shrink-0" />
+                      <p className="text-[9px] font-medium text-slate-500 line-clamp-2 leading-tight">
+                        {session.punchInLocationName || 'Coordinates Recorded'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Out: {session.punchOut?.toDate ? new Date(session.punchOut.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</p>
+                    <div className="flex items-start gap-1.5 justify-end">
+                      <p className="text-[9px] font-medium text-slate-500 line-clamp-2 leading-tight text-right">
+                        {session.punchOutLocationName || 'Coordinates Recorded'}
+                      </p>
+                      <MapPin size={8} className="text-slate-300 mt-0.5 shrink-0" />
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             ))

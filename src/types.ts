@@ -303,8 +303,14 @@ export interface Attendance {
     lat: number;
     lng: number;
   };
+  punchInLocationName?: string;
   punchIn: any;
   punchOut?: any;
+  punchOutLocation?: {
+    lat: number;
+    lng: number;
+  };
+  punchOutLocationName?: string;
   status: 'active' | 'completed';
   durationMinutes?: number;
 }

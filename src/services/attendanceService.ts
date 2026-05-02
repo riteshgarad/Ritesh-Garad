@@ -12,7 +12,7 @@ import {
   increment,
   Timestamp
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { Attendance } from '../types';
 
 enum OperationType {
@@ -37,8 +37,26 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  let errorMessage = String(error);
+  
+  if (error instanceof Error) {
+    errorMessage = error.message;
+  } else if (typeof error === 'object' && error !== null) {
+    // Handle GeolocationPositionError which doesn't stringify well
+    const geoError = error as any;
+    if (geoError.code !== undefined && geoError.message !== undefined) {
+      errorMessage = `GeoError(${geoError.code}): ${geoError.message}`;
+    } else {
+      try {
+        errorMessage = JSON.stringify(error);
+      } catch (e) {
+        errorMessage = "Complex Error Object";
+      }
+    }
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -53,32 +71,77 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export const attendanceService = {
-  async punchIn(userId: string, userName: string, projectId: string, missionName: string): Promise<string> {
+  async punchIn(userId: string, userName: string, projectId: string, missionName: string): Promise<{ id: string, locationName: string }> {
     try {
       // Get Geolocation
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
+      let lat = 0;
+      let lng = 0;
+      let locationName = "Geofencing Pulse...";
+
+      try {
+        const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, options);
         });
-      });
+
+        let position: GeolocationPosition;
+        try {
+          // Try high accuracy first
+          position = await getPos({
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          });
+        } catch (e) {
+          // Fallback to low accuracy
+          console.warn("High accuracy failed, falling back to low accuracy", e);
+          position = await getPos({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 60000
+          });
+        }
+        
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
+
+        // Reverse Geocode
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+            headers: {
+              'Accept-Language': 'en-US,en;q=0.9'
+            }
+          });
+          const data = await response.json();
+          // Extract a readable portion of the address
+          const address = data.address;
+          const display = [
+            address?.road || address?.pedestrian || address?.suburb,
+            address?.city || address?.town || address?.village
+          ].filter(Boolean).join(', ') || data.display_name;
+          
+          locationName = display || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        } catch (e) {
+          console.warn("Geocoding failed", e);
+          locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        }
+      } catch (geoErr) {
+        console.error("Punch-in location failed significantly", geoErr);
+        locationName = "Location Signal Lost";
+      }
 
       const attendanceData = {
         userId,
         userName,
         projectId,
         missionName,
-        location: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        },
+        location: { lat, lng },
+        punchInLocationName: locationName,
         punchIn: serverTimestamp(),
         status: 'active' as const,
       };
 
       const docRef = await addDoc(collection(db, 'attendance'), attendanceData);
-      return docRef.id;
+      return { id: docRef.id, locationName };
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'attendance');
       throw error;
@@ -87,9 +150,63 @@ export const attendanceService = {
 
   async punchOut(attendanceId: string, userId: string, durationMinutes: number): Promise<void> {
     try {
+      // Get current position for punch out - make it non-blocking
+      let lat = 0;
+      let lng = 0;
+      let locationName = "Geofencing Pulse...";
+
+      try {
+        const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        });
+
+        let position: GeolocationPosition;
+        try {
+          position = await getPos({
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          });
+        } catch (e) {
+          console.warn("High accuracy punch-out failed, falling back", e);
+          position = await getPos({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 60000
+          });
+        }
+        
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
+
+        // Reverse Geocode
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+            headers: {
+              'Accept-Language': 'en-US,en;q=0.9'
+            }
+          });
+          const data = await response.json();
+          const address = data.address;
+          const display = [
+            address?.road || address?.pedestrian || address?.suburb,
+            address?.city || address?.town || address?.village
+          ].filter(Boolean).join(', ') || data.display_name;
+          
+          locationName = display || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        } catch (e) {
+          locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        }
+      } catch (geoErr) {
+        console.warn("Punch-out location failed significantly", geoErr);
+        locationName = "Location Signal Lost";
+      }
+
       const attendanceRef = doc(db, 'attendance', attendanceId);
       await updateDoc(attendanceRef, {
         punchOut: serverTimestamp(),
+        punchOutLocation: { lat, lng },
+        punchOutLocationName: locationName,
         status: 'completed' as const,
         durationMinutes
       });
