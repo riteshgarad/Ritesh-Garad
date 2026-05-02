@@ -17,34 +17,40 @@ try {
 
 export const requestFirebaseNotificationPermission = async () => {
   if (!messaging) {
-    console.warn("Messaging not initialized");
+    console.warn("Messaging not initialized - possible environment restriction or missing service worker");
     return null;
   }
 
   try {
+    const vapidKey = (import.meta as any).env.VITE_FIREBASE_VAPID_KEY;
+    console.log("FCM Debug: VAPID Key presence:", !!vapidKey);
+    
     const permission = await Notification.requestPermission();
+    console.log("FCM Debug: Permission request result:", permission);
+
     if (permission === 'granted') {
-      // You must provide your own VAPID key here from Firebase Console
-      // Settings -> Cloud Messaging -> Web Push certificates
-      const vapidKey = (import.meta as any).env.VITE_FIREBASE_VAPID_KEY;
+      if (!vapidKey) {
+        console.error("FCM Error: VITE_FIREBASE_VAPID_KEY is missing in environment variables.");
+        return null;
+      }
       
       const token = await getToken(messaging, { 
-        vapidKey: vapidKey || undefined 
+        vapidKey: vapidKey
       });
       
       if (token) {
-        console.log("FCM Token:", token);
+        console.log("FCM Success: Token acquired");
         return token;
       } else {
-        console.warn("No registration token available. Request permission to generate one.");
+        console.warn("FCM Warning: No registration token available.");
         return null;
       }
     } else {
-      console.warn("Notification permission denied");
+      console.warn("FCM Warning: Notification permission denied by user.");
       return null;
     }
   } catch (err) {
-    console.error("An error occurred while retrieving token:", err);
+    console.error("FCM Error during token retrieval:", err);
     return null;
   }
 };

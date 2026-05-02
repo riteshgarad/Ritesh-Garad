@@ -364,14 +364,26 @@ async function startServer() {
 
       const response = await admin.messaging().sendEachForMulticast(messagePayload);
       
+      console.log(`[Push] Result: Success=${response.successCount}, Failure=${response.failureCount}`);
+      if (response.failureCount > 0) {
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            console.warn(`[Push] Token index ${idx} failed:`, resp.error);
+          }
+        });
+      }
+      
       // Log to automation_logs safely
       await logAutomationEvent({
         action: 'FCM Push Notification',
         title,
         message,
-        recipient: userId || `Broadcasting: ${targetTokens.length} users`,
-        status: response.failureCount === 0 ? 'success' : 'partial_success',
-        fcmResponse: response,
+        recipient: userId || (externalIds ? `External IDs: ${externalIds.length}` : 'Broadcast'),
+        status: response.failureCount === 0 ? 'success' : (response.successCount > 0 ? 'partial' : 'failed'),
+        fcmResponse: {
+          successCount: response.successCount,
+          failureCount: response.failureCount
+        },
         details: `Signals transmitted via FCM: ${message}`
       });
 

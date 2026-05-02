@@ -83,29 +83,33 @@ export const attendanceService = {
           reject(new Error("Geolocation not supported"));
           return;
         }
-        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        // Set a hard timeout for the internal implementation as well
+        const timer = setTimeout(() => reject(new Error("Internal Timeout")), options.timeout || 5000);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { clearTimeout(timer); resolve(pos); },
+          (err) => { clearTimeout(timer); reject(err); },
+          options
+        );
       });
 
       let position: GeolocationPosition | null = null;
       try {
-        // Try high accuracy first
+        // Try high accuracy briefly
         position = await getPos({
           enableHighAccuracy: true,
-          timeout: 15000, 
-          maximumAge: 0
+          timeout: 4000, 
+          maximumAge: 10000
         });
       } catch (err: any) {
-        // Fallback to low accuracy / cached
-        console.warn("High accuracy failed, attempting fallback", err);
+        console.warn("High accuracy GPS missed, trying quick fallback", err);
         try {
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 10000,
-            maximumAge: 300000 
+            timeout: 3000,
+            maximumAge: 600000 
           });
         } catch (fallbackErr: any) {
-          console.warn("Location fallback failed or denied:", fallbackErr);
-          // If denied or timed out, we don't throw, we just proceed with 0,0
+          console.warn("GPS sync failed, proceeding with offline coordinates", fallbackErr);
           position = null;
         }
       }
