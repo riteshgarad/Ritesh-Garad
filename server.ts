@@ -37,6 +37,11 @@ async function startServer() {
   
   console.log(`[Firebase Admin] SDK Active. Project: ${projectToUse}, Database: ${dbId}`);
 
+  // Diagnostic: OneSignal Config
+  const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID;
+  const ONESIGNAL_REST_KEY = process.env.ONESIGNAL_REST_API_KEY;
+  console.log(`[OneSignal] Configuration Check: AppID: ${ONESIGNAL_APP_ID ? 'SET' : 'MISSING'}, RestKey: ${ONESIGNAL_REST_KEY ? 'SET' : 'MISSING'}`);
+
   const app = express();
   const PORT = 3000;
 
