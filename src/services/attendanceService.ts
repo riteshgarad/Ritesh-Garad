@@ -81,13 +81,15 @@ export const attendanceService = {
 
       const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) {
-          reject(new Error("Geolocation not supported"));
+          reject({ code: 0, message: "Geolocation not supported" });
           return;
         }
-        // Increased safety timeout significantly for Native Apps to allow for OS permission prompts
+        
+        // Increased safety timeout significantly for Native Apps 
+        // 60s total buffer for native permission interactions
         const baseTimeout = options.timeout || 5000;
-        const nativeBuffer = isNativeApp() ? 40000 : 2000; // 40s extra for native prompts
-        const timer = setTimeout(() => reject(new Error("Internal Timeout")), baseTimeout + nativeBuffer);
+        const nativeBuffer = isNativeApp() ? 55000 : 5000; 
+        const timer = setTimeout(() => reject({ code: 3, message: "Internal Timeout" }), baseTimeout + nativeBuffer);
         
         navigator.geolocation.getCurrentPosition(
           (pos) => { clearTimeout(timer); resolve(pos); },
@@ -97,27 +99,48 @@ export const attendanceService = {
       });
 
       let position: GeolocationPosition | null = null;
-      const nativeMult = isNativeApp() ? 2.5 : 1;
+      const nativeMult = isNativeApp() ? 3 : 1;
 
       try {
-        // Preference for high accuracy mission data - increased timeout for native bridges
-        position = await getPos({
-          enableHighAccuracy: true,
-          timeout: 20000 * nativeMult, 
-          maximumAge: 0
-        });
-      } catch (err: any) {
-        console.warn("High accuracy GPS failed, trying fallback...", err);
+        // STEP 1: Try a rapid cached check (within 10 mins). Often instant on phones.
         try {
-          // Standard accuracy fallback - increased timeout
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 15000 * nativeMult,
-            maximumAge: 60000 
+            timeout: 2000,
+            maximumAge: 600000 // 10 minutes
+          });
+          console.log("GPS: Rapid cached sync successful");
+        } catch (e) {
+          console.warn("GPS: Rapid cache missed, initiating deep search");
+        }
+
+        // STEP 2: If no cache, try high accuracy mission data
+        if (!position) {
+          position = await getPos({
+            enableHighAccuracy: true,
+            timeout: 25000 * nativeMult, 
+            maximumAge: 10000 // Allow 10s age for stability
+          });
+        }
+      } catch (err: any) {
+        console.warn("High accuracy GPS failed, trying last ditch fallback...", err);
+        
+        // Check for permanent refusal
+        if (err.code === 1) { // PERMISSION_DENIED
+          throw new Error("LOCATION_PERM_DENIED");
+        }
+
+        try {
+          // STEP 3: Standard accuracy fallback - long timeout
+          position = await getPos({
+            enableHighAccuracy: false,
+            timeout: 20000 * nativeMult,
+            maximumAge: 300000 // 5 mins
           });
         } catch (fallbackErr: any) {
           console.error("GPS capture failed completely:", fallbackErr);
-          // If denied or timed out, position remains null
+          if (fallbackErr.code === 1) throw new Error("LOCATION_PERM_DENIED");
+          // If pure timeout (code 3), we proceed with null to allow punch-in but mark as fallback
         }
       }
       
@@ -186,12 +209,12 @@ export const attendanceService = {
 
       const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) {
-          reject(new Error("Geolocation not supported"));
+          reject({ code: 0, message: "Geolocation not supported" });
           return;
         }
         const baseTimeout = options.timeout || 5000;
-        const nativeBuffer = isNativeApp() ? 30000 : 2000;
-        const timer = setTimeout(() => reject(new Error("Internal Timeout")), baseTimeout + nativeBuffer);
+        const nativeBuffer = isNativeApp() ? 40000 : 5000;
+        const timer = setTimeout(() => reject({ code: 3, message: "Internal Timeout" }), baseTimeout + nativeBuffer);
         
         navigator.geolocation.getCurrentPosition(
           (pos) => { clearTimeout(timer); resolve(pos); },
@@ -202,22 +225,26 @@ export const attendanceService = {
 
       try {
         let position: GeolocationPosition | null = null;
-        const nativeMult = isNativeApp() ? 2 : 1;
+        const nativeMult = isNativeApp() ? 2.5 : 1;
         
         try {
-          // Attempt high accuracy wait
-          position = await getPos({
-            enableHighAccuracy: true,
-            timeout: 15000 * nativeMult,
-            maximumAge: 0
-          });
-        } catch (e) {
-          // Standard fallback
+          // STEP 1: Quick check for existing lock
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 10000 * nativeMult,
-            maximumAge: 60000
+            timeout: 2000,
+            maximumAge: 300000 // 5 mins
           });
+        } catch (e) {
+          try {
+            // STEP 2: Attempt standard accuracy
+            position = await getPos({
+              enableHighAccuracy: true,
+              timeout: 15000 * nativeMult,
+              maximumAge: 10000
+            });
+          } catch (deepErr) {
+            console.warn("Deep GPS search failed for punch-out", deepErr);
+          }
         }
         
         if (position) {

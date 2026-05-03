@@ -111,7 +111,12 @@ export const AttendanceHub: React.FC = () => {
       toast.success("Mission Active");
     } catch (err: any) {
       console.error("Punch in error:", err);
-      toast.error("Deployment failed. Re-sync needed.");
+      if (err.message === 'LOCATION_PERM_DENIED') {
+        alert("CRITICAL: Location Access REFUSED. To log missions, go to Phone Settings > App Management > Mission App > Permissions and enable 'Location' (Allow While Using App).");
+        toast.error("Location Required");
+      } else {
+        toast.error("Deployment failed. Re-sync needed.");
+      }
     } finally {
       setIsPunching(false);
     }
@@ -137,7 +142,12 @@ export const AttendanceHub: React.FC = () => {
       toast.success("Mission Logged");
     } catch (err: any) {
       console.error("Punch out error:", err);
-      toast.error("Log upload failed.");
+      if (err.message === 'LOCATION_PERM_DENIED') {
+        alert("CRITICAL: Location Access REFUSED. Go to Phone Settings > Mission App > Permissions and enable 'Location' to secure your logs.");
+        toast.error("Location Required");
+      } else {
+        toast.error("Log upload failed.");
+      }
     } finally {
       setIsPunching(false);
     }
