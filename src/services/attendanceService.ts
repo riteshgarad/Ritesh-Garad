@@ -83,8 +83,8 @@ export const attendanceService = {
           reject(new Error("Geolocation not supported"));
           return;
         }
-        // Set a hard timeout for the internal implementation as well
-        const timer = setTimeout(() => reject(new Error("Internal Timeout")), options.timeout || 5000);
+        // Increased safety timeout to 30s to allow for OS permission prompts
+        const timer = setTimeout(() => reject(new Error("Internal Timeout")), (options.timeout || 5000) + 2000);
         navigator.geolocation.getCurrentPosition(
           (pos) => { clearTimeout(timer); resolve(pos); },
           (err) => { clearTimeout(timer); reject(err); },
@@ -94,19 +94,19 @@ export const attendanceService = {
 
       let position: GeolocationPosition | null = null;
       try {
-        // Preference for high accuracy mission data
+        // Preference for high accuracy mission data - increased timeout for native bridges
         position = await getPos({
           enableHighAccuracy: true,
-          timeout: 12000, 
+          timeout: 20000, 
           maximumAge: 5000
         });
       } catch (err: any) {
         console.warn("High accuracy GPS failed, trying fallback...", err);
         try {
-          // Standard accuracy fallback
+          // Standard accuracy fallback - increased timeout
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 8000,
+            timeout: 15000,
             maximumAge: 60000 
           });
         } catch (fallbackErr: any) {
@@ -183,7 +183,12 @@ export const attendanceService = {
           reject(new Error("Geolocation not supported"));
           return;
         }
-        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        const timer = setTimeout(() => reject(new Error("Internal Timeout")), (options.timeout || 5000) + 2000);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { clearTimeout(timer); resolve(pos); },
+          (err) => { clearTimeout(timer); reject(err); },
+          options
+        );
       });
 
       try {
@@ -192,14 +197,14 @@ export const attendanceService = {
           // Attempt high accuracy wait
           position = await getPos({
             enableHighAccuracy: true,
-            timeout: 10000,
+            timeout: 15000,
             maximumAge: 0
           });
         } catch (e) {
           // Standard fallback
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 8000,
+            timeout: 10000,
             maximumAge: 60000
           });
         }
