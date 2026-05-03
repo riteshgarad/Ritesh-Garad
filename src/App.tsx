@@ -68,6 +68,7 @@ import { MobileShell } from './components/MobileShell';
 import { MissionDetailView } from './components/project/MissionDetailView';
 import { VolunteerOnboardingHub } from './components/volunteer/VolunteerOnboardingHub';
 import { VolunteerHomeHub } from './components/volunteer/VolunteerHomeHub';
+import { VolunteerProfile } from './components/volunteer/VolunteerProfile';
 import { BatchOnboarding } from './components/BatchOnboarding';
 import { SupportView } from './components/volunteer/SupportView';
 import { sendPushNotification } from './lib/push';
@@ -2338,7 +2339,11 @@ const PageView = ({
         />
       );
     case 'volunteers':
-      const canManage = user.role === 'Admin' || user.role === 'Department Head' || user.role === 'DH';
+      if (user?.role === 'new_volunteer') {
+        return <VolunteerProfile user={user} onBack={() => setCurrentPage('volunteer-hub')} />;
+      }
+      
+      const canManage = user?.role === 'Admin' || user?.role === 'Department Head' || user?.role === 'DH';
       
       if (canManage) {
         return (
