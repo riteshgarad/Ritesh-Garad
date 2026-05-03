@@ -267,7 +267,10 @@ export const AttendanceHub: React.FC = () => {
               <div className="w-20 h-20 border-8 border-emerald-100 border-t-emerald-500 rounded-full animate-spin" />
               <div className="space-y-2">
                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Syncing Location</h3>
-                <p className="text-sm text-slate-500 font-bold max-w-[200px]">Securing mission coordinates. Please allow location access if prompted.</p>
+                <p className="text-sm text-slate-500 font-bold max-w-[240px]">
+                  Securing mission coordinates. 
+                  <span className="block text-emerald-600 mt-1 uppercase text-[10px] tracking-widest animate-pulse">If prompted, select "Allow While Using App"</span>
+                </p>
               </div>
             </div>
           </motion.div>

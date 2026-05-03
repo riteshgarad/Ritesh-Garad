@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { Attendance } from '../types';
+import { isNativeApp } from './notificationService';
 
 enum OperationType {
   CREATE = 'create',
@@ -83,8 +84,11 @@ export const attendanceService = {
           reject(new Error("Geolocation not supported"));
           return;
         }
-        // Increased safety timeout to 30s to allow for OS permission prompts
-        const timer = setTimeout(() => reject(new Error("Internal Timeout")), (options.timeout || 5000) + 2000);
+        // Increased safety timeout significantly for Native Apps to allow for OS permission prompts
+        const baseTimeout = options.timeout || 5000;
+        const nativeBuffer = isNativeApp() ? 40000 : 2000; // 40s extra for native prompts
+        const timer = setTimeout(() => reject(new Error("Internal Timeout")), baseTimeout + nativeBuffer);
+        
         navigator.geolocation.getCurrentPosition(
           (pos) => { clearTimeout(timer); resolve(pos); },
           (err) => { clearTimeout(timer); reject(err); },
@@ -93,12 +97,14 @@ export const attendanceService = {
       });
 
       let position: GeolocationPosition | null = null;
+      const nativeMult = isNativeApp() ? 2.5 : 1;
+
       try {
         // Preference for high accuracy mission data - increased timeout for native bridges
         position = await getPos({
           enableHighAccuracy: true,
-          timeout: 20000, 
-          maximumAge: 5000
+          timeout: 20000 * nativeMult, 
+          maximumAge: 0
         });
       } catch (err: any) {
         console.warn("High accuracy GPS failed, trying fallback...", err);
@@ -106,7 +112,7 @@ export const attendanceService = {
           // Standard accuracy fallback - increased timeout
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 15000,
+            timeout: 15000 * nativeMult,
             maximumAge: 60000 
           });
         } catch (fallbackErr: any) {
@@ -145,7 +151,7 @@ export const attendanceService = {
           locationName = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
         }
       } else {
-        locationName = "Location Refused (Mission Node)";
+        locationName = "Mission Node (No GPS)";
       }
 
       const attendanceData = {
@@ -183,7 +189,10 @@ export const attendanceService = {
           reject(new Error("Geolocation not supported"));
           return;
         }
-        const timer = setTimeout(() => reject(new Error("Internal Timeout")), (options.timeout || 5000) + 2000);
+        const baseTimeout = options.timeout || 5000;
+        const nativeBuffer = isNativeApp() ? 30000 : 2000;
+        const timer = setTimeout(() => reject(new Error("Internal Timeout")), baseTimeout + nativeBuffer);
+        
         navigator.geolocation.getCurrentPosition(
           (pos) => { clearTimeout(timer); resolve(pos); },
           (err) => { clearTimeout(timer); reject(err); },
@@ -193,18 +202,20 @@ export const attendanceService = {
 
       try {
         let position: GeolocationPosition | null = null;
+        const nativeMult = isNativeApp() ? 2 : 1;
+        
         try {
           // Attempt high accuracy wait
           position = await getPos({
             enableHighAccuracy: true,
-            timeout: 15000,
+            timeout: 15000 * nativeMult,
             maximumAge: 0
           });
         } catch (e) {
           // Standard fallback
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 10000,
+            timeout: 10000 * nativeMult,
             maximumAge: 60000
           });
         }
@@ -236,7 +247,7 @@ export const attendanceService = {
             locationName = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
           }
         } else {
-          locationName = "Location Refused (Mission Node)";
+          locationName = "Mission Node (No GPS)";
         }
       } catch (geoErr) {
         console.warn("Punch-out location failed tracking", geoErr);
