@@ -10,7 +10,6 @@ import {
   CheckCircle2, 
   AlertCircle,
   ChevronDown,
-  Navigation,
   Timer
 } from 'lucide-react';
 import { auth, db } from '../../lib/firebase';
@@ -28,7 +27,6 @@ export const AttendanceHub: React.FC = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isPunching, setIsPunching] = useState(false);
-  const [gpsStatus, setGpsStatus] = useState<'pending' | 'active' | 'denied'>('pending');
 
   const [selectedSession, setSelectedSession] = useState<Attendance | null>(null);
 
@@ -58,17 +56,6 @@ export const AttendanceHub: React.FC = () => {
         // Fetch recent sessions
         const recent = await attendanceService.getRecentSessions(user.uid);
         setRecentSessions(recent);
-
-        // Check GPS permission
-        navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
-          if (result.state === 'granted') setGpsStatus('active');
-          else if (result.state === 'denied') setGpsStatus('denied');
-          
-          result.onchange = () => {
-            if (result.state === 'granted') setGpsStatus('active');
-            else if (result.state === 'denied') setGpsStatus('denied');
-          };
-        });
       } catch (err) {
         console.error("Initialization error:", err);
       } finally {
@@ -107,20 +94,10 @@ export const AttendanceHub: React.FC = () => {
         status: 'active'
       };
       setActiveSession(newSession);
-      setGpsStatus('active');
       toast.success("Mission Active");
     } catch (err: any) {
       console.error("Punch in error:", err);
-      if (err.message === 'LOCATION_PERM_DENIED') {
-        alert("CRITICAL: Location Access REFUSED. To log missions, go to Phone Settings > App Management > Mission App > Permissions and enable 'Location' (Allow While Using App).");
-        toast.error("Location Required");
-      } else if (err.message === 'DB_OFFLINE') {
-        toast.error("Network Link Weak. Check Connection.");
-      } else if (err.message && err.message.startsWith('DB_FAILURE')) {
-        toast.error("Cloud Access Error. Try again.");
-      } else {
-        toast.error(`Deployment failed: ${err.message || 'Re-sync needed'}`);
-      }
+      toast.error("Cloud Sync Interrupted. Retrying...");
     } finally {
       setIsPunching(false);
     }
@@ -146,16 +123,7 @@ export const AttendanceHub: React.FC = () => {
       toast.success("Mission Logged");
     } catch (err: any) {
       console.error("Punch out error:", err);
-      if (err.message === 'LOCATION_PERM_DENIED') {
-        alert("CRITICAL: Location Access REFUSED. Go to Phone Settings > Mission App > Permissions and enable 'Location' to secure your logs.");
-        toast.error("Location Required");
-      } else if (err.message === 'DB_OFFLINE') {
-        toast.error("Network Log Link Weak.");
-      } else if (err.message && err.message.startsWith('DB_FAILURE')) {
-        toast.error("Log Securement Failed. Cloud is unreachable.");
-      } else {
-        toast.error(`Log upload failed: ${err.message || 'Check Connection'}`);
-      }
+      toast.error("Log Securement Interrupted.");
     } finally {
       setIsPunching(false);
     }
@@ -284,10 +252,10 @@ export const AttendanceHub: React.FC = () => {
             <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 text-center border-b-8 border-emerald-500">
               <div className="w-20 h-20 border-8 border-emerald-100 border-t-emerald-500 rounded-full animate-spin" />
               <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Syncing Location</h3>
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Syncing Mission</h3>
                 <p className="text-sm text-slate-500 font-bold max-w-[240px]">
-                  Securing mission coordinates. 
-                  <span className="block text-emerald-600 mt-1 uppercase text-[10px] tracking-widest animate-pulse">If prompted, select "Allow While Using App"</span>
+                  Securing your Operational Log with the Foundation Cloud. 
+                  <span className="block text-emerald-600 mt-1 uppercase text-[10px] tracking-widest animate-pulse">Establishing Secure Link...</span>
                 </p>
               </div>
             </div>
@@ -359,17 +327,12 @@ export const AttendanceHub: React.FC = () => {
               {activeSession ? "Active on Mission" : "Currently Off-Duty"}
             </span>
           </div>
-          <button 
-            className={cn(
-              "px-3 py-1 rounded-full flex items-center gap-1.5 transition-all",
-              gpsStatus === 'active' ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"
-            )}
-          >
-            <Navigation size={10} className={gpsStatus === 'active' ? "animate-pulse" : ""} />
+          <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full flex items-center gap-1.5">
+            <CheckCircle2 size={10} />
             <span className="text-[8px] font-black uppercase tracking-widest">
-              GPS {gpsStatus === 'active' ? "Verified" : "Syncing..."}
+              Cloud Sync Active
             </span>
-          </button>
+          </div>
         </div>
         
         {activeSession ? (
