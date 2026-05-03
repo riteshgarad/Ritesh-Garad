@@ -254,7 +254,25 @@ export const AttendanceHub: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Notifications / Overlay removed for direct punch logic */}
+      {/* Notifications / Overlay */}
+      <AnimatePresence>
+        {isPunching && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md px-6"
+          >
+            <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 text-center border-b-8 border-emerald-500">
+              <div className="w-20 h-20 border-8 border-emerald-100 border-t-emerald-500 rounded-full animate-spin" />
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Syncing Location</h3>
+                <p className="text-sm text-slate-500 font-bold max-w-[200px]">Securing mission coordinates. Please allow location access if prompted.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Header */}
       <div className="text-center space-y-1">

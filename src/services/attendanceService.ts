@@ -94,23 +94,24 @@ export const attendanceService = {
 
       let position: GeolocationPosition | null = null;
       try {
-        // Try high accuracy briefly
+        // Preference for high accuracy mission data
         position = await getPos({
           enableHighAccuracy: true,
-          timeout: 4000, 
-          maximumAge: 10000
+          timeout: 12000, 
+          maximumAge: 5000
         });
       } catch (err: any) {
-        console.warn("High accuracy GPS missed, trying quick fallback", err);
+        console.warn("High accuracy GPS failed, trying fallback...", err);
         try {
+          // Standard accuracy fallback
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 3000,
-            maximumAge: 600000 
+            timeout: 8000,
+            maximumAge: 60000 
           });
         } catch (fallbackErr: any) {
-          console.warn("GPS sync failed, proceeding with offline coordinates", fallbackErr);
-          position = null;
+          console.error("GPS capture failed completely:", fallbackErr);
+          // If denied or timed out, position remains null
         }
       }
       
@@ -122,28 +123,29 @@ export const attendanceService = {
         try {
           const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
             headers: {
-              'Accept-Language': 'en-IN,en-US,en;q=0.9',
-              'User-Agent': 'GaradFoundationMissionApp/1.0 (riteshgerad@gmail.com)'
+              'Accept-Language': 'en',
+              'User-Agent': 'GaradFoundationMissionApp/1.0'
             }
           });
           const data = await response.json();
           
-          if (data && data.address) {
+          if (data && data.display_name) {
+            // Take a concise version of the address
             const addr = data.address;
             const parts = [
-              addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood,
-              addr.city || addr.town || addr.village || addr.district
+              addr.road || addr.pedestrian || addr.suburb,
+              addr.city || addr.town || addr.village
             ].filter(Boolean);
             
-            locationName = parts.length > 0 ? parts.join(', ') : (data.name || data.display_name);
+            locationName = parts.length > 0 ? parts.join(', ') : data.display_name;
           } else {
-            locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            locationName = `LAT: ${lat.toFixed(6)}, LNG: ${lng.toFixed(6)}`;
           }
         } catch (e) {
-          locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          locationName = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
         }
       } else {
-        locationName = "Mission Node";
+        locationName = "Location Refused (Mission Node)";
       }
 
       const attendanceData = {
@@ -185,14 +187,16 @@ export const attendanceService = {
       });
 
       try {
-        let position: GeolocationPosition;
+        let position: GeolocationPosition | null = null;
         try {
+          // Attempt high accuracy wait
           position = await getPos({
             enableHighAccuracy: true,
             timeout: 10000,
             maximumAge: 0
           });
         } catch (e) {
+          // Standard fallback
           position = await getPos({
             enableHighAccuracy: false,
             timeout: 8000,
@@ -200,33 +204,38 @@ export const attendanceService = {
           });
         }
         
-        lat = position.coords.latitude;
-        lng = position.coords.longitude;
+        if (position) {
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
 
-        // Reverse Geocode
-        try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
-            headers: {
-              'Accept-Language': 'en-IN,en-US,en;q=0.9',
-              'User-Agent': 'GaradFoundationMissionApp/1.0 (riteshgerad@gmail.com)'
+          // Reverse Geocode
+          try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+              headers: {
+                'Accept-Language': 'en',
+                'User-Agent': 'GaradFoundationMissionApp/1.0'
+              }
+            });
+            const data = await response.json();
+            if (data && data.display_name) {
+              const addr = data.address;
+              const parts = [
+                addr.road || addr.pedestrian || addr.suburb,
+                addr.city || addr.town || addr.village
+              ].filter(Boolean);
+              locationName = parts.length > 0 ? parts.join(', ') : data.display_name;
+            } else {
+              locationName = `LAT: ${lat.toFixed(6)}, LNG: ${lng.toFixed(6)}`;
             }
-          });
-          const data = await response.json();
-          if (data && data.address) {
-            const addr = data.address;
-            const parts = [
-              addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood,
-              addr.city || addr.town || addr.village || addr.district
-            ].filter(Boolean);
-            locationName = parts.length > 0 ? parts.join(', ') : data.display_name;
-          } else {
-            locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          } catch (e) {
+            locationName = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
           }
-        } catch (e) {
-          locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        } else {
+          locationName = "Location Refused (Mission Node)";
         }
       } catch (geoErr) {
         console.warn("Punch-out location failed tracking", geoErr);
+        locationName = "Mission Node (Fallback)";
       }
 
       const attendanceRef = doc(db, 'attendance', attendanceId);
