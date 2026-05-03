@@ -70,7 +70,7 @@ import { sendPushNotification } from './lib/push';
 import { ChatView } from './components/ChatView';
 import { CalendarView } from './components/schedule/CalendarView';
 import { handleFirestoreError, OperationType } from './lib/firestore_errors';
-import { requestFirebaseNotificationPermission, onMessageListener } from './services/notificationService';
+import { requestFirebaseNotificationPermission, onMessageListener, isNativeApp } from './services/notificationService';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { 
@@ -297,13 +297,19 @@ export default function App() {
       return;
     }
 
-    const tId = toast.loading("Connecting to Firebase Cloud Messaging...", { duration: 15000 });
+    const tId = toast.loading(isNativeApp() ? "Invoking Native Signal Bridge..." : "Connecting to Firebase Cloud Messaging...", { duration: 15000 });
     
     try {
       const token = await requestFirebaseNotificationPermission();
       
       if (token) {
         setNotifPermission('granted');
+        if (token === 'native_registered') {
+          toast.success("Native Comms Link Established", { id: tId });
+          alert("Mission authorization sent to device. If alerts do not appear, please check your Phone Settings > Apps > Mission App > Notifications.");
+          return;
+        }
+
         toast.success("Signals Online via FCM!", { id: tId });
         alert("Mission-critical alerts activated! (Standard Web Push)");
         
@@ -324,8 +330,12 @@ export default function App() {
         setNotifPermission(currentPerm);
         
         if (currentPerm === 'denied') {
-          toast.error("Access Refused by Browser", { id: tId });
-          alert("Notifications are blocked in your site settings. Please click the Lock icon in your address bar and reset permissions.");
+          toast.error("Access Refused", { id: tId });
+          if (isNativeApp()) {
+            alert("Mission Alerts are blocked. Please go to your phone's Settings > App Management > Mission App > Notifications and enable 'Allow Notifications'.");
+          } else {
+            alert("Notifications are blocked in your site settings. Please click the Lock icon in your address bar and reset permissions.");
+          }
         } else {
           toast.error("Authorization Session Cancelled", { id: tId });
         }
@@ -2457,10 +2467,14 @@ const DashboardView = ({ projects, tasks, volunteers, transactions, activityLogs
               </h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed text-left">
                 {notifPermission === 'denied' 
-                  ? 'Strategic alerts are blocked by your device settings. Please reset site permissions or check browser preferences.'
+                  ? (isNativeApp() 
+                      ? 'Mission alerts are blocked by your phone settings. Please enable notifications in your phone App Settings.' 
+                      : 'Strategic alerts are blocked by your device settings. Please reset site permissions or check browser preferences.')
                   : 'Strategic alert delivery requires push authorization.'}
                 <br/>
-                <span className="text-emerald-400 font-black italic">CRITICAL: If you are in the AI Studio preview, you MUST open the app in a "NEW TAB" for the button below to work.</span>
+                {!isNativeApp() && (
+                  <span className="text-emerald-400 font-black italic">CRITICAL: If you are in the AI Studio preview, you MUST open the app in a "NEW TAB" for the button below to work.</span>
+                )}
               </p>
             </div>
           </div>
@@ -2471,12 +2485,14 @@ const DashboardView = ({ projects, tasks, volunteers, transactions, activityLogs
             >
               {notifPermission === 'denied' ? 'Try Reactivate' : 'Authorize Signals'}
             </button>
-            <button 
-              onClick={() => window.open(window.location.href, '_blank')}
-              className="px-8 py-4 bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/20 transition-all w-full md:hidden"
-            >
-              Open in New Tab
-            </button>
+            {!isNativeApp() && (
+              <button 
+                onClick={() => window.open(window.location.href, '_blank')}
+                className="px-8 py-4 bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/20 transition-all w-full md:hidden"
+              >
+                Open in New Tab
+              </button>
+            )}
           </div>
         </motion.div>
       )}

@@ -15,7 +15,25 @@ try {
   console.warn("Firebase Messaging not supported in this environment:", e);
 }
 
+export const isNativeApp = () => {
+  return typeof window !== 'undefined' && ((window as any).median || (window as any).gonative);
+};
+
 export const requestFirebaseNotificationPermission = async () => {
+  if (isNativeApp()) {
+    console.log("FCM: Native App detected. Handing off to bridge.");
+    try {
+      if ((window as any).median?.onesignal?.register) {
+        await (window as any).median.onesignal.register();
+      } else {
+        window.location.href = "gonative://onesignal/register";
+      }
+      return "native_registered";
+    } catch (e) {
+      console.error("Native bridge failure:", e);
+    }
+  }
+
   if (!messaging) {
     console.warn("Messaging not initialized - possible environment restriction or missing service worker");
     return null;
