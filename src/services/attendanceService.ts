@@ -80,12 +80,30 @@ export const attendanceService = {
       let locationName = "";
 
       const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+        if (typeof window !== 'undefined') {
+          const win = window as any;
+          if (win.median?.location?.get) {
+             win.median.location.get().then((data: any) => {
+               if (data && data.latitude) {
+                 resolve({
+                   coords: { latitude: data.latitude, longitude: data.longitude, accuracy: data.accuracy || 10, altitude: null, altitudeAccuracy: null, heading: null, speed: null },
+                   timestamp: Date.now()
+                 } as GeolocationPosition);
+               } else {
+                  standardGetPos(options, resolve, reject);
+               }
+             }).catch(() => standardGetPos(options, resolve, reject));
+             return;
+          }
+        }
+        standardGetPos(options, resolve, reject);
+      });
+
+      const standardGetPos = (options: PositionOptions, resolve: any, reject: any) => {
         if (!navigator.geolocation) {
           reject({ code: 0, message: "Geolocation not supported" });
           return;
         }
-        
-        // 60s total buffer for native permission interactions
         const baseTimeout = options.timeout || 5000;
         const nativeBuffer = isNativeApp() ? 60000 : 5000; 
         const timer = setTimeout(() => reject({ code: 3, message: "Internal Timeout" }), baseTimeout + nativeBuffer);
@@ -95,39 +113,28 @@ export const attendanceService = {
           (err) => { clearTimeout(timer); reject(err); },
           options
         );
-      });
+      };
 
       let position: GeolocationPosition | null = null;
       const nativeMult = isNativeApp() ? 3 : 1;
 
       try {
-        // STEP 0: Attempt to grab ANY last known position immediately
+        if (isNativeApp()) {
+          const win = window as any;
+          if (win.gonative) win.location.href = "gonative://permissions/request?permission=location";
+          if (win.median?.location?.promptPermission) win.median.location.promptPermission();
+        }
+
         try {
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 1000,
-            maximumAge: Infinity // Any cached value is better than none
+            timeout: 2000,
+            maximumAge: Infinity
           });
-          console.log("GPS: Immediate cached sync used as baseline");
         } catch (e) {
-          console.log("GPS: No immediate cache, moving to active search");
+          console.log("GPS: Cache miss");
         }
 
-        // STEP 1: Try a rapid fresh check (within 5 mins)
-        if (!position) {
-          try {
-            position = await getPos({
-              enableHighAccuracy: false,
-              timeout: 3000,
-              maximumAge: 300000 // 5 minutes
-            });
-            console.log("GPS: Rapid background sync successful");
-          } catch (e) {
-            console.warn("GPS: Rapid sync missed, initiating deep search");
-          }
-        }
-
-        // STEP 2: Deep search with high accuracy
         if (!position) {
           position = await getPos({
             enableHighAccuracy: true,
@@ -136,21 +143,18 @@ export const attendanceService = {
           });
         }
       } catch (err: any) {
-        console.warn("GPS: Deep search failed, checking error type", err);
-        
+        console.warn("GPS: Complex search failed", err);
         if (err.code === 1) throw new Error("LOCATION_PERM_DENIED");
         
         try {
-          // STEP 3: Final fallback to cell towers/WiFi
           position = await getPos({
             enableHighAccuracy: false,
             timeout: 20000 * nativeMult,
-            maximumAge: 600000 // 10 mins
+            maximumAge: 600000 
           });
         } catch (fallbackErr: any) {
           console.error("GPS capture failed completely:", fallbackErr);
           if (fallbackErr.code === 1) throw new Error("LOCATION_PERM_DENIED");
-          // If pure timeout, we continue - the service allows punch-in with "Mission Node" label
         }
       }
       
@@ -227,6 +231,26 @@ export const attendanceService = {
       let locationName = "Mission Node";
 
       const getPos = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+        if (typeof window !== 'undefined') {
+          const win = window as any;
+          if (win.median?.location?.get) {
+             win.median.location.get().then((data: any) => {
+                if (data && data.latitude) {
+                  resolve({
+                    coords: { latitude: data.latitude, longitude: data.longitude, accuracy: data.accuracy || 10, altitude: null, altitudeAccuracy: null, heading: null, speed: null },
+                    timestamp: Date.now()
+                  } as GeolocationPosition);
+                } else {
+                  standardGetPos(options, resolve, reject);
+                }
+             }).catch(() => standardGetPos(options, resolve, reject));
+             return;
+          }
+        }
+        standardGetPos(options, resolve, reject);
+      });
+
+      const standardGetPos = (options: PositionOptions, resolve: any, reject: any) => {
         if (!navigator.geolocation) {
           reject({ code: 0, message: "Geolocation not supported" });
           return;
@@ -240,22 +264,20 @@ export const attendanceService = {
           (err) => { clearTimeout(timer); reject(err); },
           options
         );
-      });
+      };
 
       try {
         let position: GeolocationPosition | null = null;
         const nativeMult = isNativeApp() ? 2.5 : 1;
         
         try {
-          // STEP 1: Quick check for existing lock
           position = await getPos({
             enableHighAccuracy: false,
             timeout: 2000,
-            maximumAge: 300000 // 5 mins
+            maximumAge: Infinity
           });
         } catch (e) {
           try {
-            // STEP 2: Attempt standard accuracy
             position = await getPos({
               enableHighAccuracy: true,
               timeout: 15000 * nativeMult,
