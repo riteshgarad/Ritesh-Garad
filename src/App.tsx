@@ -67,6 +67,7 @@ import { VolunteerFinanceDashboard } from './components/VolunteerFinanceDashboar
 import { MobileShell } from './components/MobileShell';
 import { MissionDetailView } from './components/project/MissionDetailView';
 import { VolunteerOnboardingHub } from './components/volunteer/VolunteerOnboardingHub';
+import { VolunteerHomeHub } from './components/volunteer/VolunteerHomeHub';
 import { BatchOnboarding } from './components/BatchOnboarding';
 import { SupportView } from './components/volunteer/SupportView';
 import { sendPushNotification } from './lib/push';
@@ -173,7 +174,7 @@ const Button = ({ children, variant = 'primary', className, ...props }: React.Bu
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'attendance' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule' | 'impact-reports' | 'volunteer-hub' | 'ideas' | 'support' | 'batch-onboarding';
+type Page = 'home' | 'dashboard' | 'projects' | 'tasks' | 'attendance' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule' | 'impact-reports' | 'volunteer-hub' | 'ideas' | 'support' | 'batch-onboarding';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -185,6 +186,13 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  
+  useEffect(() => {
+    if (user?.role === 'new_volunteer' && currentPage === 'dashboard') {
+      setCurrentPage('volunteer-hub');
+    }
+  }, [user?.role, currentPage]);
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNotifBanner, setShowNotifBanner] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -2273,7 +2281,7 @@ const PageView = ({
         setShowNotifBanner={setShowNotifBanner}
       />;
     case 'volunteer-hub':
-      return <VolunteerOnboardingHub user={user} setCurrentPage={setCurrentPage} initialTab="story" />;
+      return <VolunteerHomeHub onNavigate={setCurrentPage} />;
     case 'ideas':
       return <VolunteerOnboardingHub user={user} setCurrentPage={setCurrentPage} initialTab="ideas" />;
     case 'support':
@@ -3044,7 +3052,7 @@ const PAGE_TITLES: Record<Page, string> = {
   'kyc': 'Personnel Authentication',
   'schedule': 'Mission Schedule / Calendar',
   'impact-reports': 'Impact Analytics Dashboard',
-  'volunteer-hub': 'Guardian Hub',
+  'volunteer-hub': 'Foundation Hub',
   'ideas': 'Innovation Terminal',
   'support': 'Mission Support',
   'batch-onboarding': 'Unit Deployment (Batch)'

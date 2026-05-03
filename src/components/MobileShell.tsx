@@ -79,8 +79,8 @@ export const MobileShell = ({
   };
 
   const navigation = [
-    { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Home Hub' },
-    { id: 'volunteer-hub', icon: Heart, label: 'My Hub', roles: ['new_volunteer'] },
+    { id: 'dashboard', icon: Layout, label: 'Dashboard', desc: 'Home Hub' },
+    { id: 'volunteer-hub', icon: Heart, label: 'Foundation Hub', roles: ['new_volunteer'] },
     { id: 'ideas', icon: Lightbulb, label: 'Idea Hub', roles: ['new_volunteer'] },
     { id: 'volunteers', icon: User, label: 'My Profile', roles: ['new_volunteer'] },
     { id: 'support', icon: LifeBuoy, label: 'Support', roles: ['new_volunteer'] },
@@ -161,7 +161,7 @@ export const MobileShell = ({
 
     // Strict filtering for new_volunteer
     if (user.role === 'new_volunteer') {
-      const allowedForNew = ['volunteer-hub', 'ideas', 'messages', 'schedule', 'volunteers', 'support', 'attendance'];
+      const allowedForNew = ['home', 'volunteer-hub', 'ideas', 'messages', 'schedule', 'volunteers', 'support', 'attendance'];
       return allowedForNew.includes(item.id);
     }
 
@@ -455,7 +455,6 @@ export const MobileShell = ({
             { id: 'volunteer-hub', icon: Heart, label: 'HUB' },
             { id: 'attendance', icon: Clock, label: 'PUNCH' },
             { id: 'ideas', icon: Lightbulb, label: 'IDEAS' },
-            { id: 'messages', icon: MessageCircle, label: 'COMMS' },
             { id: 'schedule', icon: Calendar, label: 'DATES' }
           ] : [
             { id: 'dashboard', icon: Home, label: 'DASH' },
