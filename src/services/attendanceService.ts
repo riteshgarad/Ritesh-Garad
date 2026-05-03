@@ -83,15 +83,18 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 /**
  * HIGH POWER GPS ACQUISITION
- * Attempts to get the most accurate location across web and native wrappers.
+ * Uses a "Warm-up" strategy with watchPosition to ensure a cold-start lock on mobile.
  */
-async function getRobustLocation(timeoutMs = 6000): Promise<{ lat: number, lng: number, name: string }> {
+async function getRobustLocation(timeoutMs = 15000): Promise<{ lat: number, lng: number, name: string }> {
   let lat = 0;
   let lng = 0;
   let name = "Mission Node";
+  let lockFound = false;
 
-  const getPositionPromise = () => new Promise<GeolocationPosition | null>((resolve) => {
-    // 1. Check for Median Native API (highest priority for native app)
+  const acquire = () => new Promise<GeolocationPosition | null>((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+
+    // 1. Try Native API first (Median/GoNative)
     const win = window as any;
     if (win.median?.location?.get) {
       win.median.location.get().then((data: any) => {
@@ -101,60 +104,68 @@ async function getRobustLocation(timeoutMs = 6000): Promise<{ lat: number, lng: 
             timestamp: Date.now()
           } as GeolocationPosition);
         } else {
-          fallbackToStandard();
+          startWatching();
         }
-      }).catch(() => fallbackToStandard());
+      }).catch(() => startWatching());
       return;
     }
 
-    function fallbackToStandard() {
-      if (!navigator.geolocation) {
+    function startWatching() {
+      // Warm up GPS - watchPosition is often more reliable for initial locks on Android/iOS
+      let watchId: number;
+      const timer = setTimeout(() => {
+        navigator.geolocation.clearWatch(watchId);
         resolve(null);
-        return;
-      }
+      }, timeoutMs);
 
-      const timer = setTimeout(() => resolve(null), timeoutMs);
-      
-      navigator.geolocation.getCurrentPosition(
-        (pos) => { clearTimeout(timer); resolve(pos); },
-        () => { clearTimeout(timer); resolve(null); },
-        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30000 }
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (pos.coords.accuracy < 100) { // Good enough accuracy
+            clearTimeout(timer);
+            navigator.geolocation.clearWatch(watchId);
+            resolve(pos);
+          }
+        },
+        () => { /* ignore intermediate errors */ },
+        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
       );
     }
 
-    fallbackToStandard();
+    startWatching();
   });
 
   try {
-    const pos = await getPositionPromise();
+    const pos = await acquire();
     if (pos) {
+      lockFound = true;
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
-      name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      name = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
-      // Try reverse geocode (Osm Nominatim) with 2s timeout
+      // Try reverse geocode with a very short timeout
       try {
         const controller = new AbortController();
-        const geoTimeout = setTimeout(() => controller.abort(), 2000);
-        
+        const geoTimeout = setTimeout(() => controller.abort(), 2500);
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
-          headers: { 'Accept-Language': 'en', 'User-Agent': 'GaradMissionApp/2.0' },
+          headers: { 'Accept-Language': 'en', 'User-Agent': 'GaradMissionApp/3.0' },
           signal: controller.signal
         });
         clearTimeout(geoTimeout);
-        
         const data = await res.json();
         if (data?.display_name) {
           const addr = data.address;
-          const parts = [addr?.road || addr?.pedestrian || addr?.suburb, addr?.city || addr?.town || addr?.village].filter(Boolean);
+          const parts = [addr?.road || addr?.suburb, addr?.city || addr?.town].filter(Boolean);
           name = parts.length > 0 ? parts.join(', ') : data.display_name.split(',').slice(0, 2).join(',');
         }
       } catch (e) {
-        console.warn("Geocode skipped or timed out");
+        // Fallback to coords already set above
       }
+    } else {
+      name = "Mission Node (No GPS Signal)";
     }
   } catch (err) {
-    console.error("GPS Error:", err);
+    console.error("GPS System Failure:", err);
+    name = "Mission Node (System Error)";
   }
 
   return { lat, lng, name };
