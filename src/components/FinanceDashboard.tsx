@@ -16,7 +16,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
 import { collection, query, onSnapshot, orderBy, updateDoc, doc, where, serverTimestamp } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { Transaction, Project, AppUser } from '../types';
 import TransactionTable from './TransactionTable';
 import AddTransactionModal from './AddTransactionModal';

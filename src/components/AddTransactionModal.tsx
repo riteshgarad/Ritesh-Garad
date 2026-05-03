@@ -3,7 +3,7 @@ import { X, Upload, DollarSign, Tag, Calendar, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface AddTransactionModalProps {
   isOpen: boolean;

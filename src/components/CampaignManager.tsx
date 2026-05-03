@@ -23,7 +23,7 @@ import {
   doc, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { Campaign, AppUser, CampaignStatus } from '../types';
 import { cn } from '../lib/utils';
 

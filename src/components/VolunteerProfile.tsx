@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Star, Clock, Heart, Award, ShieldCheck, Mail, Calendar, 
+import { Star, Clock, Heart, Award, ShieldCheck, Mail, Calendar, 
   MapPin, CheckCircle2, LayoutGrid, List, FileText, Download,
-  ExternalLink, ChevronRight, BarChart, Send, Plus, MessageCircle, Phone
+  ExternalLink, ChevronRight, BarChart, Send, Plus, MessageCircle, Phone,
+  Lock, Key, AlertCircle, Loader2
 } from 'lucide-react';
 import { Volunteer, Project, WorkLog, VolunteerCertificate, AppUser, NGODocument } from '../types';
 import { format } from 'date-fns';
 import { FileCard } from './FileCard';
 import { getWhatsAppLink } from '../lib/utils';
+import { auth, db } from '../lib/firebase';
+import { updatePassword } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
 
 interface VolunteerProfileProps {
   volunteer: Volunteer;
@@ -23,6 +27,13 @@ interface VolunteerProfileProps {
 export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLogHours, user, documents }: VolunteerProfileProps) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'certs' | 'evidence'>('overview');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+  const [passForm, setPassForm] = useState({
+    newPass: '',
+    confirmPass: ''
+  });
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  
   const [logForm, setLogForm] = useState({
     projectId: '',
     hours: 0,
@@ -53,6 +64,37 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
     setLogForm({ projectId: '', hours: 0, description: '', date: format(new Date(), 'yyyy-MM-dd') });
   };
 
+  const handlePassChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passForm.newPass !== passForm.confirmPass) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (passForm.newPass.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setIsChangingPass(true);
+    try {
+      const firebaseUser = auth.currentUser;
+      if (firebaseUser) {
+        await updatePassword(firebaseUser, passForm.newPass);
+        await updateDoc(doc(db, 'users', user.uid), {
+          mustChangePassword: false
+        });
+        toast.success("Security Credentials Updated");
+        setIsPassModalOpen(false);
+        setPassForm({ newPass: '', confirmPass: '' });
+      }
+    } catch (err: any) {
+      console.error("Password update error:", err);
+      toast.error(err.message || "Credential Update Failed");
+    } finally {
+      setIsChangingPass(false);
+    }
+  };
+
   const nextMilestone = Math.ceil((volunteer.impactPoints + 1) / 500) * 500;
   const progress = (volunteer.impactPoints / nextMilestone) * 100;
 
@@ -60,6 +102,26 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
     <div className="p-6 font-sans">
       {/* Top Banner Card */}
       <div className="relative mb-12">
+        {user.mustChangePassword && (
+          <div className="absolute -top-16 left-0 right-0 z-20">
+            <motion.div 
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="bg-amber-100 border border-amber-200 p-4 rounded-2xl flex items-center justify-between shadow-xl shadow-amber-500/10"
+            >
+              <div className="flex items-center gap-3">
+                <AlertCircle className="text-amber-600" size={18} />
+                <p className="text-[10px] font-black text-amber-900 uppercase tracking-widest">Security Alert: Default Credentials Detected. Please Change Password.</p>
+              </div>
+              <button 
+                onClick={() => setIsPassModalOpen(true)}
+                className="px-4 py-1.5 bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase tracking-widest"
+              >
+                Secure Now
+              </button>
+            </motion.div>
+          </div>
+        )}
         <div className="h-48 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-[40px] shadow-lg overflow-hidden">
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
         </div>
@@ -94,6 +156,12 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
         </div>
 
         <div className="absolute top-6 right-6 flex gap-3">
+          <button 
+            onClick={() => setIsPassModalOpen(true)}
+            className="px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all flex items-center gap-2"
+          >
+            <Lock size={14} /> Security
+          </button>
           <button className="px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all">
             Edit Profile
           </button>
@@ -323,6 +391,73 @@ export const VolunteerProfile = ({ volunteer, projects, logs, certificates, onLo
           </div>
         </div>
       </div>
+
+      {/* Log Hours Modal */}
+      <AnimatePresence>
+        {isPassModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPassModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden"
+            >
+              <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-6 mx-auto">
+                <Key size={32} />
+              </div>
+              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight text-center mb-6 italic">Secure Intelligence Terminal</h2>
+              <form onSubmit={handlePassChange} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">New Mission Key</label>
+                  <input 
+                    required
+                    type="password"
+                    value={passForm.newPass}
+                    onChange={e => setPassForm({...passForm, newPass: e.target.value})}
+                    placeholder="Min 6 characters"
+                    className="w-full px-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 italic">Re-verify Key</label>
+                  <input 
+                    required
+                    type="password"
+                    value={passForm.confirmPass}
+                    onChange={e => setPassForm({...passForm, confirmPass: e.target.value})}
+                    placeholder="Confirm password"
+                    className="w-full px-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="pt-4">
+                  <button 
+                    type="submit"
+                    disabled={isChangingPass}
+                    className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 group italic"
+                  >
+                    {isChangingPass ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <>
+                        <ShieldCheck size={16} className="group-hover:rotate-12 transition-transform" /> 
+                        Apply Security Update
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Log Hours Modal */}
       <AnimatePresence>

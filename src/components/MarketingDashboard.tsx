@@ -44,7 +44,7 @@ import {
   increment,
   where
 } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { Campaign, Donor, Donation, Transaction, Project, AppUser, NGODocument } from '../types';
 import DonorCRM from './DonorCRM';
 import CampaignManager from './CampaignManager';

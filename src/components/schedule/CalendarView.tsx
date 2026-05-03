@@ -31,7 +31,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../../lib/firebase';
 import { collection, query, onSnapshot, orderBy, where, updateDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { cn } from '../../lib/utils';
 import { MeetingCard } from './MeetingCard';
 import { MeetingScheduler } from './MeetingScheduler';

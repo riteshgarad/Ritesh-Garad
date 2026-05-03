@@ -66,10 +66,14 @@ import ExpenseApprovalDashboard from './components/ExpenseApprovalDashboard';
 import { VolunteerFinanceDashboard } from './components/VolunteerFinanceDashboard';
 import { MobileShell } from './components/MobileShell';
 import { MissionDetailView } from './components/project/MissionDetailView';
+import { VolunteerOnboardingHub } from './components/volunteer/VolunteerOnboardingHub';
+import { BatchOnboarding } from './components/BatchOnboarding';
+import { SupportView } from './components/volunteer/SupportView';
 import { sendPushNotification } from './lib/push';
 import { ChatView } from './components/ChatView';
 import { CalendarView } from './components/schedule/CalendarView';
-import { handleFirestoreError, OperationType } from './lib/firestore_errors';
+import { db, auth, storage, secondaryAuth, handleFirestoreError, OperationType } from './lib/firebase';
+export { db, auth, storage, secondaryAuth };
 import { requestFirebaseNotificationPermission, onMessageListener, isNativeApp, getNativePlayerId } from './services/notificationService';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -114,8 +118,6 @@ import { INITIAL_PROJECTS, INITIAL_TASKS, INITIAL_VOLUNTEERS, TEAM, DEPT_COLORS,
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, onSnapshot, addDoc, serverTimestamp, query, doc, updateDoc, getDocFromServer, getDocs, deleteDoc, orderBy, limit, writeBatch, where, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, auth, storage, secondaryAuth } from './lib/firebase';
-export { db, auth, storage, secondaryAuth };
 import firebaseConfig from '../firebase-applet-config.json';
 
 
@@ -171,7 +173,7 @@ const Button = ({ children, variant = 'primary', className, ...props }: React.Bu
 
 // --- App Internal State Views ---
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'attendance' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule' | 'impact-reports';
+type Page = 'dashboard' | 'projects' | 'tasks' | 'attendance' | 'messages' | 'volunteers' | 'finance' | 'docs' | 'social-media' | 'public-relations' | 'fundraising' | 'automation' | 'project-detail' | 'users' | 'expense-approvals' | 'roadmap' | 'new-proposal' | 'finance-requests' | 'kyc' | 'schedule' | 'impact-reports' | 'volunteer-hub' | 'ideas' | 'support' | 'batch-onboarding';
 
 export default function App() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -283,6 +285,14 @@ export default function App() {
       if (unsubProfile) unsubProfile();
     };
   }, []);
+
+  useEffect(() => {
+    if (user?.role === 'new_volunteer') {
+      if (currentPage === 'dashboard') {
+        setCurrentPage('volunteer-hub');
+      }
+    }
+  }, [user, currentPage]);
 
   const [notifPermission, setNotifPermission] = useState<string>(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
@@ -2262,6 +2272,12 @@ const PageView = ({
         showNotifBanner={showNotifBanner}
         setShowNotifBanner={setShowNotifBanner}
       />;
+    case 'volunteer-hub':
+      return <VolunteerOnboardingHub user={user} setCurrentPage={setCurrentPage} initialTab="story" />;
+    case 'ideas':
+      return <VolunteerOnboardingHub user={user} setCurrentPage={setCurrentPage} initialTab="ideas" />;
+    case 'support':
+      return <SupportView />;
     case 'attendance':
       return <AttendanceHub />;
     case 'messages':
@@ -2391,6 +2407,8 @@ const PageView = ({
       return <AutomationView />;
     case 'impact-reports':
       return <ImpactReports />;
+    case 'batch-onboarding':
+      return <BatchOnboarding />;
     case 'expense-approvals':
       return <ExpenseApprovalDashboard user={user} requests={expenseRequests} />;
     case 'create':
@@ -3025,5 +3043,9 @@ const PAGE_TITLES: Record<Page, string> = {
   'finance-requests': 'Resource Requisition',
   'kyc': 'Personnel Authentication',
   'schedule': 'Mission Schedule / Calendar',
-  'impact-reports': 'Impact Analytics Dashboard'
+  'impact-reports': 'Impact Analytics Dashboard',
+  'volunteer-hub': 'Guardian Hub',
+  'ideas': 'Innovation Terminal',
+  'support': 'Mission Support',
+  'batch-onboarding': 'Unit Deployment (Batch)'
 };

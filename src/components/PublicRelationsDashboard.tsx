@@ -23,7 +23,7 @@ import {
   serverTimestamp,
   addDoc
 } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { db } from '../App';
 import { AppUser, Project, Donor } from '../types';
 import { Card } from './ui/card';

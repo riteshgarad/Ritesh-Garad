@@ -10,18 +10,13 @@ service cloud.firestore {
     // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
     function isVerified() { 
-      return isSignedIn() && (
-        request.auth.token.email_verified == true || 
-        request.auth.token.email == 'riteshgarad4@gmail.com' || 
-        request.auth.token.email == 'yuktagarad@gmail.com' ||
-        true // Temporarily allow for testing
-      );
+      return isSignedIn(); // Simplified for now as requested roles are trusted
     }
 
     function isAdmin() { 
       return isSignedIn() && (
              request.auth.token.email == 'riteshgarad4@gmail.com' ||
-             request.auth.token.email == 'yuktagarad@gmail.com' ||
+             request.auth.token.email == 'gauravgarad1998@gmail.com' ||
              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin')
       );
@@ -50,11 +45,15 @@ service cloud.firestore {
              data.read == false &&
              (data.attachment == null || (
                data.attachment.keys().hasAll(['url', 'name', 'type', 'isImage']) &&
-               data.attachment.url is string && data.attachment.url.size() <= 1000000 && // 1MB total doc limit
+               data.attachment.url is string && data.attachment.url.size() <= 1000000 && 
                data.attachment.name is string &&
                data.attachment.type is string &&
                data.attachment.isImage is bool
              ));
+    }
+
+    match /test/connection {
+      allow read: if true;
     }
 
     // --- User Profiles ---
@@ -62,11 +61,11 @@ service cloud.firestore {
       allow list: if isSignedIn();
       allow get: if isSignedIn(); 
       allow create: if isAdmin() || (
-        isVerified() && isOwner(userId) && 
+        isSignedIn() && isOwner(userId) && 
         incoming().keys().hasAll(['uid', 'email', 'name', 'role', 'department', 'isActive', 'createdAt']) &&
-        (incoming().role == 'Volunteer' || incoming().role == 'Staff Operative' || request.auth.token.email == 'riteshgarad4@gmail.com')
+        (incoming().role == 'Volunteer' || incoming().role == 'Staff Operative' || incoming().role == 'new_volunteer')
       );
-      allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'department', 'isActive', 'fcmToken', 'onesignalId', 'lastSignalUpdate', 'lastTokenSync']));
+      allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'department', 'isActive', 'fcmToken', 'onesignalId', 'lastSignalUpdate', 'lastTokenSync', 'mustChangePassword', 'hours']));
       allow delete: if isAdmin();
 
       match /notifications/{notifId} {
@@ -229,14 +228,7 @@ service cloud.firestore {
 
     // --- Schedule & Meetings ---
     match /schedule/{eventId} {
-      allow list, get: if isSignedIn() && (
-        isAdmin() ||
-        resource.data.type == 'global' ||
-        resource.data.type == 'mission' || 
-        (resource.data.type == 'departmental' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == resource.data.dept) ||
-        (resource.data.attendees != null && resource.data.attendees[request.auth.uid] != null) ||
-        resource.data.creatorId == request.auth.uid
-      );
+      allow list, get: if isSignedIn();
       allow create: if isAdmin() || (isVerified() && (isDeptHead(incoming().dept) || incoming().type == 'mission'));
       allow update: if isVerified() && (
         isAdmin() || 
@@ -244,6 +236,15 @@ service cloud.firestore {
         (incoming().diff(existing()).affectedKeys().hasOnly(['attendees']) && 
          incoming().attendees.diff(existing().attendees).affectedKeys().hasOnly([request.auth.uid]))
       );
+      allow delete: if isAdmin();
+    }
+
+    // --- Innovations ---
+    match /innovations/{innovationId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isVerified();
+      allow update: if isAdmin() || (isSignedIn() && existing().submittedBy == request.auth.uid);
       allow delete: if isAdmin();
     }
 

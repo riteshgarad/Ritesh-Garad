@@ -288,9 +288,21 @@ export interface AppUser {
   uid: string;
   name: string;
   email: string;
-  role: string;
+  role: 'Admin' | 'Department Head' | 'Volunteer' | 'Staff Operative' | 'Finance Head' | 'HR Head' | 'Project Head' | 'Marketing Head' | 'new_volunteer';
   department?: string;
   isActive?: boolean;
+  mustChangePassword?: boolean;
+}
+
+export interface Innovation {
+  id: string;
+  title: string;
+  description: string;
+  submittedBy: string;
+  submittedByName: string;
+  category: 'Education' | 'Logistics' | 'Social Media' | 'Environment' | 'Community' | 'Other';
+  status: 'pending' | 'reviewed' | 'archived';
+  createdAt: any;
 }
 
 export interface Attendance {

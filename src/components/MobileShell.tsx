@@ -6,6 +6,8 @@ import {
   Plus, 
   FileText, 
   User, 
+  Heart,
+  Lightbulb,
   Bell,
   Menu,
   ChevronLeft,
@@ -26,7 +28,8 @@ import {
   X,
   MessageCircle,
   TrendingUp,
-  Calendar
+  Calendar,
+  LifeBuoy
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { NotificationPanel } from './NotificationPanel';
@@ -77,7 +80,12 @@ export const MobileShell = ({
 
   const navigation = [
     { id: 'dashboard', icon: Home, label: 'Dashboard', desc: 'Home Hub' },
+    { id: 'volunteer-hub', icon: Heart, label: 'My Hub', roles: ['new_volunteer'] },
+    { id: 'ideas', icon: Lightbulb, label: 'Idea Hub', roles: ['new_volunteer'] },
+    { id: 'volunteers', icon: User, label: 'My Profile', roles: ['new_volunteer'] },
+    { id: 'support', icon: LifeBuoy, label: 'Support', roles: ['new_volunteer'] },
     { id: 'impact-reports', icon: TrendingUp, label: 'Impact Analytics', roles: ['Admin'] },
+    { id: 'batch-onboarding', icon: Users, label: 'Batch Onboarding', roles: ['Admin'] },
     { id: 'messages', icon: MessageCircle, label: 'Mission Comms' },
     { id: 'schedule', icon: Calendar, label: 'Calendar' },
     {
@@ -149,6 +157,12 @@ export const MobileShell = ({
     if (isYukta) {
       const allowedForYukta = ['dashboard', 'messages', 'finance', 'schedule', 'missions', 'projects'];
       return allowedForYukta.includes(item.id);
+    }
+
+    // Strict filtering for new_volunteer
+    if (user.role === 'new_volunteer') {
+      const allowedForNew = ['volunteer-hub', 'ideas', 'messages', 'schedule', 'volunteers', 'support', 'attendance'];
+      return allowedForNew.includes(item.id);
     }
 
     if (user.role === 'Admin') return true;
@@ -263,15 +277,17 @@ export const MobileShell = ({
           );
         })}
 
-        <div className="pt-6 mt-6 border-t border-slate-50 px-2">
-          <button 
-            onClick={() => handleNavClick('create')}
-            className="w-full flex items-center justify-center gap-3 p-4 bg-terracotta text-white rounded-[2rem] shadow-xl shadow-terracotta/20 hover:bg-mahogany active:scale-95 transition-all text-[10px] font-black uppercase tracking-[0.2em]"
-          >
-            <Plus size={16} />
-            <span>Deploy Initiative</span>
-          </button>
-        </div>
+        {user?.role !== 'new_volunteer' && (
+          <div className="pt-6 mt-6 border-t border-slate-50 px-2">
+            <button 
+              onClick={() => handleNavClick('create')}
+              className="w-full flex items-center justify-center gap-3 p-4 bg-terracotta text-white rounded-[2rem] shadow-xl shadow-terracotta/20 hover:bg-mahogany active:scale-95 transition-all text-[10px] font-black uppercase tracking-[0.2em]"
+            >
+              <Plus size={16} />
+              <span>Deploy Initiative</span>
+            </button>
+          </div>
+        )}
       </nav>
 
       <div className="p-6 border-t border-slate-50">
@@ -427,13 +443,19 @@ export const MobileShell = ({
 
         {/* Mobile-Only Bottom Navigation (Sleek Modern Profile) */}
         <nav className="lg:hidden h-[calc(75px+env(safe-area-inset-bottom,16px))] bg-white/95 backdrop-blur-xl border-t border-slate-100 flex items-start justify-around px-2 pt-2 pb-[env(safe-area-inset-bottom,16px)] shadow-[0_-10px_30px_rgba(0,0,0,0.04)] z-50">
-          {[
+          {(user?.role === 'new_volunteer' ? [
+            { id: 'volunteer-hub', icon: Heart, label: 'HUB' },
+            { id: 'attendance', icon: Clock, label: 'PUNCH' },
+            { id: 'ideas', icon: Lightbulb, label: 'IDEAS' },
+            { id: 'messages', icon: MessageCircle, label: 'COMMS' },
+            { id: 'schedule', icon: Calendar, label: 'DATES' }
+          ] : [
             { id: 'dashboard', icon: Home, label: 'DASH' },
             { id: 'attendance', icon: Clock, label: 'PUNCH' },
             { id: 'create', icon: Plus, label: 'NEW', isSpecial: true },
             { id: 'messages', icon: MessageCircle, label: 'COMMS' },
             { id: 'projects', icon: Target, label: 'MISSIONS' }
-          ].map((item) => {
+          ]).map((item: any) => {
             const isActive = activePath === item.id || 
                             (item.id === 'projects' && activePath === 'roadmap') ||
                             (item.id === 'attendance' && activePath === 'attendance');

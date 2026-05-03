@@ -8,7 +8,7 @@
         "uid": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "name": { "type": "string" },
-        "role": { "type": "string", "enum": ["Admin", "Department Head", "Volunteer", "Staff Operative", "Finance Head", "HR Head", "Project Head", "Marketing Head"] },
+        "role": { "type": "string", "enum": ["Admin", "Department Head", "Volunteer", "Staff Operative", "Finance Head", "HR Head", "Project Head", "Marketing Head", "new_volunteer"] },
         "department": { "type": "string" },
         "isActive": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
@@ -57,6 +57,21 @@
         "durationMinutes": { "type": "number" }
       },
       "required": ["userId", "projectId", "punchIn", "status"]
+    },
+    "Innovation": {
+      "title": "Volunteer Innovation",
+      "description": "Ideas and feedback submitted by volunteers",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "submittedBy": { "type": "string" },
+        "submittedByName": { "type": "string" },
+        "category": { "type": "string", "enum": ["Education", "Logistics", "Social Media", "Environment", "Community", "Other"] },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "submittedBy", "category", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -71,6 +86,10 @@
     "/attendance/{attendanceId}": {
       "schema": "Attendance",
       "description": "Volunteer mission punch records"
+    },
+    "/innovations/{innovationId}": {
+      "schema": "Innovation",
+      "description": "Ideas and innovations submitted by volunteers"
     }
   }
 }

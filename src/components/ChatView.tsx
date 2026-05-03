@@ -18,7 +18,7 @@ import { AppUser, ChatMessage } from '../types';
 import { cn } from '../lib/utils';
 import { Shield } from 'lucide-react';
 import { sendPushNotification } from '../lib/push';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { ChatList } from './chat/ChatList';
 import { ChatWindow } from './chat/ChatWindow';
 import { MessageInput } from './chat/MessageInput';

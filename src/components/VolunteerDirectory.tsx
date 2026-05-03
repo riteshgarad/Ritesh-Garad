@@ -23,7 +23,7 @@ import {
   arrayUnion, 
   deleteDoc
 } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { db, auth } from '../App';
 import { Volunteer, VolunteerApplication, AppUser } from '../types';
 import { format } from 'date-fns';

@@ -32,7 +32,7 @@ import { db, auth } from '../App';
 import { collection, query, onSnapshot, orderBy, where, limit } from 'firebase/firestore';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { cn } from '../lib/utils';
 import ExpenseApprovalDashboard from './ExpenseApprovalDashboard';
 import { LedgerList } from './LedgerList';

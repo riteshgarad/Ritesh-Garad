@@ -15,7 +15,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../App';
 import { collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { toast } from 'react-hot-toast';
 import { sendEmail } from '../services/emailService';
 import { cn } from '../lib/utils';

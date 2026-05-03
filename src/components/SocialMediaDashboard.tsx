@@ -25,7 +25,7 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { db } from '../App';
 import { NGODocument, Project, Campaign, AppUser } from '../types';
 import { Card } from './ui/card';

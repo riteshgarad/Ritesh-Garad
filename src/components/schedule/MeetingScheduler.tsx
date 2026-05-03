@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { cn } from '../../lib/utils';
 import { db } from '../../lib/firebase';
 import { collection, query, getDocs, where } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../../lib/firebase';
 
 interface MeetingSchedulerProps {
   onClose: () => void;

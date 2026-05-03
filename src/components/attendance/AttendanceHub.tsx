@@ -19,7 +19,11 @@ import { Project, Attendance } from '../../types';
 import { useLiveTimer } from '../../hooks/useLiveTimer';
 import { cn } from '../../lib/utils';
 
-export const AttendanceHub: React.FC = () => {
+interface AttendanceHubProps {
+  variant?: 'full' | 'minimal';
+}
+
+export const AttendanceHub: React.FC<AttendanceHubProps> = ({ variant = 'full' }) => {
   const [activeSession, setActiveSession] = useState<Attendance | null>(null);
   const [recentSessions, setRecentSessions] = useState<Attendance[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -144,8 +148,65 @@ export const AttendanceHub: React.FC = () => {
     );
   }
 
+  if (variant === 'minimal') {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        {!activeSession && (
+          <div className="w-full max-w-[280px]">
+            <select 
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full h-12 px-4 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black text-mahogany uppercase outline-none transition-all shadow-sm"
+            >
+              <option value="">Select Mission Node...</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        
+        <div className="relative">
+          {activeSession && (
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1.2, opacity: 1 }}
+              transition={{ repeat: Infinity, duration: 2, repeatType: "reverse" }}
+              className="absolute inset-0 bg-terracotta/10 rounded-full blur-2xl"
+            />
+          )}
+          
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.9 }}
+            disabled={!selectedProjectId && !activeSession || isPunching}
+            onClick={activeSession ? handlePunchOut : handlePunchIn}
+            className={cn(
+              "w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 shadow-2xl transition-all duration-500 relative z-10 disabled:opacity-50",
+              activeSession 
+                ? "bg-mahogany text-white shadow-mahogany/20 border-4 border-white/20 ring-8 ring-mahogany/5" 
+                : "bg-terracotta text-white shadow-terracotta/20 border-4 border-white/20 ring-8 ring-terracotta/5"
+            )}
+          >
+            {activeSession ? <Square size={32} /> : <Play size={32} className="ml-1" />}
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              {activeSession ? 'End Session' : 'Start Session'}
+            </span>
+          </motion.button>
+        </div>
+
+        {activeSession && (
+          <div className="text-center">
+            <p className="text-[24px] font-black text-mahogany tracking-tighter tabular-nums">{timerDisplay}</p>
+            <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest leading-none">Mission Active • Protocol 001</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-md mx-auto space-y-8 pb-32 px-4 md:px-0">
+    <div className="max-w-2xl mx-auto space-y-8 pb-32 px-4 md:px-0">
       {/* Mission Detail Inspection Modal */}
       <AnimatePresence>
         {selectedSession && (

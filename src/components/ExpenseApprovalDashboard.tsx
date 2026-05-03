@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { ExpenseRequest, AppUser } from '../types';
 import { db } from '../App';
 import { doc, updateDoc, serverTimestamp, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { sendEmail } from '../services/emailService';

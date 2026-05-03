@@ -14,7 +14,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../App';
 import { collection, query, onSnapshot, orderBy, updateDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore_errors';
+import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { BudgetRequest, AppUser } from '../types';
 
 interface BudgetReviewDashboardProps {
