@@ -258,10 +258,10 @@ export const AttendanceHub: React.FC = () => {
             <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 text-center border-b-8 border-emerald-500">
               <div className="w-20 h-20 border-8 border-emerald-100 border-t-emerald-500 rounded-full animate-spin" />
               <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Syncing Mission</h3>
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Satellite Sync</h3>
                 <p className="text-sm text-slate-500 font-bold max-w-[240px]">
-                  Securing your Operational Log with the Foundation Cloud. 
-                  <span className="block text-emerald-600 mt-1 uppercase text-[10px] tracking-widest animate-pulse">Establishing Secure Link...</span>
+                  Acquiring secure GPS coordinates for your mission log.
+                  <span className="block text-emerald-600 mt-1 uppercase text-[10px] tracking-widest animate-pulse">Searching for high-precision lock...</span>
                 </p>
               </div>
             </div>

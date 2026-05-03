@@ -83,18 +83,18 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 /**
  * HIGH POWER GPS ACQUISITION
- * Uses a "Warm-up" strategy with watchPosition to ensure a cold-start lock on mobile.
+ * Uses a "Warm-up" strategy and accuracy fallback to ensure a lock even in poor conditions.
  */
-async function getRobustLocation(timeoutMs = 15000): Promise<{ lat: number, lng: number, name: string }> {
+async function getRobustLocation(timeoutMs = 25000): Promise<{ lat: number, lng: number, name: string }> {
   let lat = 0;
   let lng = 0;
   let name = "Mission Node";
-  let lockFound = false;
+  let lastReceivedPos: GeolocationPosition | null = null;
 
   const acquire = () => new Promise<GeolocationPosition | null>((resolve) => {
     if (!navigator.geolocation) return resolve(null);
 
-    // 1. Try Native API first (Median/GoNative)
+    // 1. Try Native API (Median/GoNative)
     const win = window as any;
     if (win.median?.location?.get) {
       win.median.location.get().then((data: any) => {
@@ -111,23 +111,31 @@ async function getRobustLocation(timeoutMs = 15000): Promise<{ lat: number, lng:
     }
 
     function startWatching() {
-      // Warm up GPS - watchPosition is often more reliable for initial locks on Android/iOS
       let watchId: number;
       const timer = setTimeout(() => {
-        navigator.geolocation.clearWatch(watchId);
-        resolve(null);
+        if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+        resolve(lastReceivedPos); 
       }, timeoutMs);
 
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          if (pos.coords.accuracy < 100) { // Good enough accuracy
+          lastReceivedPos = pos;
+          // If accuracy is good (< 60m), resolve immediately
+          if (pos.coords.accuracy < 60) {
             clearTimeout(timer);
             navigator.geolocation.clearWatch(watchId);
             resolve(pos);
           }
         },
-        () => { /* ignore intermediate errors */ },
-        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
+        (err) => {
+          console.warn("GPS Watch Update Error:", err);
+          // Don't resolve null yet, let the timer decide if we get a position later
+        },
+        { 
+          enableHighAccuracy: true, 
+          timeout: timeoutMs, 
+          maximumAge: 0 
+        }
       );
     }
 
@@ -137,35 +145,34 @@ async function getRobustLocation(timeoutMs = 15000): Promise<{ lat: number, lng:
   try {
     const pos = await acquire();
     if (pos) {
-      lockFound = true;
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
       name = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
-      // Try reverse geocode with a very short timeout
+      // Try reverse geocode with a short timeout
       try {
         const controller = new AbortController();
-        const geoTimeout = setTimeout(() => controller.abort(), 2500);
+        const geoTimeout = setTimeout(() => controller.abort(), 3000);
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
-          headers: { 'Accept-Language': 'en', 'User-Agent': 'GaradMissionApp/3.0' },
+          headers: { 'Accept-Language': 'en', 'User-Agent': 'GaradMissionApp/4.0' },
           signal: controller.signal
         });
         clearTimeout(geoTimeout);
         const data = await res.json();
         if (data?.display_name) {
           const addr = data.address;
-          const parts = [addr?.road || addr?.suburb, addr?.city || addr?.town].filter(Boolean);
+          const parts = [addr?.road || addr?.suburb || addr?.neighbourhood, addr?.city || addr?.town].filter(Boolean);
           name = parts.length > 0 ? parts.join(', ') : data.display_name.split(',').slice(0, 2).join(',');
         }
       } catch (e) {
-        // Fallback to coords already set above
+        // Stick with the lat/lng string set above
       }
     } else {
-      name = "Mission Node (No GPS Signal)";
+      name = "Mission Node (Signal Search Failed)";
     }
   } catch (err) {
-    console.error("GPS System Failure:", err);
-    name = "Mission Node (System Error)";
+    console.error("GPS System Critical Failure:", err);
+    name = "Mission Node (Internal Error)";
   }
 
   return { lat, lng, name };
