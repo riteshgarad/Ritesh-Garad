@@ -114,8 +114,12 @@ export const AttendanceHub: React.FC = () => {
       if (err.message === 'LOCATION_PERM_DENIED') {
         alert("CRITICAL: Location Access REFUSED. To log missions, go to Phone Settings > App Management > Mission App > Permissions and enable 'Location' (Allow While Using App).");
         toast.error("Location Required");
+      } else if (err.message === 'DB_OFFLINE') {
+        toast.error("Network Link Weak. Check Connection.");
+      } else if (err.message && err.message.startsWith('DB_FAILURE')) {
+        toast.error("Cloud Access Error. Try again.");
       } else {
-        toast.error("Deployment failed. Re-sync needed.");
+        toast.error(`Deployment failed: ${err.message || 'Re-sync needed'}`);
       }
     } finally {
       setIsPunching(false);
@@ -145,8 +149,12 @@ export const AttendanceHub: React.FC = () => {
       if (err.message === 'LOCATION_PERM_DENIED') {
         alert("CRITICAL: Location Access REFUSED. Go to Phone Settings > Mission App > Permissions and enable 'Location' to secure your logs.");
         toast.error("Location Required");
+      } else if (err.message === 'DB_OFFLINE') {
+        toast.error("Network Log Link Weak.");
+      } else if (err.message && err.message.startsWith('DB_FAILURE')) {
+        toast.error("Log Securement Failed. Cloud is unreachable.");
       } else {
-        toast.error("Log upload failed.");
+        toast.error(`Log upload failed: ${err.message || 'Check Connection'}`);
       }
     } finally {
       setIsPunching(false);

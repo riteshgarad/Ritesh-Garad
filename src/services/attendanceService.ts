@@ -85,10 +85,9 @@ export const attendanceService = {
           return;
         }
         
-        // Increased safety timeout significantly for Native Apps 
         // 60s total buffer for native permission interactions
         const baseTimeout = options.timeout || 5000;
-        const nativeBuffer = isNativeApp() ? 55000 : 5000; 
+        const nativeBuffer = isNativeApp() ? 60000 : 5000; 
         const timer = setTimeout(() => reject({ code: 3, message: "Internal Timeout" }), baseTimeout + nativeBuffer);
         
         navigator.geolocation.getCurrentPosition(
@@ -102,45 +101,56 @@ export const attendanceService = {
       const nativeMult = isNativeApp() ? 3 : 1;
 
       try {
-        // STEP 1: Try a rapid cached check (within 10 mins). Often instant on phones.
+        // STEP 0: Attempt to grab ANY last known position immediately
         try {
           position = await getPos({
             enableHighAccuracy: false,
-            timeout: 2000,
-            maximumAge: 600000 // 10 minutes
+            timeout: 1000,
+            maximumAge: Infinity // Any cached value is better than none
           });
-          console.log("GPS: Rapid cached sync successful");
+          console.log("GPS: Immediate cached sync used as baseline");
         } catch (e) {
-          console.warn("GPS: Rapid cache missed, initiating deep search");
+          console.log("GPS: No immediate cache, moving to active search");
         }
 
-        // STEP 2: If no cache, try high accuracy mission data
+        // STEP 1: Try a rapid fresh check (within 5 mins)
+        if (!position) {
+          try {
+            position = await getPos({
+              enableHighAccuracy: false,
+              timeout: 3000,
+              maximumAge: 300000 // 5 minutes
+            });
+            console.log("GPS: Rapid background sync successful");
+          } catch (e) {
+            console.warn("GPS: Rapid sync missed, initiating deep search");
+          }
+        }
+
+        // STEP 2: Deep search with high accuracy
         if (!position) {
           position = await getPos({
             enableHighAccuracy: true,
             timeout: 25000 * nativeMult, 
-            maximumAge: 10000 // Allow 10s age for stability
+            maximumAge: 15000 
           });
         }
       } catch (err: any) {
-        console.warn("High accuracy GPS failed, trying last ditch fallback...", err);
+        console.warn("GPS: Deep search failed, checking error type", err);
         
-        // Check for permanent refusal
-        if (err.code === 1) { // PERMISSION_DENIED
-          throw new Error("LOCATION_PERM_DENIED");
-        }
-
+        if (err.code === 1) throw new Error("LOCATION_PERM_DENIED");
+        
         try {
-          // STEP 3: Standard accuracy fallback - long timeout
+          // STEP 3: Final fallback to cell towers/WiFi
           position = await getPos({
             enableHighAccuracy: false,
             timeout: 20000 * nativeMult,
-            maximumAge: 300000 // 5 mins
+            maximumAge: 600000 // 10 mins
           });
         } catch (fallbackErr: any) {
           console.error("GPS capture failed completely:", fallbackErr);
           if (fallbackErr.code === 1) throw new Error("LOCATION_PERM_DENIED");
-          // If pure timeout (code 3), we proceed with null to allow punch-in but mark as fallback
+          // If pure timeout, we continue - the service allows punch-in with "Mission Node" label
         }
       }
       
@@ -188,13 +198,22 @@ export const attendanceService = {
         status: 'active' as const,
       };
 
-      const docRef = await addDoc(collection(db, 'attendance'), attendanceData);
-      return { id: docRef.id, locationName };
-    } catch (error) {
-      // Check if it's a Geolocation error
-      if (typeof error === 'object' && error !== null && 'code' in (error as any)) {
-        throw error; // Let UI handle geo errors
+      try {
+        const docRef = await addDoc(collection(db, 'attendance'), attendanceData);
+        return { id: docRef.id, locationName };
+      } catch (dbErr: any) {
+        console.error("Attendance Write Error:", dbErr);
+        if (dbErr.code === 'permission-denied') throw new Error("DB_PERMISSION_DENIED");
+        if (dbErr.code === 'unavailable') throw new Error("DB_OFFLINE");
+        throw new Error(`DB_FAILURE: ${dbErr.message || 'Unknown'}`);
       }
+    } catch (error: any) {
+      // Re-throw known logic errors
+      if (['LOCATION_PERM_DENIED', 'DB_PERMISSION_DENIED', 'DB_OFFLINE'].includes(error.message)) {
+        throw error;
+      }
+      if (error.message && error.message.startsWith('DB_FAILURE')) throw error;
+      
       handleFirestoreError(error, OperationType.CREATE, 'attendance');
       throw error;
     }
