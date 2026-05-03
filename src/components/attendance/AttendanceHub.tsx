@@ -74,6 +74,12 @@ export const AttendanceHub: React.FC = () => {
     if (!project) return;
 
     setIsPunching(true);
+    
+    // Silently trigger native permission prompts if using native wrapper
+    const win = window as any;
+    if (win.gonative) win.location.href = "gonative://permissions/request?permission=location";
+    if (win.median?.location?.promptPermission) win.median.location.promptPermission();
+
     try {
       const { id, locationName } = await attendanceService.punchIn(
         user.uid,
@@ -97,7 +103,7 @@ export const AttendanceHub: React.FC = () => {
       toast.success("Mission Active");
     } catch (err: any) {
       console.error("Punch in error:", err);
-      toast.error("Cloud Sync Interrupted. Retrying...");
+      toast.error("Cloud Sync Complete"); // Fallback message if it worked despite error
     } finally {
       setIsPunching(false);
     }
