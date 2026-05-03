@@ -360,6 +360,14 @@ export const MobileShell = ({
 
       {/* Main Layout Container */}
       <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden lg:ml-80">
+        {/* Foundation Global Branding Header */}
+        <div className="shrink-0 bg-mahogany text-white py-1.5 px-6 lg:px-10 flex items-center justify-center lg:justify-start gap-3 z-[60] shadow-md">
+          <Shield size={12} className="text-white/50 fill-current" />
+          <span className="text-[10px] font-black uppercase tracking-[0.4em] italic">The Garad Foundation</span>
+          <div className="hidden lg:block h-3 w-px bg-white/20 ml-2" />
+          <span className="hidden lg:block text-[8px] font-bold text-white/40 uppercase tracking-widest italic">Digital Command Hub</span>
+        </div>
+
         {/* Top App Bar */}
         {activePath !== 'messages' && (
           <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-50 flex items-center justify-between px-6 lg:px-10 z-40 pt-[calc(env(safe-area-inset-top,24px)+24px)] pb-6 h-auto min-h-[100px]">
