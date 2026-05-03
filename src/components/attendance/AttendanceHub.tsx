@@ -86,7 +86,6 @@ export const AttendanceHub: React.FC = () => {
     const project = projects.find(p => p.id === selectedProjectId);
     if (!project) return;
 
-    const tId = toast.loading("Launching mission protocols...");
     setIsPunching(true);
     try {
       const { id, locationName } = await attendanceService.punchIn(
@@ -109,10 +108,10 @@ export const AttendanceHub: React.FC = () => {
       };
       setActiveSession(newSession);
       setGpsStatus('active');
-      toast.success("Mission Started Successfully", { id: tId });
+      toast.success("Mission Active");
     } catch (err: any) {
       console.error("Punch in error:", err);
-      toast.error("Deployment failed. Please check connection.", { id: tId });
+      toast.error("Deployment failed. Re-sync needed.");
     } finally {
       setIsPunching(false);
     }
@@ -121,7 +120,6 @@ export const AttendanceHub: React.FC = () => {
   const handlePunchOut = async () => {
     if (!activeSession) return;
 
-    const tId = toast.loading("Securing mission logs...");
     setIsPunching(true);
     try {
       const durationMins = Math.floor(elapsed / 60);
@@ -136,10 +134,10 @@ export const AttendanceHub: React.FC = () => {
       if (!userSnap.empty) {
         setTotalHours(userSnap.docs[0].data().hours || 0);
       }
-      toast.success("Mission Logged Successfully", { id: tId });
+      toast.success("Mission Logged");
     } catch (err: any) {
       console.error("Punch out error:", err);
-      toast.error("Failed to secure mission log.", { id: tId });
+      toast.error("Log upload failed.");
     } finally {
       setIsPunching(false);
     }
@@ -256,25 +254,7 @@ export const AttendanceHub: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Notifications / Overlay */}
-      <AnimatePresence>
-        {isPunching && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-mahogany/20 backdrop-blur-sm px-6"
-          >
-            <div className="bg-white p-8 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 text-center">
-              <div className="w-16 h-16 border-4 border-terracotta/10 border-t-terracotta rounded-full animate-spin" />
-              <div className="space-y-1">
-                <h3 className="text-xl font-black text-mahogany uppercase tracking-tight">Fetching Location</h3>
-                <p className="text-xs text-slate-500 font-medium">Synchronizing GPS coordinates for mission integrity...</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Notifications / Overlay removed for direct punch logic */}
 
       {/* Header */}
       <div className="text-center space-y-1">

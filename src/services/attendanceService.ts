@@ -143,7 +143,7 @@ export const attendanceService = {
           locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
       } else {
-        locationName = "Location Restricted";
+        locationName = "Mission Node";
       }
 
       const attendanceData = {

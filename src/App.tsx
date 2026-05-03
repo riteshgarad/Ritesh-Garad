@@ -184,6 +184,7 @@ export default function App() {
   
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [projects, setProjects] = useState<Project[]>([]);
+  const [showNotifBanner, setShowNotifBanner] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [documents, setDocuments] = useState<NGODocument[]>([]);
@@ -330,14 +331,19 @@ export default function App() {
         setNotifPermission(currentPerm);
         
         if (currentPerm === 'denied') {
-          toast.error("Access Refused", { id: tId });
+          toast.error("Bridge Connection Refused", { id: tId });
           if (isNativeApp()) {
-            alert("Mission Alerts are blocked. Please go to your phone's Settings > App Management > Mission App > Notifications and enable 'Allow Notifications'.");
+            alert("Mission Alerts are blocked at the system level. Please go to your Phone's Settings > App Management > Mission App > Notifications and enable 'Allow Notifications'.");
           } else {
-            alert("Notifications are blocked in your site settings. Please click the Lock icon in your address bar and reset permissions.");
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) {
+              alert("Notifications are blocked. Please tap the menu icon (three dots) or the Lock icon in your browser address bar to enable permissions.");
+            } else {
+              alert("Notifications are blocked in your site settings. Please click the Lock icon in your address bar and reset permissions.");
+            }
           }
         } else {
-          toast.error("Authorization Session Cancelled", { id: tId });
+          toast.error("Mission Authorization Cancelled", { id: tId });
         }
       }
     } catch (err: any) {
@@ -1643,6 +1649,8 @@ export default function App() {
               operators={operators}
               notifPermission={notifPermission}
               requestNotificationPermission={requestNotificationPermission}
+              showNotifBanner={showNotifBanner}
+              setShowNotifBanner={setShowNotifBanner}
             />
       </MobileShell>
 
@@ -2177,7 +2185,9 @@ const PageView = ({
   onTaskStatusChange, onAddTask, activityLogs, setProofTaskTargetId,
   operators,
   notifPermission,
-  requestNotificationPermission
+  requestNotificationPermission,
+  showNotifBanner,
+  setShowNotifBanner
 }: any) => {
   // --- Protection Logic ---
   const isFinanceHead = (user?.department === 'Finance' && (user?.role === 'Department Head' || user?.role === 'DH')) || user?.email === 'yuktagarad@gmail.com' || user?.name === 'Yukta';
@@ -2217,6 +2227,8 @@ const PageView = ({
         user={user} 
         notifPermission={notifPermission}
         requestNotificationPermission={requestNotificationPermission}
+        showNotifBanner={showNotifBanner}
+        setShowNotifBanner={setShowNotifBanner}
       />;
     case 'attendance':
       return <AttendanceHub />;
@@ -2412,7 +2424,21 @@ const PageView = ({
 
 // --- Sub-Views ---
 
-const DashboardView = ({ projects, tasks, volunteers, transactions, activityLogs, onOpenProject, setCurrentPage, onDeleteProject, user, notifPermission, requestNotificationPermission }: any) => {
+const DashboardView = ({ 
+  projects, 
+  tasks, 
+  volunteers, 
+  transactions, 
+  activityLogs, 
+  onOpenProject, 
+  setCurrentPage, 
+  onDeleteProject, 
+  user, 
+  notifPermission, 
+  requestNotificationPermission,
+  showNotifBanner,
+  setShowNotifBanner
+}: any) => {
   const isDH = user?.role === 'DH';
   const isAdmin = user?.role === 'Admin';
   
@@ -2451,12 +2477,19 @@ const DashboardView = ({ projects, tasks, volunteers, transactions, activityLogs
   return (
     <div className="space-y-10">
       {/* OS Warning Banner if notifications not enabled */}
-      {notifPermission !== 'granted' && (
+      {notifPermission !== 'granted' && showNotifBanner && (
         <motion.div 
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="bg-slate-900 border-l-4 border-emerald-500 p-6 rounded-3xl mb-10 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden shadow-2xl"
+          exit={{ height: 0, opacity: 0 }}
+          className="bg-slate-900 border-l-4 border-emerald-500 p-6 rounded-3xl mb-10 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden shadow-2xl relative"
         >
+          <button 
+            onClick={() => setShowNotifBanner(false)}
+            className="absolute top-4 right-4 p-1.5 bg-white/5 text-white/30 hover:text-white rounded-lg transition-colors"
+          >
+            <X size={14} />
+          </button>
           <div className="flex items-center gap-6">
             <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-emerald-400 shrink-0">
               <Zap size={24} className={cn("animate-pulse", notifPermission === 'denied' ? "text-amber-500" : "text-emerald-400")} />
