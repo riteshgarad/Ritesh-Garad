@@ -70,7 +70,7 @@ import { sendPushNotification } from './lib/push';
 import { ChatView } from './components/ChatView';
 import { CalendarView } from './components/schedule/CalendarView';
 import { handleFirestoreError, OperationType } from './lib/firestore_errors';
-import { requestFirebaseNotificationPermission, onMessageListener, isNativeApp } from './services/notificationService';
+import { requestFirebaseNotificationPermission, onMessageListener, isNativeApp, getNativePlayerId } from './services/notificationService';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { 
@@ -289,7 +289,7 @@ export default function App() {
   );
 
   const requestNotificationPermission = async () => {
-    console.log("Action: requestNotificationPermission initiated (FCM Alternative)");
+    console.log("Action: requestNotificationPermission initiated (Native/FCM Hybrid)");
     
     if (window.self !== window.top) {
       if (confirm("Notification prompts are blocked within previews. Open in a New Tab to enable?")) {
@@ -305,25 +305,38 @@ export default function App() {
       
       if (token) {
         setNotifPermission('granted');
-        if (token === 'native_registered') {
-          toast.success("Native Comms Link Established", { id: tId });
-          alert("Mission authorization sent to device. If alerts do not appear, please check your Phone Settings > Apps > Mission App > Notifications.");
-          return;
-        }
-
-        toast.success("Signals Online via FCM!", { id: tId });
-        alert("Mission-critical alerts activated! (Standard Web Push)");
         
         // Sync token to user profile if logged in
         if (user) {
           try {
             const userRef = doc(db, 'users', user.uid);
+            
+            if (token.startsWith('native_')) {
+              const playerId = token.replace('native_', '');
+              if (playerId && playerId !== 'registered') {
+                await setDoc(userRef, {
+                  onesignalId: playerId,
+                  fcmToken: null,
+                  lastSignalUpdate: serverTimestamp()
+                }, { merge: true });
+                toast.success("Native Signal Link Online", { id: tId });
+              } else {
+                toast.success("Native Comms Established", { id: tId });
+                alert("Mission authorization sent to device. If alerts do not appear, go into Phone Settings > Mission App > Notifications and enable 'Allow'.");
+              }
+              return;
+            }
+
+            toast.success("Signals Online via FCM!", { id: tId });
+            alert("Mission-critical alerts activated! (Standard Web Push)");
+            
             await setDoc(userRef, { 
               fcmToken: token,
+              onesignalId: null,
               lastTokenSync: serverTimestamp() 
             }, { merge: true });
           } catch (syncErr) {
-            console.error("Failed to sync FCM token to database:", syncErr);
+            console.error("Failed to sync token to database:", syncErr);
           }
         }
       } else {
@@ -371,6 +384,25 @@ export default function App() {
     if (typeof Notification !== 'undefined') {
       setNotifPermission(Notification.permission);
     }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    const autoRegisterNative = async () => {
+      if (user && isNativeApp() && !user.onesignalId) {
+        console.log("Auto-detecting native app session...");
+        const playerId = await getNativePlayerId();
+        if (playerId) {
+          const userRef = doc(db, 'users', user.uid);
+          await setDoc(userRef, {
+            onesignalId: playerId,
+            fcmToken: null,
+            lastSignalUpdate: serverTimestamp()
+          }, { merge: true });
+          console.log("Native Signal Link auto-synced.");
+        }
+      }
+    };
+    autoRegisterNative();
   }, [user?.uid]);
 
   // Handle Deep Linking from Notifications

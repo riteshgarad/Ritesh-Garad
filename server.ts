@@ -320,78 +320,95 @@ async function startServer() {
     const { title, message, url, data, userId, externalIds, segment } = req.body;
 
     try {
-      let targetTokens: string[] = [];
+      let targetFcmTokens: string[] = [];
+      let targetOneSignalIds: string[] = [];
+      
       console.log(`[Push] Targeting request:`, { userId, externalIds, segment, title });
-
+  
       if (userId || (externalIds && externalIds.length > 0)) {
         // Target specific user(s)
         const idsToTarget = (externalIds && externalIds.length > 0) ? externalIds : [userId];
-        console.log(`[Push] Resolved IDs:`, idsToTarget);
         
-        // Fetch tokens for all targeted users
         const usersSnapshot = await db.collection("users")
           .where(admin.firestore.FieldPath.documentId(), "in", idsToTarget)
           .get();
           
-        targetTokens = usersSnapshot.docs
-          .map(doc => doc.data().fcmToken)
-          .filter(token => !!token);
+        usersSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.fcmToken) targetFcmTokens.push(data.fcmToken);
+          if (data.onesignalId) targetOneSignalIds.push(data.onesignalId);
+        });
           
-        console.log(`[Push] Found ${targetTokens.length} tokens for ${idsToTarget.length} users`);
+        console.log(`[Push] Found ${targetFcmTokens.length} FCM tokens and ${targetOneSignalIds.length} OneSignal IDs`);
       } else if (segment === 'Subscribed Users' || !segment) {
-        // Broadcast to all active users with tokens (or by segment)
-        const usersSnapshot = await db.collection("users").where("fcmToken", "!=", null).get();
-        targetTokens = usersSnapshot.docs.map(doc => doc.data().fcmToken);
-        console.log(`[Push] Broadcast mode: Found ${targetTokens.length} tokens`);
-      }
-
-      if (targetTokens.length === 0) {
-        console.warn(`[Push] No tokens found for notification: ${title}`);
-        return res.status(200).json({ success: false, message: "No target tokens found" });
-      }
-
-      const messagePayload = {
-        notification: {
-          title,
-          body: message,
-        },
-        data: {
-          ...data,
-          url: url || '',
-        },
-        tokens: targetTokens,
-      };
-
-      const response = await admin.messaging().sendEachForMulticast(messagePayload);
-      
-      console.log(`[Push] Result: Success=${response.successCount}, Failure=${response.failureCount}`);
-      if (response.failureCount > 0) {
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            console.warn(`[Push] Token index ${idx} failed:`, resp.error);
-          }
+        // Broadcast
+        const usersSnapshot = await db.collection("users").get();
+        usersSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.fcmToken) targetFcmTokens.push(data.fcmToken);
+          if (data.onesignalId) targetOneSignalIds.push(data.onesignalId);
         });
       }
-      
+  
+      if (targetFcmTokens.length === 0 && targetOneSignalIds.length === 0) {
+        return res.status(200).json({ success: false, message: "No target signals found" });
+      }
+
+      const results = { fcm: null as any, onesignal: null as any };
+
+      // 1. Send FCM
+      if (targetFcmTokens.length > 0) {
+        const messagePayload = {
+          notification: { title, body: message },
+          data: { ...data, url: url || '' },
+          tokens: targetFcmTokens,
+        };
+        results.fcm = await admin.messaging().sendEachForMulticast(messagePayload);
+      }
+
+      // 2. Send OneSignal
+      if (targetOneSignalIds.length > 0) {
+        const appId = process.env.VITE_ONESIGNAL_APP_ID;
+        const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+
+        if (appId && apiKey) {
+          try {
+            const osResponse = await fetch("https://onesignal.com/api/v1/notifications", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": `Basic ${apiKey}`
+              },
+              body: JSON.stringify({
+                app_id: appId,
+                include_player_ids: targetOneSignalIds,
+                contents: { en: message },
+                headings: { en: title },
+                url: url || "",
+                data: data || {}
+              })
+            });
+            results.onesignal = await osResponse.json();
+            console.log("[Push] OneSignal success:", results.onesignal);
+          } catch (osErr) {
+            console.error("[Push] OneSignal direct error:", osErr);
+          }
+        } else {
+          console.warn("[Push] OneSignal keys missing in environment");
+        }
+      }
+  
       // Log to automation_logs safely
       await logAutomationEvent({
-        action: 'FCM Push Notification',
+        action: 'Push Notification Dispatch',
         title,
         message,
-        recipient: userId || (externalIds ? `External IDs: ${externalIds.length}` : 'Broadcast'),
-        status: response.failureCount === 0 ? 'success' : (response.successCount > 0 ? 'partial' : 'failed'),
-        fcmResponse: {
-          successCount: response.successCount,
-          failureCount: response.failureCount
-        },
-        details: `Signals transmitted via FCM: ${message}`
+        recipient: userId || (externalIds ? `Bulk: ${externalIds.length}` : 'Broadcast'),
+        status: 'dispatched',
+        details: `Signals sent: FCM(${targetFcmTokens.length}), OneSignal(${targetOneSignalIds.length})`
       });
 
-      res.status(200).json({ 
-        success: true, 
-        successCount: response.successCount, 
-        failureCount: response.failureCount 
-      });
+      res.status(200).json({ success: true, results });
     } catch (error: any) {
       console.error("[FCM Error]:", error);
       res.status(500).json({ error: error.message });

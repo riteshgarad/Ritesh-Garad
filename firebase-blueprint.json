@@ -11,7 +11,10 @@
         "role": { "type": "string", "enum": ["Admin", "Department Head", "Volunteer", "Staff Operative", "Finance Head", "HR Head", "Project Head", "Marketing Head"] },
         "department": { "type": "string" },
         "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "fcmToken": { "type": "string" },
+        "onesignalId": { "type": "string" },
+        "lastSignalUpdate": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "name", "role", "department", "isActive", "createdAt"]
     },

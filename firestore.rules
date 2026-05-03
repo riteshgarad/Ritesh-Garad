@@ -66,7 +66,7 @@ service cloud.firestore {
         incoming().keys().hasAll(['uid', 'email', 'name', 'role', 'department', 'isActive', 'createdAt']) &&
         (incoming().role == 'Volunteer' || incoming().role == 'Staff Operative' || request.auth.token.email == 'riteshgarad4@gmail.com')
       );
-      allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'department', 'isActive']));
+      allow update: if isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'department', 'isActive', 'fcmToken', 'onesignalId', 'lastSignalUpdate', 'lastTokenSync']));
       allow delete: if isAdmin();
 
       match /notifications/{notifId} {

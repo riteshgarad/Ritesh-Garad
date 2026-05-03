@@ -16,7 +16,28 @@ try {
 }
 
 export const isNativeApp = () => {
-  return typeof window !== 'undefined' && ((window as any).median || (window as any).gonative);
+  return typeof window !== 'undefined' && (!!(window as any).median || !!(window as any).gonative);
+};
+
+export const getNativePlayerId = async (): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    // Median Bridge
+    if ((window as any).median?.onesignal?.getInfo) {
+      const info = await (window as any).median.onesignal.getInfo();
+      return info?.oneSignalUserId || info?.userId || null;
+    }
+    
+    // GoNative Bridge
+    if ((window as any).gonative?.onesignal?.info) {
+       const info = await (window as any).gonative.onesignal.info();
+       return info?.oneSignalUserId || null;
+    }
+  } catch (e) {
+    console.error("Failed to get native player ID:", e);
+  }
+  return null;
 };
 
 export const requestFirebaseNotificationPermission = async () => {
@@ -25,10 +46,14 @@ export const requestFirebaseNotificationPermission = async () => {
     try {
       if ((window as any).median?.onesignal?.register) {
         await (window as any).median.onesignal.register();
-      } else {
+      } else if ((window as any).gonative) {
         window.location.href = "gonative://onesignal/register";
       }
-      return "native_registered";
+      
+      // Wait a bit for registration to complete then try to get ID
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const playerId = await getNativePlayerId();
+      return playerId ? `native_${playerId}` : "native_registered";
     } catch (e) {
       console.error("Native bridge failure:", e);
     }
